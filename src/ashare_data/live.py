@@ -9,7 +9,7 @@ from urllib.parse import urlencode
 
 import pandas as pd
 
-from .model import DataError, TZ, require, timestamp, validate_ohlc
+from .model import DataError, TZ, canonical, digest, require, timestamp, validate_ohlc
 from .contracts import CoverageContract, data_age, label_time, unknown_coverage
 from .transport import Transport
 from .visibility import LEVELS, select_visible
@@ -150,6 +150,64 @@ class Client:
         require(self.coverage_contract._data["provider"] == "sina_public", "CONTRACT_SCOPE_MISMATCH", "契约来源不符")
         return self.coverage_contract.trading_status(security, clock)
 
+    def _bar_observations(self, url, scale, wall_now, *, allow_empty=False):
+        """Materialize actual pinned observations, never synthesize missing labels."""
+        windows = self.transport.read_windows(url, lambda body: _bars(body, scale))
+        require(sum(len(rows) for rows, _ in windows) <= 100000, "BOUNDED_QUERY", "固定观测原始记录总数超过100000")
+        raw_by_label, by_label, observations, conflicts = {}, {}, {}, set()
+        any_completed = False
+        for raw, meta in windows:
+            completed, cutoff = _completed_rows(raw, meta, wall_now, scale)
+            any_completed = any_completed or bool(completed)
+            visibility = {"level": "unrestricted_research", "as_of": None, "point_in_time_verified": False,
+                          "available_at": None, "revision_history": "unknown", "finality": "CLOSED_PROVISIONAL",
+                          "source_version_observed_at": meta["observed_at"], "raw_hash": meta["sha256"],
+                          "assumptions": ["原接口软件时间门槛不证明最终发布"]}
+            if self._clock is not None:
+                completed, visibility = select_visible(completed, meta, as_of=self._clock, level=self._visibility,
+                                                       daily=scale == 240, contract=self.coverage_contract)
+            identity = meta.get("observation_id") or digest({k: meta.get(k) for k in
+                        ("url", "observed_at", "request_started_at", "sha256")})
+            observations[identity] = {**meta, "completion_cutoff": cutoff.isoformat(), "visibility": visibility}
+            for row in raw:
+                raw_by_label[row["day"]] = row
+            for row in completed:
+                label = row["day"]
+                if label in by_label:
+                    old, old_id = by_label[label]
+                    before = timestamp(observations[old_id]["observed_at"])
+                    current = timestamp(meta["observed_at"])
+                    if before == current and canonical(old) != canonical(row):
+                        conflicts.add(label)
+                    elif current > before:
+                        conflicts.discard(label)
+                by_label[label] = (row, identity)
+        require(allow_empty or any_completed, "NO_COMPLETED_BARS", "固定观测抓取时没有通过软件闭合阈值的记录")
+        require(allow_empty or by_label, "NO_VISIBLE_BARS", "此策略时钟下没有满足所选可见性模型的记录")
+        return ([raw_by_label[k] for k in sorted(raw_by_label)],
+                [by_label[k][0] for k in sorted(by_label)], by_label, observations, conflicts)
+
+    @staticmethod
+    def _observation_metadata(chosen, by_label, observations):
+        ids = {by_label[row["day"]][1] for row in chosen}
+        parts = sorted((observations[i] for i in ids), key=lambda p: (timestamp(p["observed_at"]), p["sha256"]))
+        meta = {k: v for k, v in parts[-1].items() if k != "visibility"}
+        visible = dict(parts[-1]["visibility"])
+        if len(parts) > 1:
+            # No single raw response/hash contains a composite query result.
+            meta.update(url=None, sha256=None, observation_id=None, request_started_at=None,
+                        completion_cutoff=None, cache_window_reused=any(p.get("cache_window_reused", False) for p in parts))
+            visible["raw_hash"] = None
+        meta["response_observations"] = [{k: v for k, v in part.items() if k != "visibility"} for part in parts]
+        meta["row_observations"] = [{"source_label": row["day"], "observation_id": by_label[row["day"]][1],
+            **{key: observations[by_label[row["day"]][1]].get(key) for key in
+               ("url", "sha256", "observed_at", "request_started_at", "completion_cutoff")}} for row in chosen]
+        meta["observation_selection"] = "latest eligible received observation per source label; absence is not a tombstone"
+        meta["observation_time_meaning"] = "latest contributing receipt; per-row times retained"
+        visible["raw_hashes"] = sorted({p["sha256"] for p in parts})
+        visible["component_visibility"] = [p["visibility"] for p in parts]
+        return meta, visible
+
     def get_price(self, security, start_date=None, end_date=None, frequency="daily", fields=None,
                   skip_paused=False, fq=None, count=None, panel=False, fill_paused=False,
                   round=False, *, strict=False, as_of=None, visibility="verified",
@@ -225,20 +283,7 @@ class Client:
                     {"closed_market": "MARKET_CLOSED", "session_break": "SESSION_BREAK", "suspended": "SUSPENDED"}.get(decision["state"], "TRADING_STATUS_UNKNOWN"),
                     "A数达声明时段/证券状态准入未满足", decision)
             url = KLINE_URL + "?" + urlencode({"symbol": source_symbol, "scale": scale, "ma": "no", "datalen": requested})
-            raw, meta = self.transport.read(url, lambda b: _bars(b, scale))
-            # A later query must never upgrade a partial observation in an old response.
-            # New responses also retain request start, so crossing a boundary in flight
-            # cannot promote a cached row later. Legacy caches use their observed_at.
-            complete, cutoff = _completed_rows(raw, meta, wall_now, scale)
-            require(complete, "NO_COMPLETED_BARS",
-                    "该响应抓取时没有可确认结束的记录；等待闭合后可显式 cache_mode='refresh' 重新取数")
-            visible = {"level": "unrestricted_research", "as_of": None, "point_in_time_verified": False,
-                       "available_at": None, "revision_history": "unknown", "finality": "CLOSED_PROVISIONAL",
-                       "source_version_observed_at": meta["observed_at"], "assumptions": ["原接口软件时间门槛不证明最终发布"]}
-            if self._clock is not None:
-                complete, visible = select_visible(complete, meta, as_of=now, level=self._visibility,
-                                                   daily=scale == 240, contract=self.coverage_contract)
-                require(complete, "NO_VISIBLE_BARS", "此策略时钟下没有满足所选可见性模型的记录", visible)
+            raw, complete, by_label, observations, conflicts = self._bar_observations(url, scale, wall_now)
             labels = [_dt(r["day"]) for r in complete]
             chosen = [r for r, t in zip(complete, labels) if (start is None or t >= start) and t <= end]
             bounds = {"security": code, "source_first": complete[0]["day"], "source_last": complete[-1]["day"],
@@ -253,7 +298,7 @@ class Client:
             if self.coverage_contract:
                 grid_start = start or label_time(min(self.coverage_contract._days))
                 coverage = self.coverage_contract.assess(code, [r["day"] for r in complete], grid_start,
-                                                         end, count=count, as_of=now if self._clock else None)
+                                                         end, count=count, as_of=now)
             require(not require_complete or coverage["complete"],
                     "COVERAGE_UNKNOWN" if coverage["status"] == "unknown" else "COVERAGE_INCOMPLETE",
                     "A数达覆盖准入未满足；不补价、补量或把缺数据解释为停牌", coverage)
@@ -261,6 +306,10 @@ class Client:
                     "源近期窗口内记录不足；缩短日期/count 或等待有数据的交易时段", bounds)
             if count:
                 chosen = chosen[-count:]
+            require(not (conflicts & {row["day"] for row in chosen}), "OBSERVATION_CONFLICT",
+                    "请求中的同一标签在同一观测时刻有冲突值，不能按窗口大小择一",
+                    {"source_labels": sorted(conflicts & {row["day"] for row in chosen})})
+            meta, visible = self._observation_metadata(chosen, by_label, observations)
             freshness = data_age(raw, chosen, meta, now, daily=scale == 240)
             if self.coverage_contract:
                 freshness.update(self.coverage_contract.freshness(code, [r["day"] for r in complete], now))
@@ -293,9 +342,9 @@ class Client:
                 record.update({field: int(_decimal(row[field])) if field == "volume" else
                                float(_decimal(row["amount" if field == "money" else field])) for field in wanted})
                 all_records.append(record)
-            provenance.append({**meta, **bounds, "completion_cutoff": cutoff.isoformat(),
-                               "completion_basis": "request_started_at" if "request_started_at" in meta
-                               else "legacy_observed_at", "irregular_intervals": gaps, "source_rows": chosen,
+            provenance.append({**meta, **bounds,
+                               "completion_basis": "per_observation" if len(meta["response_observations"]) > 1 else
+                               "request_started_at" if meta.get("request_started_at") else "legacy_observed_at", "irregular_intervals": gaps, "source_rows": chosen,
                                "coverage_report": coverage, "freshness": freshness, "trading_status": decision,
                                "completion_model": "legacy_software_15_05" if scale == 240 else "source_label_as_end",
                                "closure_verified": False, "visibility": visible})
@@ -324,17 +373,14 @@ class Client:
             return unknown_coverage()  # Missing facts cannot be repaired by fetching another bar window.
         require(self.coverage_contract.frequency == ("daily" if scale == 240 else f"{scale}m")
                 and self.coverage_contract._data["provider"] == "sina_public", "CONTRACT_SCOPE_MISMATCH", "契约频率/来源不符")
-        empty = self.coverage_contract.assess(security, [], _dt(start_date), _dt(end_date, end=True), as_of=self._clock)
+        clock = self._clock or datetime.now(TZ)
+        empty = self.coverage_contract.assess(security, [], _dt(start_date), _dt(end_date, end=True), as_of=clock)
         if empty["complete"]:
             return empty  # Evidenced closed/suspended slots do not require a source call or filled bars.
         url = KLINE_URL + "?" + urlencode({"symbol": _security(security), "scale": scale, "ma": "no", "datalen": MAX_BARS})
-        rows, meta = self.transport.read(url, lambda b: _bars(b, scale))
-        rows, _ = _completed_rows(rows, meta, datetime.now(TZ), scale)
-        if self._clock:
-            rows, _ = select_visible(rows, meta, as_of=self._clock, level=self._visibility,
-                                     daily=scale == 240, contract=self.coverage_contract)
+        _, rows, _, _, _ = self._bar_observations(url, scale, datetime.now(TZ), allow_empty=True)
         return self.coverage_contract.assess(security, [r["day"] for r in rows], _dt(start_date),
-                                             _dt(end_date, end=True), as_of=self._clock)
+                                             _dt(end_date, end=True), as_of=clock)
 
     def acquire_price(self, security, start_date, end_date, *, frequency="1m"):
         """Explicit one-window replenishment. Unsupported history stays a failed requirement."""
@@ -469,7 +515,7 @@ def _observation_time(value):
 
 
 def capabilities():
-    return {"version": "0.3.0.dev2", "mode": "direct_public_source", "source": "sina_public",
+    return {"version": "0.3.0.dev3", "mode": "direct_public_source", "source": "sina_public",
             "frequency": ["daily", "1m", "5m"], "adjustment": [None],
             "default_fields": DEFAULT_FIELDS.copy(), "minute_extra_fields": ["money"],
             "count": [1, 1000], "max_securities": 10, "max_source_window": MAX_BARS,

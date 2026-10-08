@@ -6,7 +6,7 @@ A数达是直接获取 A 股行情的 Python 库和命令行工具。调用 `get
 
 当前支持沪深 A 股的日线、近期1分钟和5分钟行情，单股、多股、日期筛选及按条数查询；可选择本地缓存，用同一接口离线读取。另提供证券名称查询、上交所年度交易日历，以及高级离线数据管理能力。
 
-接口名称、证券代码和 DataFrame 形态向聚宽本地 SDK 靠拢，长期目标是逐步扩展兼容范围。当前 **0.3.0.dev2 为本地数据契约修复候选**，尚不能直接替换 `jqdatasdk`，支持范围见[接口说明](docs/live-api.md)。
+接口名称、证券代码和 DataFrame 形态向聚宽本地 SDK 靠拢，长期目标是逐步扩展兼容范围。当前 **0.3.0.dev3 为本地数据契约修复候选**，尚不能直接替换 `jqdatasdk`，支持范围见[接口说明](docs/live-api.md)。
 
 ## 安装指南
 
@@ -79,7 +79,7 @@ saved = offline.get_price("600000.XSHG", frequency="5m", count=2)
 
 每股元数据现在分别报告行情标签年龄、HTTP观测年龄、覆盖状态及可见性等级。旧 `strict` 仍只检查相邻返回标签；完整标签覆盖使用 `require_complete=True`；`require_fresh=True` 现在同时检查源水位、所选窗口水位和当前可交易状态。`client.trading_status(..., as_of=...)` 独立返回休市、午休、停牌、可交易或未知，不将缺数据当停牌。
 
-策略时钟使用 `client.at(as_of, visibility=...)` 固定本地缓存，查询不联网。可显式选择 `assumed` 做非空历史研究，或 `received` 使用当时本机收到的版本；二者均不冒充PIT。默认 `verified` 要求真实公布/修订证据，当前源缺证据会拒绝。`end_date`仍只负责标签过滤。
+策略时钟使用 `client.at(as_of, visibility=...)` 固定本地缓存，查询不联网。可显式选择 `assumed` 做非空历史研究，或 `received` 使用当时本机收到的版本；二者均不冒充PIT。默认 `verified` 要求真实公布/修订证据，当前源缺证据会拒绝。`end_date`仍只负责标签过滤。固定上下文按每个标签选择最新合格观测，保留逐行来源；较早大窗口不会遮蔽较新小窗口。count=N的完整性检查仅覆盖取得这N个有据槽所需的范围，所需范围内的未知和缺口仍会拒绝。
 
 `acquire-price`显式尝试单窗口补齐，`live-coverage`检查声明事实，`reconcile-day`诊断量额；无法完成的要求返回未满足状态，不造数。详见[数据准入接口与schema](docs/data-admission.md)及[归因与剩余阻塞](docs/data-attribution.md)。
 

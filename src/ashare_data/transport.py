@@ -69,82 +69,91 @@ class Transport:
         self.snapshot_id = None
 
     def freeze(self, *, received_by=None):
-        """Pin local response versions; never fetch or migrate a legacy cache."""
+        """Pin the immutable observation ledger, including older bounded windows."""
         require(self.root is not None, "CACHE_REQUIRED", "策略时钟查询须先显式采集到缓存，再固定本地观测版本")
-        paths = list((self.root / "requests").glob("*.json"))
-        if received_by is not None:
-            paths += list((self.root / "observations").glob("*.json"))
+        paths = list((self.root / "requests").glob("*.json")) + list((self.root / "observations").glob("*.json"))
         require(len(paths) <= 10000, "BOUNDED_QUERY", "观测索引过多，请使用独立小范围缓存")
-        latest, eligible = {}, {}
+        entries, timestamps = {}, {}
         try:
             for path in paths:
                 require(path.stat().st_size <= 65536, "CACHE_CORRUPT", "观测索引过大")
                 entry = json.loads(path.read_text())
-                key = hashlib.sha256(entry["url"].encode()).hexdigest()
                 observed = timestamp(entry["observed_at"])
-                for target in [latest] + ([eligible] if received_by is not None and observed <= received_by else []):
-                    previous = target.get(key)
-                    if previous and observed == timestamp(previous["observed_at"]):
-                        require(previous["sha256"] == entry["sha256"], "OBSERVATION_CONFLICT", "同一观测时刻存在冲突版本")
-                    if previous is None or observed > timestamp(previous["observed_at"]):
-                        target[key] = entry
+                key = (entry["url"], observed)
+                previous = timestamps.get(key)
+                require(previous is None or previous == entry["sha256"], "OBSERVATION_CONFLICT", "同一请求和观测时刻存在冲突版本")
+                timestamps[key] = entry["sha256"]
+                entries[digest(entry)] = entry
         except (OSError, ValueError, KeyError, TypeError) as exc:
             raise DataError("CACHE_CORRUPT", "不能固定观测索引") from exc
         frozen = Transport(cache=self.root, cache_mode="only", cache_ttl=self.ttl, timeout=self.timeout)
-        # A late-only entry remains identifiable, so the visibility gate can explain
-        # why it is not available at the requested historical clock.
-        frozen._frozen = {**latest, **eligible}
+        frozen._frozen = sorted(entries.values(), key=lambda e: (e["url"], timestamp(e["observed_at"]), digest(e)))
         frozen._received_by = received_by
-        frozen.snapshot_id = digest(frozen._frozen)
+        frozen.snapshot_id = digest({"observations": frozen._frozen,
+                                     "received_by": received_by.isoformat() if received_by else None})
         return frozen
 
+    @staticmethod
+    def _stream(url):
+        parsed = urlsplit(url)
+        params = dict(parse_qsl(parsed.query))
+        size = params.pop("datalen", None)
+        return (parsed.scheme, parsed.netloc, parsed.path, sorted(params.items())), size
+
+    def _cached(self, entry, url, decode):
+        try:
+            entry = json.loads(canonical(entry))
+            content_hash = entry["sha256"]
+            require(len(content_hash) == 64 and all(c in "0123456789abcdef" for c in content_hash),
+                    "CACHE_CORRUPT", "缓存内容编号无效")
+            body = (self.root / "objects" / content_hash).read_bytes()
+            require(len(body) <= MAX_BYTES and hashlib.sha256(body).hexdigest() == content_hash,
+                    "CACHE_CORRUPT", "缓存内容校验失败；可显式 refresh 重新获取")
+            age = (datetime.now(timezone.utc) - timestamp(entry["observed_at"])).total_seconds()
+            require(age >= 0, "CACHE_CORRUPT", "缓存观测时间在未来")
+        except (KeyError, ValueError, TypeError, OSError) as exc:
+            raise DataError("CACHE_CORRUPT", "缓存不可读；可显式 refresh 重新获取") from exc
+        return decode(body), {**entry, "cache_hit": True, "cache_age_seconds": age,
+                              "requested_url": url, "cache_window_reused": entry["url"] != url,
+                              "network_used": False}
+
+    def read_windows(self, url, decode):
+        """All pinned same-stream receipts; the bar layer resolves per-label versions.
+
+        Exact URL and datalen do not imply recency or sufficient query coverage.
+        Normal non-context reads retain their exact-request cache/refresh policy.
+        """
+        if self._frozen is None:
+            return [self.read(url, decode)]
+        signature, size = self._stream(url)
+        candidates = [e for e in self._frozen if e["url"] == url or
+                      (size is not None and self._stream(e["url"])[0] == signature
+                       and str(self._stream(e["url"])[1]).isdigit())]
+        require(candidates, "CACHE_MISS", "固定观测集合中没有这个来源/证券/频率的响应")
+        available = [e for e in candidates if self._received_by is None or
+                     timestamp(e["observed_at"]) <= self._received_by]
+        # Retain one late receipt only to explain why no observation is visible.
+        selected = available or [min(candidates, key=lambda e: timestamp(e["observed_at"]))]
+        require(len(selected) <= 128, "BOUNDED_QUERY", "同一流最多合并128个固定观测；请缩小缓存范围")
+        selected.sort(key=lambda e: (timestamp(e["observed_at"]), digest(e)))
+        return [self._cached(e, url, decode) for e in selected]
+
     def read(self, url, decode):
+        if self._frozen is not None:
+            windows = self.read_windows(url, decode)
+            require(len(windows) == 1, "WINDOW_SELECTION_REQUIRED", "多个固定观测须由行情查询层按标签选择，不能按窗口大小择一")
+            return windows[0]
         key = hashlib.sha256(url.encode()).hexdigest()
         path = self.root / "requests" / (key + ".json") if self.root else None
-        pinned = self._frozen.get(key) if self._frozen is not None else None
-        reused_window = False
-        def eligible(entry):
-            return self._received_by is None or timestamp(entry["observed_at"]) <= self._received_by
-
-        if self._frozen is not None and (pinned is None or not eligible(pinned)):
-            # A fixed context can reuse another pinned window of the exact same
-            # endpoint/security/frequency. It never changes source or fetches.
-            def signature(value):
-                parsed = urlsplit(value)
-                params = dict(parse_qsl(parsed.query))
-                size = params.pop("datalen", None)
-                return (parsed.scheme, parsed.netloc, parsed.path, sorted(params.items())), size
-            wanted, size = signature(url)
-            if size is not None:
-                candidates = [entry for entry in self._frozen.values()
-                              if signature(entry["url"])[0] == wanted and
-                              str(signature(entry["url"])[1]).isdigit()]
-                if candidates:
-                    available = [entry for entry in candidates if eligible(entry)]
-                    # Future receipts remain diagnostic fallback only. An exact
-                    # unavailable URL must not hide an eligible other window.
-                    pinned = max(available or candidates, key=lambda entry: (
-                        int(signature(entry["url"])[1]), timestamp(entry["observed_at"])))
-                    reused_window = pinned["url"] != url
-        exists = pinned is not None if self._frozen is not None else path and path.exists()
-        if path and self.mode != "refresh" and exists:
+        if path and self.mode != "refresh" and path.exists():
             try:
-                entry = json.loads(canonical(pinned)) if pinned is not None else json.loads(path.read_text())
-                require(entry["url"] == url or reused_window, "CACHE_CORRUPT", "缓存请求不匹配")
-                content_hash = entry["sha256"]
-                require(len(content_hash) == 64 and all(c in "0123456789abcdef" for c in content_hash),
-                        "CACHE_CORRUPT", "缓存内容编号无效")
-                body = (self.root / "objects" / content_hash).read_bytes()
-                require(len(body) <= MAX_BYTES and hashlib.sha256(body).hexdigest() == content_hash,
-                        "CACHE_CORRUPT", "缓存内容校验失败；可显式 refresh 重新获取")
-                age = (datetime.now(timezone.utc) - datetime.fromisoformat(entry["observed_at"])).total_seconds()
-                require(age >= 0, "CACHE_CORRUPT", "缓存观测时间在未来")
+                entry = json.loads(path.read_text())
+                require(entry["url"] == url, "CACHE_CORRUPT", "缓存请求不匹配")
             except (KeyError, ValueError, TypeError, OSError) as exc:
-                raise DataError("CACHE_CORRUPT", "缓存不可读；可显式 refresh 重新获取") from exc
-            if self.mode == "only" or age <= self.ttl:
-                return decode(body), {**entry, "cache_hit": True, "cache_age_seconds": age,
-                                     "requested_url": url, "cache_window_reused": reused_window,
-                                     "network_used": False}
+                raise DataError("CACHE_CORRUPT", "缓存请求索引不可读") from exc
+            body, meta = self._cached(entry, url, lambda value: value)
+            if self.mode == "only" or meta["cache_age_seconds"] <= self.ttl:
+                return decode(body), meta
         require(self.mode != "only", "CACHE_MISS", "离线缓存中没有这个请求；先联网调用同一接口")
         request_started_at = datetime.now(timezone.utc).isoformat()
         body = public_read(url, self.timeout)

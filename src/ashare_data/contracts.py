@@ -201,16 +201,13 @@ class CoverageContract:
         symbol(security)
         cutoff = timestamp(as_of) if as_of is not None else None
         start, end = label_time(start), label_time(end)
-        slots, unknown = self._expected(security, start, end, cutoff)
+        if count is None:
+            slots, unknown = self._expected(security, start, end, cutoff)
+        else:
+            require(type(count) is int and 0 < count <= 1000, "INVALID_COUNT", "无效 count")
+            slots, unknown = self._expected_tail(security, start, end, count, cutoff)
         if self._data["label_semantics"] != "verified":
             unknown.append({"code": "SESSION_SCOPE_UNKNOWN"})
-        if count is not None:
-            require(type(count) is int and 0 < count <= 1000, "INVALID_COUNT", "无效 count")
-            if cutoff:
-                slots = [s for s in slots if s["end"] <= cutoff]
-            if len(slots) < count:
-                unknown.append({"code": "CALENDAR_COVERAGE", "required_count": count})
-            slots = slots[-count:]
         expected = {s["label"] for s in slots}
         labels = [label_time(t) for t in labels]
         selected = [t for t in labels if start <= t <= end]
@@ -247,8 +244,34 @@ class CoverageContract:
                 "expected_count": len(expected), "present_count": len(present),
                 "missing": missing, "unexpected": unexpected, "duplicates": duplicates, "unknown": unknown,
                 "out_of_request_labels": outside, "assessment_scope": "requested inclusive source-label range",
+                "requested_count": count,
+                "count_evidence_start": slots[0]["start"].isoformat() if count and slots else None,
                 "range": {"start": start.isoformat(), "end": end.isoformat(), "as_of": cutoff.isoformat() if cutoff else None},
                 "meaning": "仅证据声明的标签槽覆盖；不认证证据真伪、成交全量、PIT或供应商最终值"}
+
+    def _expected_tail(self, security, start, end, count, cutoff):
+        """Prove the requested N-slot tail; never skip an unknown needed slot."""
+        require(start <= end and (end-start).days <= 366, "INVALID_RANGE", "覆盖窗口须有效且不超过一年")
+        d = min(end, cutoff).date() if cutoff else end.date()
+        slots = []
+        while d >= start.date():
+            key = d.isoformat()
+            cal = self._days.get(key)
+            if cal is None or (cutoff and timestamp(cal["available_at"]) > cutoff):
+                return sorted(slots, key=lambda s: s["label"]), [{"date": key, "code": "CALENDAR_UNKNOWN"}]
+            for slot in reversed(self._slots[key]):
+                if not start <= slot["label"] <= end or (cutoff and slot["end"] > cutoff):
+                    continue
+                state = self._slot_state(security, slot, cutoff)
+                if state in {"unknown", "mixed"}:
+                    return sorted(slots, key=lambda s: s["label"]), [{"date": key,
+                        "code": "PARTIAL_BAR_STATUS" if state == "mixed" else "TRADING_STATUS_UNKNOWN"}]
+                if state == "trading":
+                    slots.append(slot)
+                    if len(slots) == count:
+                        return sorted(slots, key=lambda s: s["label"]), []
+            d -= timedelta(days=1)
+        return sorted(slots, key=lambda s: s["label"]), [{"code": "CALENDAR_COVERAGE", "required_count": count}]
 
     def bounds(self, label, *, as_of=None):
         t = label_time(label)

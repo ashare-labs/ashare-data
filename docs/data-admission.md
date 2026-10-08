@@ -1,6 +1,6 @@
 # 数据准入契约 v1
 
-0.3.0.dev2是本地修复候选，未发布。A数达负责采集、缺口检测及补齐能力、单位/量额、复权/状态资产、可见性模型与保证检查。上层只传策略逻辑时钟和所需保证，消费结果或明确错误，不再另建清洗、填价或猜测停牌逻辑。
+0.3.0.dev3是本地修复候选，未发布。A数达负责采集、缺口检测及补齐能力、单位/量额、复权/状态资产、可见性模型与保证检查。上层只传策略逻辑时钟和所需保证，消费结果或明确错误，不再另建清洗、填价或猜测停牌逻辑。
 
 ## 接口
 
@@ -43,7 +43,11 @@ bars = research.get_price("600000.XSHG", frequency="1m", count=3)
 assert not bars.attrs["point_in_time_verified"]
 ```
 
-上下文有query_snapshot_id，创建后刷新不改变已固定版本。received可从不可变观测日志选择旧版本；旧缓存没有的历史不会被伪造。原文对象不能覆盖，每次观测存hash及supersedes_observation，当前请求索引只是一条指针。received先排除策略时钟后才收到的候选窗口；只有没有任何可用窗口时才保留晚到版本用于解释错误。较晚大窗口及晚到精确URL都不能遮蔽较早可用窗口。上下文可复用已固定的同一endpoint/证券/频率不同datalen窗口，标cache_window_reused，仍核对实际窗口及条数；不联网或换源。
+上下文有query_snapshot_id，创建时固定请求索引与不可变观测日志；随后刷新不会改变该上下文。received先按observed_at <= as_of过滤，assumed可使用创建时已有的历史回填但不声称历史公布时间。每份响应先独立执行抓取时刻和策略时钟的闭合/可见性过滤，再对同一endpoint、证券、频率的实际标签取最新合格观测。精确URL和大窗口都没有优先权。相交、嵌套或不相交窗口均可提供各自实有记录；较新小窗口不会被旧大窗口遮蔽，较旧窗口仍可提供较新窗口未含的历史标签。窗口缺行不构成删除或修订撤回证明，不造bar、不换源、不联网。已有请求索引只是当前指针，旧观测与原文对象保持不变。
+
+同一时刻同一标签出现不同值，没有可证明先后的版本；请求选中该标签时报OBSERVATION_CONFLICT。严格较新的合格观测可以解除该标签的冲突。一个查询最多读取128份同流观测、合计100000条原始行；固定上下文最多10000个索引/日志文件，超限报BOUNDED_QUERY。只有没有任何received合格窗口时才保留晚到版本用于解释VISIBILITY_UNKNOWN，不返回该版本作为历史行情。
+
+逐行来源见provenance中的row_observations（source_label、sha256、observed_at、url、observation_id和completion_cutoff），所贡献的原响应摘要见response_observations。仅一份响应贡献结果时保留单一sha256/url；多响应组合时单一sha256/url/observation_id/request_started_at/completion_cutoff均为None，completion_basis为per_observation。汇总observed_at仅为最新贡献观测时刻，不能替代逐行溯源；visibility.raw_hashes列出贡献原文，raw_hash为None。这是固定本地观测的组合视图，不是供应商原子快照或PIT/最终版本认证。每份旧响应的未闭合记录仍不会随时间自动成熟。
 
 上下文的当前证券名称及年度网页日历接口缺历史证明，会明确拒绝，防止从另一个入口读取未来事实。原Store固定snapshot保留as_of、quality及bar_end门禁；导入者的声明也不等于供应商历史真值认证。
 
@@ -56,6 +60,10 @@ CoverageContract顶层字段：schema_version=1或2、id、provider、frequency�
 v1的statuses仍表示有证据的整日证券状态，含security、date、state（trading/suspended/unknown）、evidence、available_at。v2改为security、effective_start、effective_end、state、evidence、available_at；生效区间为左闭右开，可跨日但最多366天，必须带时区，不得重叠或混用date。修订须建立新契约。缺记录、区间空洞或晚于as_of的事实为unknown；盘中停复牌不再铺成全天事实。
 
 一分钟/五分钟槽若跨越状态切换且未明确映射为完整区间，报PARTIAL_BAR_STATUS，不能整根删除或造半根；已证全槽停牌才去除期望。日线可跨已知停牌，但其所有声明活跃session的状态须完整已知。源最新水位从最近闭合槽向前检查，不要求与最近已知复牌时段无关的旧历史事实齐备；全区间coverage仍须逐槽证明。
+
+`require_complete`的count=N按所需尾部范围取证：从min(end_date, as_of)对应的最近闭合槽向前逐槽检查，直到取得N个有据可交易槽。只有有据休市/全槽停牌可跳过；遇到所需范围内未知日历、状态空洞、未来才可见的事实或跨状态半根bar即unknown，不越过它们寻找更早记录。找到N槽后，更早且与这N槽无关的未知事实不再阻断。warm-up需要更多条时应请求更大的N，新增所需范围仍必须有证据；下限耗尽仍不足则拒绝。报告含requested_count和count_evidence_start（最早所需槽起点）。
+
+显式start_date/end_date仍检查整个闭区间标签范围，不采用尾部缩限；start_date与count互斥。Client无固定上下文时也按本次逻辑时钟限制日历/状态available_at，未来事实不能给当前查询背书。count只决定所需范围，不能通过减少范围掩盖该范围内缺失的最新bar或内部缺口。
 
 交易时段也使用左闭右开：开盘边界可交易，收盘边界不再可交易；边界bar可以已经闭合。这是本库明确的paper模型，不代表经纪商接单规则。合成时段、盘后范围或订单类型不能自动升级成真实市场规则。
 
@@ -77,4 +85,4 @@ DataFrame仍使用原float列保持兼容；原十进制文本保留在source_ro
 
 CLI提供trading-status、live-coverage、acquire-price、reconcile-day；price支持--as-of、--visibility、--coverage-contract、--require-complete、--require-fresh、--require-final、--require-tradable。trading-status在tradable时退出0，其他状态退出2，均不联网。策略只传时钟与保证，A数达实施检查；显式采集与固定观测查询分离。
 
-覆盖assess检查请求的闭区间标签子集；范围外标签另列out_of_request_labels，不按请求内缺陷报错。已证休市/停牌的空集合仍可complete=True，但status分别为closed_market/suspended、tradable=False；该字段说明请求范围有无可交易槽，当前paper状态应读trading_status。C14/C15的独立验收范围争议见[本轮修复说明](review2-fixes.md)。
+覆盖assess检查请求的闭区间标签子集；范围外标签另列out_of_request_labels，不按请求内缺陷报错。已证休市/停牌的空集合仍可complete=True，但status分别为closed_market/suspended、tradable=False；该字段说明请求范围有无可交易槽，当前paper状态应读trading_status。C14/C15原冻结结果保留；独立裁决新增5项通过，见[第三轮修复与版本化裁决](review3-fixes.md)。
