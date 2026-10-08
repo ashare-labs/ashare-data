@@ -159,6 +159,22 @@ class Store:
         from .d1 import import_facts
         return import_facts(self, directory)
 
+    def compose_br1(self, strict_dataset_id, *, mode, assumption_ids):
+        from .br1 import compose
+        return compose(self, strict_dataset_id, mode=mode, assumption_ids=assumption_ids)
+
+    def br1(self, dataset_id, *, mode):
+        from .br1 import BR1View
+        return BR1View(self, dataset_id, mode=mode)
+
+    def br1_snapshots(self):
+        from .br1 import snapshots
+        return snapshots(self)
+
+    def recover_br1(self):
+        from .br1 import recover
+        return recover(self)
+
     def d1_facts(self, component_id):
         from .d1 import D1Facts
         return D1Facts(self, component_id)

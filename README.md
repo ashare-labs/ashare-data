@@ -1,4 +1,8 @@
-> **0.6.0.dev1：D1有限官方事实与固定组合版本。** [公共接口及分字段裁决](docs/d1-api.md) · [有限缺口与未批准的研究假设提议](docs/d1-evidence-options.md)。
+> **0.6.0.dev2：D1-BR1显式条件研究投影。** [独立公开契约](docs/d1-br1-api.md)。委托方已接受有限A-EQ/A-NORMAL/A-AD08假设用于条件验证；实现与后端绑定仍待独审，执行许可保持false。
+> `Store.compose_br1(..., mode="conditional_research", assumption_ids=("A-EQ","A-NORMAL","A-AD08"))`创建新组合；读取也须显式传mode。
+> 模型空事件、有限前收与限价另行标注假设依赖；严格D1、原verified_absent=false和complete=false不变。没有运行成交或认证历史收益。
+
+> **0.6.0.dev1：D1有限官方事实与固定组合版本。** [公共接口及分字段裁决](docs/d1-api.md) · [当时冻结的缺口与假设提议](docs/d1-evidence-options.md)。
 > 7/11必需字段可作限定事后研究读取；历史资格、每日限价、权益无事件证明、AD08前收仍阻断。`complete=false`；没有执行引擎或放行D1。
 > `Store.import_d1_facts`显式封存已审本地包，`Store.compose_d1`固定价格/事实/计划，`Store.d1(ID)`离线返回typed字段与owner回执。
 > 所有D1读操作不联网；原始价格ID不变。正向事实、源观察、历史推断和候选值分开保留。

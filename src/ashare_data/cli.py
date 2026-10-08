@@ -149,6 +149,19 @@ def parser():
     dq.add_argument("--dataset", dest="dataset_id", required=True)
     sub.add_parser("d1-snapshots")
     sub.add_parser("d1-recover")
+    bc = sub.add_parser("br1-compose", help="显式接受三个假设并创建独立条件研究组合")
+    bc.add_argument("--strict", required=True)
+    bc.add_argument("--mode", required=True, choices=["conditional_research"])
+    bc.add_argument("--assumption", action="append", required=True)
+    bq = sub.add_parser("br1-query", help="离线条件模型投影；不授予后端执行许可")
+    bq.add_argument("dataset", choices=["descriptor", "profile", "admission", "owner-receipt", "instrument",
+                    "rules", "bars", "calendar", "statuses", "modeled-events", "price-limits", "adjusted-prev-close"])
+    bq.add_argument("--dataset", dest="dataset_id", required=True)
+    bq.add_argument("--mode", required=True, choices=["conditional_research"])
+    bq.add_argument("--date")
+    bq.add_argument("--call", help="完整AD08参数tuple JSON文件")
+    sub.add_parser("br1-snapshots")
+    sub.add_parser("br1-recover")
     return p
 
 
@@ -195,6 +208,20 @@ def main(argv=None):
                 result = getattr(store, args.command)()
             elif args.command == "d1-import-facts":
                 result = {"facts_component_id": store.import_d1_facts(args.directory)}
+            elif args.command == "br1-compose":
+                result = {"dataset_id": store.compose_br1(args.strict, mode=args.mode, assumption_ids=args.assumption)}
+            elif args.command == "br1-snapshots":
+                result = store.br1_snapshots()
+            elif args.command == "br1-recover":
+                result = store.recover_br1()
+            elif args.command == "br1-query":
+                require((args.date is not None) == (args.dataset == "price-limits")
+                        and (args.call is not None) == (args.dataset == "adjusted-prev-close"),
+                        "BR1_QUERY_ARGUMENT", "date仅且必须用于price-limits，call仅且必须用于adjusted-prev-close")
+                view = store.br1(args.dataset_id, mode=args.mode)
+                method = getattr(view, args.dataset.replace("-", "_"))
+                value = method(args.date) if args.date is not None else (method(**read_json(args.call)) if args.call else method())
+                result = [x.to_dict() for x in value] if isinstance(value, tuple) else value.to_dict()
             elif args.command == "d1-compose":
                 result = {"dataset_id": store.compose_d1(args.price, args.facts)}
             elif args.command == "d1-snapshots":
@@ -283,7 +310,7 @@ def main(argv=None):
                     else:
                         result = getattr(view, ds.replace("-", "_"))()
         print(json.dumps(result, ensure_ascii=False, sort_keys=True, default=json_value))
-        if args.command == "d1-query" and args.dataset == "admission":
+        if args.command in {"d1-query", "br1-query"} and args.dataset == "admission":
             return 0 if result["execution_permission"] else 2
         if args.command in {"live-coverage", "acquire-price", "reconcile-day", "trading-status"}:
             return 0 if result.get({"live-coverage": "complete", "acquire-price": "requirements_met", "reconcile-day": "accepted", "trading-status": "tradable"}[args.command]) else 2

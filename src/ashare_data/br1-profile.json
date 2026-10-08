@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "profile_id": "D1-BR1",
+  "profile_version": "1",
+  "owner_version": "0.6.0.dev2",
+  "mode": "conditional_research",
+  "security": "600000.XSHG",
+  "scope_start": "2020-01-02",
+  "scope_end": "2020-01-07",
+  "price_dependency_start": "2019-12-31",
+  "initial_cash": "10000.00",
+  "initial_quantity": 0,
+  "initial_entitlements": 0,
+  "logical_decision_cutoff": "2020-01-02T23:59:59.999999+08:00",
+  "intents": [
+    {
+      "security": "600000.XSHG",
+      "at": "2020-01-03T15:00:00+08:00",
+      "side": "buy",
+      "quantity": 100,
+      "order_style": "market"
+    },
+    {
+      "security": "600000.XSHG",
+      "at": "2020-01-06T15:00:00+08:00",
+      "side": "sell",
+      "quantity": 100,
+      "order_style": "market"
+    }
+  ],
+  "strict_plan_reference_sha256": "8863e4598b8c70f1813a2c86ce2ef0abb4e568828bc495ad769bca1101208bcd",
+  "price_dataset_id": "31bc25c99e00c8b5c43f8d77daeae9ae9bc41116f40802b0aad10567e6259973",
+  "facts_manifest_sha256": "499cc2b4e2985f6597f1d8923fbf1878fcb148f4a0764835607cb3919b040d82",
+  "independent_closure_addendum_sha256": "24cf0c4778ab8966a3e0b760d9ee1830c38dd89658aec58c174a26356aad8c13",
+  "evidence_status": "bounded_corroborated_review",
+  "assumptions": [
+    {
+      "id": "A-EQ",
+      "depends_on": [],
+      "statement": "基于固定官方检索和正文复核，假设2019-12-31至2020-01-07无未识别的价格调整，01-03至01-06登记或持有资格无遗漏普通股现金、送转、配股或其他需处理权利；初始旧权益为零。发现相关事件即退出。",
+      "derived_projection": "assumed_no_relevant_events",
+      "evidence_fact_ids": [
+        "window_corporate_action_review",
+        "2019_ordinary_share_changes",
+        "2019_post_bond_issue_adjustment_events",
+        "2020_q1_capital"
+      ]
+    },
+    {
+      "id": "A-NORMAL",
+      "depends_on": [],
+      "statement": "接受600000在四日为普通适用情形的有界历史推断，假设无未识别特别参考价、恢复/重新上市或改变本模型准入的例外。保留源停牌/ST、100股买入单位、tick、T+1和普通限幅检查。",
+      "derived_projection": "assumed_normal_applicability",
+      "evidence_fact_ids": [
+        "security_identity",
+        "initial_listing_date",
+        "historical_board_candidate",
+        "daily_status",
+        "normal_daily_limit_ratio",
+        "ex_right_reference"
+      ]
+    },
+    {
+      "id": "A-AD08",
+      "depends_on": [
+        "A-EQ"
+      ],
+      "statement": "依赖A-EQ无价基调整，仅对列出的四个history_dt至adjust_orig区间假设累计因子比值为1，给出raw与实际pre请求的有限等价；不生成绝对因子或通用复权。",
+      "derived_projection": "derived_under_declared_assumptions",
+      "evidence_fact_ids": [
+        "window_corporate_action_review",
+        "ex_right_reference"
+      ]
+    }
+  ],
+  "allowed_calls": [
+    {
+      "security": "600000.XSHG",
+      "trade_date": "2020-01-02",
+      "history_dt": "2019-12-31",
+      "adjust_orig": "2020-01-02",
+      "frequency": "1d",
+      "field": "close",
+      "bar_count": 1,
+      "include_now": false,
+      "skip_suspended": false,
+      "adjustment_requested": "pre"
+    },
+    {
+      "security": "600000.XSHG",
+      "trade_date": "2020-01-03",
+      "history_dt": "2020-01-02",
+      "adjust_orig": "2020-01-03",
+      "frequency": "1d",
+      "field": "close",
+      "bar_count": 1,
+      "include_now": false,
+      "skip_suspended": false,
+      "adjustment_requested": "pre"
+    },
+    {
+      "security": "600000.XSHG",
+      "trade_date": "2020-01-06",
+      "history_dt": "2020-01-03",
+      "adjust_orig": "2020-01-06",
+      "frequency": "1d",
+      "field": "close",
+      "bar_count": 1,
+      "include_now": false,
+      "skip_suspended": false,
+      "adjustment_requested": "pre"
+    },
+    {
+      "security": "600000.XSHG",
+      "trade_date": "2020-01-07",
+      "history_dt": "2020-01-06",
+      "adjust_orig": "2020-01-07",
+      "frequency": "1d",
+      "field": "close",
+      "bar_count": 1,
+      "include_now": false,
+      "skip_suspended": false,
+      "adjustment_requested": "pre"
+    }
+  ],
+  "rqalpha_wheel_sha256": "2afbd96da3940842f5edf474f65df0fb046f9bf445ed3e50010df13c40ee7fe3",
+  "rules_effective_from": "2018-08-20",
+  "limit_calculation_version": "d1-normal-limits-1",
+  "required_native_checks": [
+    "identity_scope",
+    "source_suspended",
+    "source_st",
+    "buy_lot_100",
+    "price_tick_0.01",
+    "T+1",
+    "normal_price_limits",
+    "volume_limits",
+    "planned_intents_only",
+    "strategy_execution_data_isolation",
+    "stop_on_unfilled_or_partial_intent"
+  ],
+  "stop_conditions": [
+    "identity_or_hash_conflict",
+    "unknown_suspended_or_st_status",
+    "suspended_or_st_true",
+    "related_record_or_price_adjustment_event",
+    "unreviewed_call_tuple",
+    "missing_assumption",
+    "special_rule_exception_identified",
+    "intent_not_fully_filled",
+    "native_checks_bypassed"
+  ],
+  "complete": false,
+  "verified_absent": false,
+  "execution_permission": false,
+  "limitations": [
+    "条件账务一致性验证，不认证历史经济收益",
+    "预定意图不保证成交，不对齐目标现金强制成交",
+    "source_claim_unverified",
+    "historical_pit_unverified",
+    "closing_queue_unverified",
+    "personal_fees_unverified",
+    "没有通用权益执行或复权引擎",
+    "公开实现独审前后端不得开放真实数据条件执行"
+  ],
+  "backend_profile_reference_sha256": "9383a66ecfc7ca5c768b0b49bcc8b1a13a63285710c8fcacdbc35458dfd4f5d8"
+}
