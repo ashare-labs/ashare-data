@@ -1,96 +1,89 @@
 {
-  "version": "0.3.0.dev4",
-  "status": "local repair candidate; author source/wheel regressions passed; new independent re-review pending; not full acceptance",
-  "frozen_at_utc": "2026-10-08T17:28:53.310614+00:00",
-  "base_commit": "95617cbf67d8da0b72255d709b7359f93dcc031c",
-  "branch": "fix/data-admission-contracts",
-  "public_manifest_sha256": "0d237b37f1662d27d86afa6e6932d6acea1d28dc1985e9a8ff90cfccfe024e07",
-  "public_files_including_metadata": 49,
-  "payload_files": 47,
+  "version": "0.4.0.dev1",
+  "status": "local research vertical candidate; author source/wheel passed; independent review pending; not full strategy acceptance",
+  "frozen_at_utc": "2026-10-08T18:23:43.818137+00:00",
+  "base_commit": "f17ec2181dbb552bec690fc9aa171872d52fbab4",
+  "branch": "feature/research-snapshots",
+  "public_manifest_sha256": "3fc6dab4fe70e532b4c89f57016934cb0d9acdea7054ef359c18e94f2c41c3f7",
+  "public_files_including_metadata": 53,
+  "payload_files": 51,
   "prior_independent_review": {
-    "commit": "95617cbf67d8da0b72255d709b7359f93dcc031c",
+    "commit": "f17ec2181dbb552bec690fc9aa171872d52fbab4",
+    "dev4_accepted": true,
+    "source_and_wheel_passed_each": 671,
+    "additional_review119_passed": 119,
+    "frozen68": {
+      "PASS": 54,
+      "SAFE_LIMITED": 12,
+      "FAIL": 2
+    }
+  },
+  "author_regression": {
+    "prior_project": 638,
+    "new_project": 50,
+    "project_total": 688,
+    "unchanged_external_cases": 33,
+    "source_total_passed": 721,
+    "wheel_total_passed": 721,
+    "failed": 0,
+    "skipped": 0,
+    "network_guard": true
+  },
+  "author_reviewer_replays_each_environment": {
+    "review119_passed": 119,
+    "dev3_passed": 18,
+    "boundaries_passed": 22,
+    "window_passed": 2,
+    "supplement_passed": 19,
+    "supplement_diagnostic": 3,
     "frozen68": {
       "PASS": 54,
       "SAFE_LIMITED": 12,
       "FAIL": 2
     },
-    "separate_C14_C15_adjudication_PASS": 5,
-    "new_defects": [
-      "N3 global same-URL conflict rejection"
-    ],
-    "N1_N2_independently_confirmed": true,
-    "independent_dev3_18": {
-      "PASS": 14,
-      "FAIL": 4,
-      "ERROR": 0
-    }
-  },
-  "author_regression": {
-    "prior_project": 424,
-    "new_project": 214,
-    "project_total": 638,
-    "unchanged_external_cases": 33,
-    "total_passed": 671,
-    "failed": 0,
-    "skipped": 0,
-    "network_guard": true
-  },
-  "author_unchanged_supplement": {
-    "PASS": 19,
-    "DIAGNOSTIC": 3
-  },
-  "author_reviewer_new_boundaries": {
-    "PASS": 22,
-    "includes_separate_adjudication": 5
-  },
-  "author_reviewer_window_probes": {
-    "PASS": 2
-  },
-  "author_reviewer_dev3_18": {
-    "PASS": 18,
-    "FAIL": 0,
-    "ERROR": 0,
-    "before_fix_PASS": 14,
-    "before_fix_FAIL": 4
-  },
-  "initial_new_test_fixture_error": "list incorrectly passed to JSON decoder before exercising candidate; initial logs retained; fixture corrected, intended assertions unchanged",
-  "author_frozen68_replay": {
-    "fixture_oracle_and_reviewer_dev2_binding_unchanged": true,
-    "PASS": 54,
-    "SAFE_LIMITED": 12,
-    "FAIL": 2,
     "original_failures_retained": [
       "C14",
       "C15"
     ],
-    "separate_adjudication_not_retroactive": true,
     "not_independent_acceptance": true
   },
   "wheel": {
-    "sha256": "f8c092249ce49458f847330c26432f4d006d8c92fa730632a32073231b997d6b",
-    "runtime_modules_equal": 11,
-    "RECORD_entries_verified": 14,
-    "regression_repeated_passed": 671,
-    "supplement_repeated_passed": 19,
-    "supplement_diagnostic": 3,
-    "new_boundaries_passed": 22,
-    "window_probes_passed": 2,
-    "dev3_independent_checks_passed": 18,
-    "frozen68_same_result": true,
-    "method": "offline no-deps install in separate venv; byte-verified copies of 4416 existing locked dependency files; not fresh online dependency install"
+    "sha256": "5831ad77767be9e10f1a6349a0ef14cbf42630dcbf51bbf8e0ee92844e044ebc",
+    "runtime_modules_equal": 12,
+    "RECORD_entries_verified": 15,
+    "method": "byte-verified copies of prior locked installed dependencies; offline no-deps wheel install; not fresh online dependency resolution",
+    "dependency_file_count": 4416
   },
+  "real_data": {
+    "approved_local_daily_rows": 12,
+    "all_approved_row_hashes_match": true,
+    "local_files_modified": false,
+    "new_sina_bounded_requests": 1,
+    "sina_raw_rows": 3,
+    "sina_queried_rows": 2,
+    "source_and_wheel_public_offline_reopen_verified": true,
+    "baostock_collector_adopted": false
+  },
+  "interface": [
+    "Store.fetch_price",
+    "Client.save_research",
+    "Store.import_research",
+    "Store.research",
+    "ResearchView.descriptor/at/get_price/coverage/quality/lineage",
+    "Store.research_snapshots/recover_research"
+  ],
   "dependency_versions_changed": false,
-  "new_market_requests_in_this_repair": 0,
-  "free_source_prototype_adoption": "isolated research staging only; no formal source adapter added",
-  "code_history_rewritten": false,
   "pushed": false,
   "published": false,
+  "code_history_rewritten": false,
   "limitations": [
-    "source turnover discrepancy remains SOURCE_UNRESOLVED",
-    "real status/session/label contracts not supplied",
-    "verified PIT/finality still unsupported",
-    "target historical minute coverage and corporate-action assets unavailable",
-    "composed observation view is not an atomic vendor snapshot; missing labels are not revision tombstones",
-    "no full strategy, trade execution, long-running latency or cross-platform validation"
+    "verified historical PIT/finality unavailable",
+    "legacy Bao complete-receipt time unknown",
+    "source-grid matching is not full trading/session/status admission",
+    "Sina daily amount unavailable",
+    "source turnover discrepancy remains unresolved",
+    "target 2026-04-09..09-30 true minute coverage and 14:55 semantics not established",
+    "no historical universe/actions/limits/execution projection",
+    "no full strategy, server or cross-platform validation"
   ]
 }

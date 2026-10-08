@@ -150,6 +150,27 @@ class Store:
             finally:
                 fcntl.flock(f, fcntl.LOCK_UN)
 
+    def research(self, dataset_id):
+        """Reopen a fixed, verified local research dataset without network access."""
+        from .research import ResearchView
+        return ResearchView(self, dataset_id)
+
+    def research_snapshots(self):
+        from .research import snapshots
+        return snapshots(self)
+
+    def recover_research(self):
+        from .research import recover
+        return recover(self)
+
+    def import_research(self, paths, *, format="baostock_daily", calendar_path=None):
+        from .research import import_research
+        return import_research(self, paths, format=format, calendar_path=calendar_path)
+
+    def fetch_price(self, security, start_date=None, end_date=None, frequency="daily", count=None, timeout=15):
+        from .research import fetch_price
+        return fetch_price(self, security, start_date, end_date, frequency, count, timeout)
+
     @staticmethod
     def _task(db, kind, status, artifact):
         db.execute("INSERT INTO tasks(kind,status,artifact_id,created_at) VALUES (?,?,?,?)",

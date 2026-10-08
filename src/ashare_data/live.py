@@ -120,6 +120,11 @@ class Client:
         self._clock, self._visibility = None, None
         self._requirements = {}
 
+    def save_research(self, store):
+        """Seal this client's pinned/local bar receipts via a public Store API."""
+        from .research import save_client
+        return save_client(self, store)
+
     def at(self, as_of, *, visibility="verified", require_complete=False, require_fresh=False, require_final=False,
            require_tradable=False):
         """A pinned, offline context. Strategies supply a clock and desired guarantees."""
@@ -541,7 +546,7 @@ def _observation_time(value):
 
 
 def capabilities():
-    return {"version": "0.3.0.dev4", "mode": "direct_public_source", "source": "sina_public",
+    return {"version": "0.4.0.dev1", "mode": "direct_public_source", "source": "sina_public",
             "frequency": ["daily", "1m", "5m"], "adjustment": [None],
             "default_fields": DEFAULT_FIELDS.copy(), "minute_extra_fields": ["money"],
             "count": [1, 1000], "max_securities": 10, "max_source_window": MAX_BARS,
@@ -557,4 +562,5 @@ def capabilities():
             "corporate_actions": "unavailable", "historical_trading_status": "unavailable without evidence contract",
             "finalized_bars": False, "turnover_completeness": "unverified; reconciliation discrepancies block acceptance",
             "joinquant_equivalent": False, "historical_minute_coverage_guaranteed": False,
+            "research_dataset_api": "Store.fetch_price/import_research/research; Client.save_research; offline pinned ResearchView",
             "offline_snapshot_api": "Store; explicit advanced API retained"}

@@ -97,6 +97,29 @@ def parser():
     q.add_argument("--as-of")
     q.add_argument("--quality", choices=["observed", "synthetic", "research"], default="observed")
     q.add_argument("--allow-partial", action="store_true", help="仅 bars：明确返回缺口，仍不允许来源冲突")
+    for name in ("research-snapshots", "research-recover"):
+        sub.add_parser(name)
+    ri = sub.add_parser("research-import", help="封存旧本地 Bao 原价日线；接收时间保持未知")
+    ri.add_argument("paths", nargs="+")
+    ri.add_argument("--calendar")
+    rd = sub.add_parser("research-describe", help="离线重开并校验持久研究描述符")
+    rd.add_argument("--dataset", required=True)
+    for name in ("research-fetch", "research-price"):
+        rp = sub.add_parser(name, help="显式拉取封存" if name == "research-fetch" else "仅查询固定本地版本")
+        rp.add_argument("security", nargs="+")
+        rp.add_argument("--start")
+        rp.add_argument("--end")
+        rp.add_argument("--count", type=int)
+        rp.add_argument("--frequency", choices=["daily", "1d", "1m", "minute", "5m"], default="daily")
+        if name == "research-fetch":
+            rp.add_argument("--timeout", type=float, default=15)
+        else:
+            rp.add_argument("--dataset", required=True)
+            rp.add_argument("--fields", nargs="+")
+            rp.add_argument("--as-of")
+            rp.add_argument("--visibility", choices=["verified", "assumed", "received"], default="verified")
+            for flag in ("complete", "fresh", "final", "tradable"):
+                rp.add_argument("--require-" + flag, action="store_true")
     return p
 
 
@@ -141,6 +164,26 @@ def main(argv=None):
             store = Store(args.store)
             if args.command in {"capabilities", "snapshots", "recover"}:
                 result = getattr(store, args.command)()
+            elif args.command == "research-snapshots":
+                result = store.research_snapshots()
+            elif args.command == "research-recover":
+                result = store.recover_research()
+            elif args.command == "research-import":
+                result = {"dataset_id": store.import_research(args.paths, calendar_path=args.calendar)}
+            elif args.command == "research-fetch":
+                result = {"dataset_id": store.fetch_price(args.security[0] if len(args.security) == 1 else args.security,
+                    start_date=args.start, end_date=args.end, frequency=args.frequency, count=args.count, timeout=args.timeout)}
+            elif args.command == "research-describe":
+                result = store.research(args.dataset).descriptor()
+            elif args.command == "research-price":
+                view = store.research(args.dataset)
+                require(args.as_of is not None or args.visibility == "verified", "INVALID_REQUEST", "visibility须与as-of同传")
+                if args.as_of is not None:
+                    view = view.at(args.as_of, visibility=args.visibility)
+                result = view.get_price(args.security[0] if len(args.security) == 1 else args.security,
+                    start_date=args.start, end_date=args.end, frequency=args.frequency, fields=args.fields, count=args.count,
+                    require_complete=args.require_complete, require_fresh=args.require_fresh,
+                    require_final=args.require_final, require_tradable=args.require_tradable).to_dict()
             elif args.command == "import":
                 result = {"batch_id": store.import_bundle(read_json(args.bundle))}
             elif args.command == "validate":
