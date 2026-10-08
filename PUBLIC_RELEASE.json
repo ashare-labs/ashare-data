@@ -1,35 +1,55 @@
 {
-  "version": "0.2.0rc2",
-  "frozen_at_utc": "2026-10-08T11:27:41.980713+00:00",
-  "status": "L1/L2/L3 fixed; author validation passed; independent incremental review pending",
-  "public_manifest_sha256": "16083294f64d00182511cb6b4dd31f85e46622663447494a358f267ce776f89a",
-  "payload_files": 32,
-  "public_files_including_metadata": 34,
+  "version": "0.3.0.dev1",
+  "frozen_at_utc": "2026-10-08T14:57:40.879969+00:00",
+  "status": "local candidate; author validation passed; new independent review pending; real-source turnover acceptance failed",
+  "base_commit": "3d41d28600481bff163242a8775a6e682cb995f2",
+  "branch": "fix/data-admission-contracts",
+  "public_manifest_sha256": "55c8d4021cc81fdd5ba5c3fb9931c718ec3c14fc3997044175fa982b43ede3d9",
+  "payload_files": 39,
+  "public_files_including_metadata": 41,
   "tests": {
     "executor": "author",
-    "project_passed": 153,
-    "unchanged_independent_cases_passed": 13,
-    "total_passed": 166,
+    "original_project_passed": 153,
+    "new_project_passed": 53,
+    "unchanged_independent_cases_replayed": 33,
+    "total_passed": 239,
     "failed": 0,
     "skipped": 0,
     "network_guard_enabled": true
   },
-  "prior_independent_review": {
-    "version": "0.2.0rc1",
-    "passed": 133,
-    "failed": 6,
-    "skipped": 0
+  "wheel_verification": {
+    "sha256": "efc05240c78cfc4af79e43b4e71f03f349e3244e51b6c4f35a9158f0a339d3c6",
+    "passed": 86,
+    "failed": 0,
+    "skipped": 0,
+    "repeated_cases_not_additional": true,
+    "method": "Fresh venv; byte-verified copies of existing locked dependencies; offline no-deps wheel installation; no new empty-cache online install claimed"
   },
-  "real_source_validation": "Prior HTTP responses replayed unchanged; no new live market request in this fix round",
-  "official_pypi_fresh_install": "author passed; prior reviewer DNS failure remains recorded",
-  "wheel_isolated_install": "author passed with official empty cache; earlier explicit offline attempt failed due to incomplete cache",
+  "new_independent_review": {
+    "status": "pending",
+    "sealed_cases_reported_by_reviewer": 68,
+    "executed_by_author": false
+  },
+  "bounded_real_source_check": {
+    "http_requests": 6,
+    "http_200": 6,
+    "date": "2026-10-08",
+    "turnover_accepted": false,
+    "sina_1m_volume_residual_shares": "52300",
+    "sina_1m_amount_residual_cny": "507179.1011",
+    "sina_5m_amount_residual_cny": "507179.1008"
+  },
+  "dependency_versions_changed": false,
   "code_history_rewritten": false,
+  "pushed": false,
+  "published": false,
   "limitations": [
-    "independent incremental review pending",
-    "no verified JoinQuant equivalence",
-    "no adjustment or paused fill",
-    "no complete historical minute coverage",
-    "no historical universe PIT",
-    "no production stability validation"
+    "No verified vendor historical publication/revision PIT",
+    "No proven finality",
+    "No real Sina coverage contract supplied",
+    "Full historical minute target remains unsupported",
+    "Same-vendor minute/day trading scopes and turnover residual unresolved",
+    "No historical security universe, corporate-action or adjustment dataset",
+    "No full strategy, live trading or long-running latency validation"
   ]
 }

@@ -85,6 +85,13 @@ def nonempty(value, name):
     require(isinstance(value, str) and bool(value.strip()), "INVALID_BUNDLE", f"缺少 {name}")
 
 
+def validate_ohlc(o, h, low, c, *, code="INVALID_OHLC"):
+    """Shared live/import price gate; callers retain their numeric precision contract."""
+    require(all(x.is_finite() and 0 < x < Decimal("1e17") for x in (o, h, low, c))
+            and low <= min(o, c) <= max(o, c) <= h, code,
+            "OHLC 必须为有限正数、小于 1e17 并满足 low <= open/close <= high")
+
+
 def normalize(bundle):
     """Validate a bounded local bundle; retain original rows verbatim as JSON source_fields."""
     try:
@@ -135,8 +142,7 @@ def normalize(bundle):
                 require(available >= end, "INVALID_VISIBILITY", "完整 bar 不可在闭合前可见")
                 require(available <= observed_at, "INVALID_VISIBILITY", "可见时间不能晚于观测时间")
             o, h, low, c = (number(raw[k]) for k in ("open", "high", "low", "close"))
-            require(low <= min(o, c) <= max(o, c) <= h and low > 0,
-                    "INVALID_OHLC", "OHLC 必须为正并满足 low <= open/close <= high")
+            validate_ohlc(o, h, low, c)
             v = number(raw["volume"]) * lot
             a = number(raw["amount"]) * (10000 if src["amount_unit"] == "CNY_10K" else 1)
             number(v)

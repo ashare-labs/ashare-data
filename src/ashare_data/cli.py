@@ -11,6 +11,7 @@ from pathlib import Path
 from .model import DataError, require
 from .storage import Store
 from .live import Client, capabilities
+from .contracts import CoverageContract
 
 
 def json_value(value):
@@ -43,13 +44,34 @@ def parser():
     price.add_argument("--fields", nargs="+")
     price.add_argument("--fq", choices=["none", "pre", "post"], default="none")
     price.add_argument("--strict", action="store_true")
+    price.add_argument("--as-of", help="独立策略时钟；不改变 end 标签过滤语义；仅读固定缓存")
+    price.add_argument("--visibility", choices=["assumed", "received", "verified"], default="verified")
+    price.add_argument("--require-complete", action="store_true")
+    price.add_argument("--require-fresh", action="store_true")
+    price.add_argument("--require-final", action="store_true")
+    price.add_argument("--coverage-contract", help="A数达本地证据契约 JSON；不从缺 bar 推测状态")
+    coverage = sub.add_parser("live-coverage", help="检查声明日历/session/status 下的标签覆盖")
+    coverage.add_argument("security")
+    coverage.add_argument("--start", required=True)
+    coverage.add_argument("--end", required=True)
+    coverage.add_argument("--frequency", choices=["daily", "1m", "5m"], default="1m")
+    coverage.add_argument("--coverage-contract")
+    acquire = sub.add_parser("acquire-price", help="显式刷新一个有限源窗口；无历史分页或造数补齐")
+    acquire.add_argument("security")
+    acquire.add_argument("--start", required=True)
+    acquire.add_argument("--end", required=True)
+    acquire.add_argument("--frequency", choices=["daily", "1m", "5m"], default="1m")
+    acquire.add_argument("--coverage-contract")
+    reconcile = sub.add_parser("reconcile-day", help="单股单日分钟与当前日快照量额诊断")
+    reconcile.add_argument("security")
+    reconcile.add_argument("--date", required=True)
     info = sub.add_parser("security", help="查询显式证券的当前名称/代码")
     info.add_argument("security")
     days = sub.add_parser("trade-days", help="查询上交所当前发布年度交易日")
     days.add_argument("--start")
     days.add_argument("--end")
     days.add_argument("--count", type=int)
-    for live in (price, info, days):
+    for live in (price, info, days, coverage, acquire, reconcile):
         live.add_argument("--cache", help="可选缓存目录")
         live.add_argument("--cache-mode", choices=["prefer", "only", "refresh"], default="prefer")
         live.add_argument("--timeout", type=float, default=15)
@@ -76,15 +98,25 @@ def parser():
 def main(argv=None):
     args = parser().parse_args(argv)
     try:
-        if args.command in {"price", "security", "trade-days"}:
-            client = Client(cache=args.cache, cache_mode=args.cache_mode, timeout=args.timeout)
+        if args.command in {"price", "security", "trade-days", "live-coverage", "acquire-price", "reconcile-day"}:
+            contract_path = getattr(args, "coverage_contract", None)
+            client = Client(cache=args.cache, cache_mode=args.cache_mode, timeout=args.timeout,
+                            coverage_contract=CoverageContract(read_json(contract_path)) if contract_path else None)
             if args.command == "price":
                 frame = client.get_price(args.security[0] if len(args.security) == 1 else args.security,
                                          start_date=args.start, end_date=args.end, count=args.count,
                                          frequency=args.frequency, fields=args.fields,
-                                         fq=None if args.fq == "none" else args.fq, strict=args.strict)
+                                         fq=None if args.fq == "none" else args.fq, strict=args.strict,
+                                         as_of=args.as_of, visibility=args.visibility, require_complete=args.require_complete,
+                                         require_fresh=args.require_fresh, require_final=args.require_final)
                 result = {"rows": (frame.reset_index() if frame.index.name == "time" else frame).to_dict("records"),
                           "metadata": frame.attrs}
+            elif args.command == "live-coverage":
+                result = client.coverage(args.security, args.start, args.end, frequency=args.frequency)
+            elif args.command == "acquire-price":
+                result = client.acquire_price(args.security, args.start, args.end, frequency=args.frequency)
+            elif args.command == "reconcile-day":
+                result = client.reconcile_day(args.security, args.date)
             elif args.command == "security":
                 result = client.get_security_info(args.security)
             else:
@@ -133,6 +165,8 @@ def main(argv=None):
                     else:
                         result = getattr(view, ds.replace("-", "_"))()
         print(json.dumps(result, ensure_ascii=False, sort_keys=True, default=json_value))
+        if args.command in {"live-coverage", "acquire-price", "reconcile-day"}:
+            return 0 if result.get({"live-coverage": "complete", "acquire-price": "requirements_met", "reconcile-day": "accepted"}[args.command]) else 2
         return 0 if args.command != "validate" or result["passed"] else 2
     except DataError as exc:
         print(json.dumps({"error": exc.as_dict()}, ensure_ascii=False, default=json_value), file=sys.stderr)

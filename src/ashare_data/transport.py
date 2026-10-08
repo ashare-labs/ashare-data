@@ -9,11 +9,12 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from urllib.parse import parse_qsl, urlsplit
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
-from .model import DataError, require
+from .model import DataError, canonical, digest, require, timestamp
 
 _LOCK = threading.Lock()
 _LAST_REQUEST = 0.0
@@ -63,14 +64,64 @@ class Transport:
                 "INVALID_REQUEST", "timeout 须为 0..60 秒")
         self.root = Path(cache).expanduser() if cache is not None else None
         self.mode, self.ttl, self.timeout = cache_mode, cache_ttl, timeout
+        self._frozen = None
+        self.snapshot_id = None
+
+    def freeze(self, *, received_by=None):
+        """Pin local response versions; never fetch or migrate a legacy cache."""
+        require(self.root is not None, "CACHE_REQUIRED", "策略时钟查询须先显式采集到缓存，再固定本地观测版本")
+        paths = list((self.root / "requests").glob("*.json"))
+        if received_by is not None:
+            paths += list((self.root / "observations").glob("*.json"))
+        require(len(paths) <= 10000, "BOUNDED_QUERY", "观测索引过多，请使用独立小范围缓存")
+        latest, eligible = {}, {}
+        try:
+            for path in paths:
+                require(path.stat().st_size <= 65536, "CACHE_CORRUPT", "观测索引过大")
+                entry = json.loads(path.read_text())
+                key = hashlib.sha256(entry["url"].encode()).hexdigest()
+                observed = timestamp(entry["observed_at"])
+                for target in [latest] + ([eligible] if received_by is not None and observed <= received_by else []):
+                    previous = target.get(key)
+                    if previous and observed == timestamp(previous["observed_at"]):
+                        require(previous["sha256"] == entry["sha256"], "OBSERVATION_CONFLICT", "同一观测时刻存在冲突版本")
+                    if previous is None or observed > timestamp(previous["observed_at"]):
+                        target[key] = entry
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            raise DataError("CACHE_CORRUPT", "不能固定观测索引") from exc
+        frozen = Transport(cache=self.root, cache_mode="only", cache_ttl=self.ttl, timeout=self.timeout)
+        # A late-only entry remains identifiable, so the visibility gate can explain
+        # why it is not available at the requested historical clock.
+        frozen._frozen = {**latest, **eligible}
+        frozen.snapshot_id = digest(frozen._frozen)
+        return frozen
 
     def read(self, url, decode):
         key = hashlib.sha256(url.encode()).hexdigest()
         path = self.root / "requests" / (key + ".json") if self.root else None
-        if path and self.mode != "refresh" and path.exists():
+        pinned = self._frozen.get(key) if self._frozen is not None else None
+        reused_window = False
+        if self._frozen is not None and pinned is None:
+            # A fixed context can reuse another pinned window of the exact same
+            # endpoint/security/frequency. It never changes source or fetches.
+            def signature(value):
+                parsed = urlsplit(value)
+                params = dict(parse_qsl(parsed.query))
+                size = params.pop("datalen", None)
+                return (parsed.scheme, parsed.netloc, parsed.path, sorted(params.items())), size
+            wanted, size = signature(url)
+            if size is not None:
+                candidates = [entry for entry in self._frozen.values()
+                              if signature(entry["url"])[0] == wanted and
+                              str(signature(entry["url"])[1]).isdigit()]
+                if candidates:
+                    pinned = max(candidates, key=lambda entry: (int(signature(entry["url"])[1]), timestamp(entry["observed_at"])))
+                    reused_window = True
+        exists = pinned is not None if self._frozen is not None else path and path.exists()
+        if path and self.mode != "refresh" and exists:
             try:
-                entry = json.loads(path.read_text())
-                require(entry["url"] == url, "CACHE_CORRUPT", "缓存请求不匹配")
+                entry = json.loads(canonical(pinned)) if pinned is not None else json.loads(path.read_text())
+                require(entry["url"] == url or reused_window, "CACHE_CORRUPT", "缓存请求不匹配")
                 content_hash = entry["sha256"]
                 require(len(content_hash) == 64 and all(c in "0123456789abcdef" for c in content_hash),
                         "CACHE_CORRUPT", "缓存内容编号无效")
@@ -83,6 +134,7 @@ class Transport:
                 raise DataError("CACHE_CORRUPT", "缓存不可读；可显式 refresh 重新获取") from exc
             if self.mode == "only" or age <= self.ttl:
                 return decode(body), {**entry, "cache_hit": True, "cache_age_seconds": age,
+                                     "requested_url": url, "cache_window_reused": reused_window,
                                      "network_used": False}
         require(self.mode != "only", "CACHE_MISS", "离线缓存中没有这个请求；先联网调用同一接口")
         request_started_at = datetime.now(timezone.utc).isoformat()
@@ -92,12 +144,21 @@ class Transport:
                  "request_started_at": request_started_at,
                  "observed_at": datetime.now(timezone.utc).isoformat()}
         if path:
-            self._write(self.root / "objects" / entry["sha256"], body)
+            previous = None
+            if path.exists():
+                try:
+                    previous = json.loads(path.read_text()).get("observation_id")
+                except (OSError, ValueError, AttributeError):
+                    pass  # Explicit refresh may repair a broken index; it never rewrites an observation.
+            entry["supersedes_observation"] = previous
+            entry["observation_id"] = digest(entry)
+            self._write(self.root / "objects" / entry["sha256"], body, immutable=True)
+            self._write(self.root / "observations" / (entry["observation_id"] + ".json"), canonical(entry), immutable=True)
             self._write(path, json.dumps(entry, sort_keys=True).encode())
         return decoded, {**entry, "cache_hit": False, "cache_age_seconds": 0, "network_used": True}
 
     @staticmethod
-    def _write(path, body):
+    def _write(path, body, *, immutable=False):
         path.parent.mkdir(parents=True, exist_ok=True)
         temp = path.with_name(path.name + "." + uuid4().hex + ".tmp")
         try:
@@ -105,6 +166,12 @@ class Transport:
                 out.write(body)
                 out.flush()
                 os.fsync(out.fileno())
-            os.replace(temp, path)
+            if immutable:
+                try:
+                    os.link(temp, path)
+                except FileExistsError:
+                    require(path.read_bytes() == body, "CACHE_CORRUPT", "不可变缓存对象已损坏，禁止覆盖")
+            else:
+                os.replace(temp, path)
         finally:
             temp.unlink(missing_ok=True)
