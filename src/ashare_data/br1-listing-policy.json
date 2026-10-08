@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "contract_version": "br1-bounded-listing-1",
+  "owner_version": "0.6.0.dev3",
+  "mode": "conditional_research",
+  "security": "600000.XSHG",
+  "query_dates": ["2020-01-02", "2020-01-03", "2020-01-06", "2020-01-07"],
+  "event_dates": ["2020-01-03", "2020-01-06"],
+  "requests": [
+    ["warmup", "2020-01-02", "2020-01-02"],
+    ["current", "2020-01-03", "2020-01-03"],
+    ["current", "2020-01-06", "2020-01-06"],
+    ["settlement_successor", "2020-01-03", "2020-01-06"],
+    ["settlement_successor", "2020-01-06", "2020-01-07"]
+  ],
+  "assumption_ids": ["A-NORMAL"],
+  "model_listed": true,
+  "model_delisted": false,
+  "absolute_delisting_date": null,
+  "absolute_date_status": "unknown",
+  "evidence_status": "derived_under_declared_assumptions",
+  "source_evidence_status": "bounded_corroborated_review",
+  "fact_ids": ["security_identity", "initial_listing_date", "historical_board_candidate", "daily_status"],
+  "independent_callsite_review_sha256": "d44003895a3f83d82ee200ec42a2f937d4a89e3dcc04ff2cf24fbfa4c3b01cd1",
+  "rqalpha_wheel_sha256": "2afbd96da3940842f5edf474f65df0fb046f9bf445ed3e50010df13c40ee7fe3",
+  "native_consumers": ["StrategyUniverse._clear_de_listed:de_listed_date<=trading_dt", "StockPosition.settlement:de_listed_at(next_trading_date)", "Instrument.active_at/listed_at/de_listed_at"],
+  "adapter_requirements": [
+    "Treat context_sha256 as a caller-declared digest of run/config/data/adapter/RQ identities, actual phase/time, event cursor and recovery generation; owner cannot verify the runtime clock.",
+    "Validate actual current AND target context at event/query/final cache consumption and recovery entry, including zero-position and empty-universe paths.",
+    "Only Jan-03 and Jan-06 may advance native events; Jan-02 warmup and Jan-07 successor are read roles, not extra execution dates.",
+    "Successor must be exactly owner next_open, strictly later, n=1, with covered target state; reject RQ tail clamping.",
+    "An internal bounded horizon marker is not a real delisting date, an estimate or a bound. Never export it as source data or use it outside reviewed consumers.",
+    "Revalidate cached projections against fresh context; reconstruct via public queries on recovery and reject old checkpoint identities. No execution permission is granted.",
+    "Unknown/contradictory listing, status, event or rule evidence stops this profile; do not disable native checks. No automatic external evidence monitoring."
+  ],
+  "complete": false,
+  "historical_pit": false,
+  "execution_permission": false
+}

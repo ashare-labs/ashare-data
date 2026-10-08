@@ -1,3 +1,5 @@
+> **0.6.0.dev3：BR1 有界上市状态。** [新增查询契约](docs/d1-br1-listing.md)：四日条件状态、双日期/用途边界、真实后继校验和缓存复核。绝对退市日 unknown，原事实/数据 ID 不变；须另 pin 新契约与 wheel。执行仍拒绝，原生 adapter 和重跑留待独审。
+
 > **0.6.0.dev2：D1-BR1显式条件研究投影。** [独立公开契约](docs/d1-br1-api.md)。委托方已接受有限A-EQ/A-NORMAL/A-AD08假设用于条件验证；实现与后端绑定仍待独审，执行许可保持false。
 > `Store.compose_br1(..., mode="conditional_research", assumption_ids=("A-EQ","A-NORMAL","A-AD08"))`创建新组合；读取也须显式传mode。
 > 模型空事件、有限前收与限价另行标注假设依赖；严格D1、原verified_absent=false和complete=false不变。没有运行成交或认证历史收益。

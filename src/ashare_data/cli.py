@@ -162,6 +162,12 @@ def parser():
     bq.add_argument("--call", help="完整AD08参数tuple JSON文件")
     sub.add_parser("br1-snapshots")
     sub.add_parser("br1-recover")
+    bl = sub.add_parser("br1-listing", help="显式绑定有界上市状态契约；不授予执行许可")
+    bl.add_argument("operation", choices=["contract", "status", "successor"])
+    bl.add_argument("--dataset", dest="dataset_id", required=True)
+    bl.add_argument("--mode", required=True, choices=["conditional_research"])
+    bl.add_argument("--contract", dest="contract_sha256")
+    bl.add_argument("--call", help="完整有界请求JSON；须含消费方context_sha256")
     return p
 
 
@@ -222,6 +228,17 @@ def main(argv=None):
                 method = getattr(view, args.dataset.replace("-", "_"))
                 value = method(args.date) if args.date is not None else (method(**read_json(args.call)) if args.call else method())
                 result = [x.to_dict() for x in value] if isinstance(value, tuple) else value.to_dict()
+            elif args.command == "br1-listing":
+                view = store.br1(args.dataset_id, mode=args.mode)
+                if args.operation == "contract":
+                    require(args.contract_sha256 is None and args.call is None,
+                            "BR1_LISTING_ARGUMENT", "contract不接受查询参数")
+                    result = view.listing_contract().to_dict()
+                else:
+                    require(args.contract_sha256 is not None and args.call is not None,
+                            "BR1_LISTING_ARGUMENT", "查询必须固定contract并提供完整call")
+                    listing = view.listing(contract_sha256=args.contract_sha256)
+                    result = getattr(listing, args.operation)(**read_json(args.call)).to_dict()
             elif args.command == "d1-compose":
                 result = {"dataset_id": store.compose_d1(args.price, args.facts)}
             elif args.command == "d1-snapshots":

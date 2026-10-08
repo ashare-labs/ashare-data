@@ -412,6 +412,17 @@ class BR1View:
         )
         self._strict = _validate(store, d1._json(data))
         self._id = sid
+        self._store = store
+
+    def listing_contract(self):
+        from .br1_listing import contract
+
+        return contract(self._store.br1(self._id, mode=MODE))
+
+    def listing(self, *, contract_sha256):
+        from .br1_listing import BR1ListingView
+
+        return BR1ListingView(self._store, self._id, contract_sha256=contract_sha256)
 
     def descriptor(self) -> BR1Descriptor:
         s = self._strict.descriptor()
