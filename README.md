@@ -1,3 +1,6 @@
+> **0.5.0.dev2：BaoStock 5/15/30/60分钟有界研究查询。** [分钟接口与实测边界](docs/baostock-minutes.md)。
+> 仅显式证券、短日期窗口；原标签不平移，压缩外层校验未知继续明示。没有1m或完整历史保证。
+
 > 0.5.0.dev1 新增 BaoStock 免费日线、显式证券资料、短窗口日历及不可变请求证据。
 > [接口契约](docs/baostock-api.md) · [来源与许可边界](docs/baostock-source.md)。日线压缩外层校验待验，允许明确标注的研究读取；不提供历史 PIT 或 BaoStock 1m。
 
@@ -15,7 +18,33 @@ A数达是直接获取 A 股行情的 Python 库和命令行工具。调用 `get
 
 当前支持沪深 A 股的日线、近期1分钟和5分钟行情，单股、多股、日期筛选及按条数查询；可选择本地缓存，用同一接口离线读取。另提供证券名称查询、上交所年度交易日历，以及高级离线数据管理能力。
 
-接口名称、证券代码和 DataFrame 形态向聚宽本地 SDK 靠拢，长期目标是逐步扩展兼容范围。当前 **0.5.0.dev1 为 BaoStock 研究接入候选**，尚不能直接替换 `jqdatasdk`，支持范围见[接口说明](docs/live-api.md)。
+接口名称、证券代码和 DataFrame 形态向聚宽本地 SDK 靠拢，长期目标是逐步扩展兼容范围。当前 **0.5.0.dev2 为 BaoStock 有界分钟研究候选**，尚不能直接替换 `jqdatasdk`，支持范围见[接口说明](docs/live-api.md)。
+
+## BaoStock 分钟直接查询
+
+```python
+from ashare_data import BaoStockSource, Store
+
+store = Store("./bao-store")  # 首次使用先 Store.init("./bao-store")
+source = BaoStockSource(sdk_path="/path/to/existing/baostock-0.9.4")
+result = source.get_price("600000.XSHG", store=store,
+                          start_date="2026-09-30", end_date="2026-09-30",
+                          frequency="5m")  # 同样支持15m / 30m / 60m
+print(result.data)
+print(result.report["coverage"]["minute_labels"])
+
+# 固定版本离线重开，不触发网络，不需要SDK
+capture_id = result.report["capture_id"]
+result = Store("./bao-store").baostock(capture_id).get_price()
+```
+
+```sh
+.venv/bin/ashare-data --store ./bao-store baostock-fetch minute --frequency 5m --security 600000.XSHG --start 2026-09-30 --end 2026-09-30 --sdk-path /path/to/existing/baostock-0.9.4
+.venv/bin/ashare-data --store ./bao-store baostock-query price --capture CAPTURE_ID
+```
+
+此入口显式使用BaoStock，最多2个连续自然日；默认`frequency="daily"`保持日线接口。
+下面的通用顶层`get_price`沿用原新浪通道，不会自动替换来源。
 
 ## BaoStock 显式研究查询
 

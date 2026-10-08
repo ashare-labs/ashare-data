@@ -121,7 +121,8 @@ def parser():
             for flag in ("complete", "fresh", "final", "tradable"):
                 rp.add_argument("--require-" + flag, action="store_true")
     bf = sub.add_parser("baostock-fetch", help="显式查询匿名免费源并封存请求证据")
-    bf.add_argument("kind", choices=["daily", "basic", "calendar"])
+    bf.add_argument("kind", choices=["daily", "minute", "basic", "calendar"])
+    bf.add_argument("--frequency", choices=["daily", "5m", "15m", "30m", "60m"])
     bf.add_argument("--security")
     bf.add_argument("--start")
     bf.add_argument("--end")
@@ -182,7 +183,7 @@ def main(argv=None):
                 from .baostock import BaoStockSource
                 source = BaoStockSource(sdk_path=args.sdk_path, timeout=args.timeout)
                 sid = source.fetch(store, kind=args.kind, security=args.security,
-                                   start_date=args.start, end_date=args.end)
+                                   start_date=args.start, end_date=args.end, frequency=args.frequency)
                 result = store.baostock(sid).descriptor()
                 require(result["status"] in {"research_rows", "empty_unknown"},
                         "SOURCE_REQUEST_FAILED", "源响应未达到研究读取条件；失败证据已封存", result)

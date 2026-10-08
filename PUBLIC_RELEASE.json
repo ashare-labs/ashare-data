@@ -1,23 +1,17 @@
 {
-  "version": "0.5.0.dev1",
-  "status": "local bounded BaoStock research candidate; author verified; independent review pending",
-  "frozen_at_utc": "2026-10-08T19:55:49.404041+00:00",
-  "base_commit": "7533b1f3f26fe7a651fc4e4454acc254b30845a8",
-  "branch": "feature/baostock-research",
-  "payload_files": 64,
-  "public_files_including_metadata": 66,
-  "public_manifest_sha256": "fe0a28af2b2c5ea1d49c8d0b205722f4df6bb11447123234ef03d5b074e440b3",
-  "source_and_wheel_passed_each": 866,
-  "new_baostock_tests": 87,
-  "prior_project_tests": 746,
+  "version": "0.5.0.dev2",
+  "status": "local bounded BaoStock minute candidate; author source/wheel verified; independent review pending",
+  "frozen_at_utc": "2026-10-08T20:13:54.373765+00:00",
+  "base_commit": "6b0a24ad4719657410f7621cf42ade41c93a6d21",
+  "branch": "feature/baostock-minutes",
+  "public_files_including_metadata": 70,
+  "payload_files": 68,
+  "public_manifest_sha256": "5657d96f71273ec0ba31cce251348904800e68bf2b9bcb85d33bb253ae1d5840",
+  "source_and_wheel_passed_each": 928,
+  "previous_project_tests": 833,
+  "new_minute_tests": 62,
   "unchanged_external_tests": 33,
-  "receipt_v4_original_tests": 312,
-  "integrated_r1r2_replay": {
-    "PASS": 300,
-    "FAIL": 0,
-    "DIAGNOSTIC": 1
-  },
-  "prior_reviewer_replays": {
+  "prior_reviewer_replays_each": {
     "research72": {
       "PASS": 71,
       "DIAGNOSTIC": 1
@@ -36,29 +30,44 @@
       "FAIL": 2
     }
   },
-  "dependencies": "unchanged lock except project version; existing official SDK0.9.4 independently fingerprinted; not bundled",
+  "receipt_worker_sdk_core": "unchanged from 6b0a24a, fingerprint verified; no new R1/R2 semantics",
+  "scope": {
+    "frequencies": [
+      "5m",
+      "15m",
+      "30m",
+      "60m"
+    ],
+    "max_securities_per_request": 1,
+    "max_calendar_days": 2,
+    "max_rows": 128,
+    "max_pages": 2
+  },
   "real_probe": {
-    "business_queries": 7,
-    "anonymous_logins": 5,
-    "logout": 1,
+    "business_queries": 6,
+    "anonymous_logins": 6,
+    "retry_count": 0,
+    "minute_rows": 172,
+    "daily_reference_rows_new": 2,
     "securities": [
       "600000.XSHG",
       "000001.XSHE"
     ],
-    "daily_window": [
-      "2026-09-28",
+    "dates": [
+      "2026-09-29",
       "2026-09-30"
     ],
-    "new_unique_daily_rows": 3,
     "provider_failure_observed": false
   },
   "limitations": [
-    "compressed daily outer integrity unverified; research readable, received denied",
-    "no historical PIT or complete market coverage",
-    "no 1m, 14:55 closed-bar certification, strategy/trading acceptance",
-    "commercial redistribution permission unconfirmed"
+    "compressed outer integrity remains unverified",
+    "session-end label is an observed grid hypothesis, not verified bar closure",
+    "no 1m, PIT or full historical/market coverage",
+    "600000 2026-09-30 minute amount totals are CNY0.38 below daily; difference preserved"
   ],
+  "dependencies": "unchanged locked dependencies; existing SDK only; no new downloads",
   "pushed": false,
   "published": false,
-  "deployed": false
+  "deployed": false,
+  "akuan_dependency_changed": false
 }

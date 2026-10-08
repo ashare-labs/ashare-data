@@ -23,6 +23,7 @@ from .live import _security
 from .model import DataError, canonical, require, timestamp
 from .research import ResearchResult, _bao, _day, _decimal, _read
 from .storage import identifier, immutable_write
+from . import baostock_minutes as minutes
 
 FIELDS = "date,code,open,high,low,close,volume,amount,adjustflag,tradestatus"
 TABLE = """CREATE TABLE IF NOT EXISTS baostock_captures
@@ -30,10 +31,24 @@ TABLE = """CREATE TABLE IF NOT EXISTS baostock_captures
 VERSION = "baostock-research-1/receipt-4.1"
 
 
-def request(kind, security=None, start_date=None, end_date=None):
+def request(kind, security=None, start_date=None, end_date=None, frequency=None):
     require(
-        kind in {"daily", "basic", "calendar"}, "UNSUPPORTED_SOURCE", "仅支持日线、证券资料、日历"
+        kind in {"daily", "minute", "basic", "calendar"},
+        "UNSUPPORTED_SOURCE",
+        "仅支持日线、限定分钟、证券资料、日历",
     )
+    if kind == "minute":
+        require(
+            isinstance(frequency, str) and frequency in minutes.FREQUENCIES,
+            "UNSUPPORTED_FREQUENCY",
+            "分钟仅支持5m/15m/30m/60m；不支持1m",
+        )
+    else:
+        require(
+            frequency is None or (kind == "daily" and frequency == "daily"),
+            "INVALID_ARGUMENT",
+            "周期参数与查询种类不匹配",
+        )
     params = {}
     if kind != "calendar":
         code = _security(security)
@@ -49,13 +64,19 @@ def request(kind, security=None, start_date=None, end_date=None):
     else:
         start, end = _day(start_date), _day(end_date)
         require(
-            start <= end and (end - start).days < 31, "BOUNDED_REQUEST", "须显式指定至多31个自然日"
+            start <= end and (end - start).days < (2 if kind == "minute" else 31),
+            "BOUNDED_REQUEST",
+            "分钟须指定至多2个连续自然日；日线/日历至多31日",
         )
         params.update(start_date=start_date, end_date=end_date)
         method = "query_trade_dates"
-        if kind == "daily":
+        if kind in {"daily", "minute"}:
             method = "query_history_k_data_plus"
-            params.update(fields=FIELDS, frequency="d", adjustflag="3")
+            params.update(
+                fields=minutes.FIELDS if kind == "minute" else FIELDS,
+                frequency=minutes.FREQUENCIES[frequency] if kind == "minute" else "d",
+                adjustflag="3",
+            )
     return {"method": method, "params": params}
 
 
@@ -85,9 +106,10 @@ class BaoStockSource:
     def capabilities():
         return {
             "source": "baostock",
-            "kinds": ["daily", "basic", "calendar"],
-            "frequencies": ["daily"],
+            "kinds": ["daily", "minute", "basic", "calendar"],
+            "frequencies": ["daily", *minutes.FREQUENCIES],
             "max_calendar_days": 31,
+            "max_minute_calendar_days": 2,
             "max_securities": 1,
             "max_rows": 128,
             "max_pages": 2,
@@ -97,12 +119,18 @@ class BaoStockSource:
             "full_history": False,
             "concurrent_connections": False,
             "daily_outer_integrity": "unverified",
-            "minute_data": "unsupported",
+            "minute_data": "bounded_research; compressed_outer_integrity_unverified",
+            "one_minute": "unsupported",
         }
 
-    def get_price(self, security, *, store, start_date, end_date):
+    def get_price(self, security, *, store, start_date, end_date, frequency="daily"):
         sid = self.fetch(
-            store, kind="daily", security=security, start_date=start_date, end_date=end_date
+            store,
+            kind="daily" if frequency == "daily" else "minute",
+            security=security,
+            start_date=start_date,
+            end_date=end_date,
+            frequency=frequency,
         )
         return self._acquired(store.baostock(sid).get_price())
 
@@ -121,8 +149,8 @@ class BaoStockSource:
         result.report["acquisition"] = "explicit_baostock_query"
         return result
 
-    def fetch(self, store, *, kind, security=None, start_date=None, end_date=None):
-        req = request(kind, security, start_date, end_date)
+    def fetch(self, store, *, kind, security=None, start_date=None, end_date=None, frequency=None):
+        req = request(kind, security, start_date, end_date, frequency)
         # A per-user machine lock spans every store created by this library.
         lock = Path(tempfile.gettempdir()) / f"ashare-baostock-{os.getuid()}.lock"
         with lock.open("a+b") as fd:
@@ -196,10 +224,14 @@ def _verify_impl(blobs):
     }
     kind = methods[req["method"]]
     params = req["params"]
+    frequency = None
+    if kind == "daily" and params.get("frequency") != "d":
+        kind = "minute"
+        frequency = str(params.get("frequency")) + "m"
     code = params.get("code")
     sec = (code[3:] + (".XSHG" if code[:2] == "sh" else ".XSHE")) if code else None
     require(
-        req == request(kind, sec, params.get("start_date"), params.get("end_date")),
+        req == request(kind, sec, params.get("start_date"), params.get("end_date"), frequency),
         "INTEGRITY",
         "请求超出固定范围",
     )
@@ -384,6 +416,8 @@ def _verify_impl(blobs):
                     }
                 )
             )
+        elif kind == "minute":
+            minutes.validate(rows, params)
         elif kind == "calendar" and rows:
             _bao(
                 canonical(
@@ -414,14 +448,16 @@ def _verify_impl(blobs):
 
 
 def _publish(store, blobs):
-    _verify(blobs)
+    attempt, *_ = _verify(blobs)
     require(
         len(blobs) <= 20 and sum(map(len, blobs.values())) <= 20 * 1024 * 1024,
         "BOUNDED_IMPORT",
         "证据文件超限",
     )
     manifest = {
-        "version": VERSION,
+        "version": minutes.VERSION
+        if attempt["request"]["params"].get("frequency") in minutes.FREQUENCIES.values()
+        else VERSION,
         "artifacts": [
             {"name": n, "sha256": bh(b), "bytes": len(b)} for n, b in sorted(blobs.items())
         ],
@@ -454,7 +490,7 @@ def _load(store, body, sid):
     require(bh(body) == sid, "INTEGRITY", "清单 hash 不匹配")
     m = json.loads(body)
     require(
-        m["version"] == VERSION and 0 < len(m["artifacts"]) <= 20,
+        m["version"] in {VERSION, minutes.VERSION} and 0 < len(m["artifacts"]) <= 20,
         "INTEGRITY",
         "证据版本或文件数无效",
     )
@@ -470,7 +506,14 @@ def _load(store, body, sid):
         require(len(b) == a["bytes"] and bh(b) == a["sha256"], "INTEGRITY", "证据内容 hash 不匹配")
         blobs[name] = b
     require(sum(map(len, blobs.values())) <= 20 * 1024 * 1024, "INTEGRITY", "证据总量超限")
-    return m, _verify(blobs)
+    verified = _verify(blobs)
+    expected_version = (
+        minutes.VERSION
+        if verified[0]["request"]["params"].get("frequency") in minutes.FREQUENCIES.values()
+        else VERSION
+    )
+    require(m["version"] == expected_version, "INTEGRITY", "证据版本与周期契约不符")
+    return m, verified
 
 
 def snapshots(store):
@@ -535,7 +578,7 @@ class BaoStockView:
         return copy.deepcopy(
             {
                 "capture_id": self._id,
-                "version": VERSION,
+                "version": self._manifest["version"],
                 "source": "baostock",
                 "status": self._status,
                 "request": self._attempt["request"],
@@ -583,7 +626,7 @@ class BaoStockView:
         }
 
     def coverage(self):
-        return {
+        result = {
             "rows": len(self._rows),
             "query_complete": bool(self._receipt and self._receipt["query_complete"]),
             "query_status": self._receipt["query_status"]
@@ -594,6 +637,11 @@ class BaoStockView:
             "market_coverage": "unknown",
             "calendar_is_source_claim": True,
         }
+        if self._manifest["version"] == minutes.VERSION:
+            result["minute_labels"] = minutes.diagnostics(
+                self._rows, self._attempt["request"]["params"]
+            )
+        return result
 
     def at(self, as_of, *, visibility="received"):
         require(
@@ -636,22 +684,31 @@ class BaoStockView:
         )
         rows = copy.deepcopy(self._rows)
         if method == "query_history_k_data_plus":
+            is_minute = self._manifest["version"] == minutes.VERSION
             for r in rows:
                 r["source_row"] = copy.deepcopy(r)
                 r["raw_record_sha256"] = sh(r["source_row"])
                 r["security"] = r["code"][3:] + (
                     ".XSHG" if r["code"].startswith("sh.") else ".XSHE"
                 )
-                r["source_label"] = r["date"]
+                r["source_label"] = (
+                    minutes.label(r).isoformat(timespec="milliseconds") if is_minute else r["date"]
+                )
+                if is_minute:
+                    r["source_time"] = r.pop("time")
                 for f in ("open", "high", "low", "close", "amount"):
                     r[f] = _decimal(r[f]) if r[f] else None
                 r["volume"] = int(_decimal(r["volume"]))
             data = pd.DataFrame(
                 rows,
-                columns=FIELDS.split(",")
+                columns=(
+                    ["source_time" if f == "time" else f for f in minutes.FIELDS.split(",")]
+                    if is_minute
+                    else FIELDS.split(",")
+                )
                 + ["security", "source_label", "source_row", "raw_record_sha256"],
             )
-            data.index = pd.DatetimeIndex(pd.to_datetime(data["date"]), name="time")
+            data.index = pd.DatetimeIndex(pd.to_datetime(data["source_label"]), name="time")
         else:
             columns = (
                 ["calendar_date", "is_trading_day"]
