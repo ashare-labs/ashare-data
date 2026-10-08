@@ -1,43 +1,28 @@
 {
-  "version": "0.5.0.dev3",
-  "status": "author-verified local repair candidate; new independent review pending",
-  "base_commit": "71c6b4a1656c49908feea28c2c7b083c51b32d54",
-  "branch": "feature/baostock-query-fixes",
-  "created_utc": "2026-10-08T20:44:53.826857+00:00",
-  "public_files_including_metadata": 73,
-  "payload_files": 71,
-  "public_manifest_sha256": "9166b19232ac4070bea2d5e4eb94d5ece7f0e629246dbb4577faae2801fbe08a",
-  "source_and_wheel_passed_each": 1368,
-  "previous_tests": 928,
-  "new_parameter_and_contract_tests": 440,
-  "real_capture_replays": 10,
-  "real_minute_rows_unchanged": 172,
+  "version": "0.6.0.dev1",
+  "base_commit": "9306b27c5e52cc022e8ba2c249dfc38553f19e43",
+  "branch": "feature/d1-facts",
+  "status": "strict D1 blocked; typed projection author-verified, independent implementation review pending",
+  "public_files_including_metadata": 79,
+  "payload_files": 77,
+  "public_manifest_sha256": "7954b30a682e05d052fc33519dd60cf4761dbc0d7a4b1fa00a06fd06fc841ce6",
+  "source_and_wheel_passed_each": 1411,
+  "new_tests": 43,
+  "raw_packet_tests": 22,
   "new_remote_queries": 0,
-  "old_reviewer_script_replays_each": {
-    "daily_original": {
-      "PASS": 97,
-      "FAIL": 1,
-      "reason": "old basic_semantic_validation_gap expects invalid metadata acceptance; new SOURCE_SCHEMA_ERROR is intentional"
-    },
-    "minutes_original": {
-      "PASS": 87,
-      "DIAGNOSTIC": 1,
-      "reason": "legacy diagnostic probes unsupported end_date, not new end/source_label APIs"
-    },
-    "minute_integrity": {
-      "PASS": 5
-    }
-  },
-  "receipt_protocol": "AST unchanged except corrected docstring; SDK and worker bytes unchanged",
-  "dependencies": "same locked dependencies; no downloads; isolated wheel uses hash-verified installed dependency copies",
-  "limitations": [
-    "source-label filtering is not verified closure, actual historical visibility or strict PIT",
-    "compressed outer integrity remains unknown; received remains rejected for minute/daily",
-    "empty metadata dates remain unknown; supported enums do not establish historical eligibility",
-    "existing 600000 minute/day amount difference -0.3800 CNY preserved",
-    "no new 1m, full target history, market truth, corporate action, rules or execution admission"
+  "raw_price_dataset_id": "31bc25c99e00c8b5c43f8d77daeae9ae9bc41116f40802b0aad10567e6259973",
+  "facts_manifest_sha256": "499cc2b4e2985f6597f1d8923fbf1878fcb148f4a0764835607cb3919b040d82",
+  "composite_dataset_id": "4b75c097def48a69dd2042a7df70d835f1e29c7d1507be5c7cd4c6894bac8078",
+  "required_facts_supported": 7,
+  "required_facts_unknown": [
+    "instrument",
+    "price_limits",
+    "event_absence",
+    "adjusted_prev_close"
   ],
+  "dependencies": "unchanged locks; isolated wheel uses byte-verified local dependency copies; no downloads",
+  "execution": "NOT_RUN",
+  "backend_modified": false,
   "pushed": false,
-  "deployed": false,
-  "akuan_dependency_changed": false
+  "deployed": false
 }

@@ -154,6 +154,31 @@ class Store:
         from .baostock import BaoStockView
         return BaoStockView(self, capture_id)
 
+    def import_d1_facts(self, directory):
+        """Seal the explicitly reviewed, local D1 evidence package."""
+        from .d1 import import_facts
+        return import_facts(self, directory)
+
+    def d1_facts(self, component_id):
+        from .d1 import D1Facts
+        return D1Facts(self, component_id)
+
+    def compose_d1(self, price_dataset_id, facts_component_id):
+        from .d1 import compose
+        return compose(self, price_dataset_id, facts_component_id)
+
+    def d1(self, dataset_id):
+        from .d1 import D1View
+        return D1View(self, dataset_id)
+
+    def d1_snapshots(self):
+        from .d1 import snapshots
+        return snapshots(self)
+
+    def recover_d1(self):
+        from .d1 import recover
+        return recover(self)
+
     def baostock_snapshots(self):
         from .baostock import snapshots
         return snapshots(self)

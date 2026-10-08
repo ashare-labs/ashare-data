@@ -137,6 +137,18 @@ def parser():
     bq.add_argument("--end-exclusive", action="store_true", help="排除--end恰好相等的标签")
     sub.add_parser("baostock-snapshots")
     sub.add_parser("baostock-recover")
+    di = sub.add_parser("d1-import-facts", help="离线封存已审阅的固定D1证据包")
+    di.add_argument("directory")
+    dc = sub.add_parser("d1-compose", help="组合固定价格和事实版本，不授予执行许可")
+    dc.add_argument("--price", required=True)
+    dc.add_argument("--facts", required=True)
+    dq = sub.add_parser("d1-query", help="固定D1组合的离线typed事实和阻断诊断")
+    dq.add_argument("dataset", choices=["descriptor", "instrument", "rules", "bars", "calendar",
+                    "statuses", "events", "event-coverage", "limit-candidates", "prev-close-candidates",
+                    "coverage", "lineage", "quality", "admission", "owner-receipt"])
+    dq.add_argument("--dataset", dest="dataset_id", required=True)
+    sub.add_parser("d1-snapshots")
+    sub.add_parser("d1-recover")
     return p
 
 
@@ -181,6 +193,19 @@ def main(argv=None):
             store = Store(args.store)
             if args.command in {"capabilities", "snapshots", "recover"}:
                 result = getattr(store, args.command)()
+            elif args.command == "d1-import-facts":
+                result = {"facts_component_id": store.import_d1_facts(args.directory)}
+            elif args.command == "d1-compose":
+                result = {"dataset_id": store.compose_d1(args.price, args.facts)}
+            elif args.command == "d1-snapshots":
+                result = store.d1_snapshots()
+            elif args.command == "d1-recover":
+                result = store.recover_d1()
+            elif args.command == "d1-query":
+                view = store.d1(args.dataset_id)
+                method = {"events": "known_events"}.get(args.dataset, args.dataset.replace("-", "_"))
+                value = getattr(view, method)()
+                result = [x.to_dict() for x in value] if isinstance(value, tuple) else value.to_dict()
             elif args.command == "baostock-fetch":
                 from .baostock import BaoStockSource
                 source = BaoStockSource(sdk_path=args.sdk_path, timeout=args.timeout)
@@ -258,6 +283,8 @@ def main(argv=None):
                     else:
                         result = getattr(view, ds.replace("-", "_"))()
         print(json.dumps(result, ensure_ascii=False, sort_keys=True, default=json_value))
+        if args.command == "d1-query" and args.dataset == "admission":
+            return 0 if result["execution_permission"] else 2
         if args.command in {"live-coverage", "acquire-price", "reconcile-day", "trading-status"}:
             return 0 if result.get({"live-coverage": "complete", "acquire-price": "requirements_met", "reconcile-day": "accepted", "trading-status": "tradable"}[args.command]) else 2
         return 0 if args.command != "validate" or result["passed"] else 2
