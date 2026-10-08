@@ -120,6 +120,20 @@ def parser():
             rp.add_argument("--visibility", choices=["verified", "assumed", "received"], default="verified")
             for flag in ("complete", "fresh", "final", "tradable"):
                 rp.add_argument("--require-" + flag, action="store_true")
+    bf = sub.add_parser("baostock-fetch", help="显式查询匿名免费源并封存请求证据")
+    bf.add_argument("kind", choices=["daily", "basic", "calendar"])
+    bf.add_argument("--security")
+    bf.add_argument("--start")
+    bf.add_argument("--end")
+    bf.add_argument("--sdk-path", help="已有官方0.9.4 SDK根目录；不自动安装")
+    bf.add_argument("--timeout", type=float, default=15)
+    bq = sub.add_parser("baostock-query", help="离线查询固定BaoStock证据版本")
+    bq.add_argument("dataset", choices=["price", "security", "trade-days", "descriptor", "quality", "coverage", "lineage"])
+    bq.add_argument("--capture", required=True)
+    bq.add_argument("--as-of")
+    bq.add_argument("--visibility", choices=["received", "verified"], default="received")
+    sub.add_parser("baostock-snapshots")
+    sub.add_parser("baostock-recover")
     return p
 
 
@@ -164,6 +178,25 @@ def main(argv=None):
             store = Store(args.store)
             if args.command in {"capabilities", "snapshots", "recover"}:
                 result = getattr(store, args.command)()
+            elif args.command == "baostock-fetch":
+                from .baostock import BaoStockSource
+                source = BaoStockSource(sdk_path=args.sdk_path, timeout=args.timeout)
+                sid = source.fetch(store, kind=args.kind, security=args.security,
+                                   start_date=args.start, end_date=args.end)
+                result = store.baostock(sid).descriptor()
+                require(result["status"] in {"research_rows", "empty_unknown"},
+                        "SOURCE_REQUEST_FAILED", "源响应未达到研究读取条件；失败证据已封存", result)
+            elif args.command == "baostock-query":
+                view = store.baostock(args.capture)
+                if args.as_of:
+                    view = view.at(args.as_of, visibility=args.visibility)
+                method = {"price": "get_price", "security": "get_security_info", "trade-days": "get_trade_days"}.get(args.dataset, args.dataset)
+                value = getattr(view, method)()
+                result = value.to_dict() if hasattr(value, "to_dict") else value
+            elif args.command == "baostock-snapshots":
+                result = store.baostock_snapshots()
+            elif args.command == "baostock-recover":
+                result = store.recover_baostock()
             elif args.command == "research-snapshots":
                 result = store.research_snapshots()
             elif args.command == "research-recover":

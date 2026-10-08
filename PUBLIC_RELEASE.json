@@ -1,122 +1,64 @@
 {
-  "version": "0.4.0.dev2",
-  "status": "local reference-isolation repair candidate; author source/wheel passed; independent re-review pending",
-  "frozen_at_utc": "2026-10-08T19:03:49.256677+00:00",
-  "base_commit": "9675cc44d44db036c0474153bd260fbf9e41eb25",
-  "branch": "feature/research-snapshots",
-  "public_manifest_sha256": "b17e9d2e50c8ac37108c838aac25c7190d19b15e18ae016ccc431a9f7b641a51",
-  "public_files_including_metadata": 55,
-  "payload_files": 53,
-  "prior_independent_review": {
-    "commit": "9675cc44d44db036c0474153bd260fbf9e41eb25",
-    "research72": {
-      "PASS": 68,
-      "FAIL": 3,
-      "DIAGNOSTIC": 1
-    },
-    "blocking_root_cause": "S1 public nested report references mutated fixed Bao view and siblings",
-    "source_and_wheel_passed_each": 721
+  "version": "0.5.0.dev1",
+  "status": "local bounded BaoStock research candidate; author verified; independent review pending",
+  "frozen_at_utc": "2026-10-08T19:55:49.404041+00:00",
+  "base_commit": "7533b1f3f26fe7a651fc4e4454acc254b30845a8",
+  "branch": "feature/baostock-research",
+  "payload_files": 64,
+  "public_files_including_metadata": 66,
+  "public_manifest_sha256": "fe0a28af2b2c5ea1d49c8d0b205722f4df6bb11447123234ef03d5b074e440b3",
+  "source_and_wheel_passed_each": 866,
+  "new_baostock_tests": 87,
+  "prior_project_tests": 746,
+  "unchanged_external_tests": 33,
+  "receipt_v4_original_tests": 312,
+  "integrated_r1r2_replay": {
+    "PASS": 300,
+    "FAIL": 0,
+    "DIAGNOSTIC": 1
   },
-  "repair": [
-    "detach whole ResearchResult report, DataFrame cells/axes/attrs, and serialization",
-    "detach complete lineage envelope including nested legacy metadata",
-    "capture Store root value; detach saved coverage contract",
-    "detach legacy DataView constructor inputs/public metadata/conflicts",
-    "detach DataError input and serialized details",
-    "clarify Sina daily amount UNSUPPORTED_FIELD"
-  ],
-  "author_regression": {
-    "prior_project": 688,
-    "new_project": 58,
-    "project_total": 746,
-    "unchanged_external_cases": 33,
-    "source_total_passed": 779,
-    "wheel_total_passed": 779,
-    "failed": 0,
-    "skipped": 0,
-    "network_guard": true
-  },
-  "author_reviewer_replays_each_environment": {
+  "prior_reviewer_replays": {
     "research72": {
       "PASS": 71,
-      "FAIL": 0,
       "DIAGNOSTIC": 1
     },
-    "review119_passed": 119,
-    "dev3_passed": 18,
-    "boundaries_passed": 22,
-    "window_passed": 2,
-    "supplement_passed": 19,
-    "supplement_diagnostic": 3,
+    "review119": 119,
+    "dev3": 18,
+    "boundaries": 22,
+    "windows": 2,
+    "supplement": {
+      "PASS": 19,
+      "DIAGNOSTIC": 3
+    },
     "frozen68": {
       "PASS": 54,
       "SAFE_LIMITED": 12,
       "FAIL": 2
-    },
-    "original_failures_retained": [
-      "C14",
-      "C15"
-    ],
-    "not_independent_acceptance": true
-  },
-  "wheel": {
-    "sha256": "148f80f2272c844e9f0e0e6ef7443bf825b73ae982ec489987b2439e6695e5aa",
-    "runtime_modules_equal": 12,
-    "RECORD_entries_verified": 15,
-    "method": "byte-verified copies of prior locked installed dependencies; offline no-deps wheel install; not fresh online dependency resolution",
-    "dependency_file_count": 4416
-  },
-  "real_data": {
-    "approved_local_daily_rows": 12,
-    "all_approved_row_hashes_match": true,
-    "existing_sina_queried_rows": 2,
-    "both_original_dataset_ids_preserved": true,
-    "source_and_wheel_public_offline_reopen_verified": true,
-    "original_files_unchanged": true,
-    "new_market_requests": 0,
-    "baostock_collector_adopted": false
-  },
-  "performance_control": {
-    "baseline_version": "0.4.0.dev1",
-    "candidate_version": "0.4.0.dev2",
-    "dataset_id": "45c5f5d39140e005142dc8c36471ee03595a76d1f5e392a11c62071c1b9c15e7",
-    "interpretation": "local bounded repeat-read and serialization comparison, not production latency SLA",
-    "rows": {
-      "2": {
-        "repeats_per_trial": 20,
-        "trials": 3,
-        "baseline_median_seconds": 0.024198958999477327,
-        "candidate_median_seconds": 0.03157745899807196,
-        "ratio": 1.304909810325064,
-        "same_full_result_hash": true
-      },
-      "366": {
-        "repeats_per_trial": 20,
-        "trials": 3,
-        "baseline_median_seconds": 0.44905308399756905,
-        "candidate_median_seconds": 0.600944999998319,
-        "ratio": 1.338249354950588,
-        "same_full_result_hash": true
-      }
-    },
-    "context_seconds": {
-      "baseline": 0.011172792001161724,
-      "candidate": 0.01225483299640473
     }
   },
-  "manifest_schema_parser_policy_changed": false,
-  "dependency_versions_changed": false,
+  "dependencies": "unchanged lock except project version; existing official SDK0.9.4 independently fingerprinted; not bundled",
+  "real_probe": {
+    "business_queries": 7,
+    "anonymous_logins": 5,
+    "logout": 1,
+    "securities": [
+      "600000.XSHG",
+      "000001.XSHE"
+    ],
+    "daily_window": [
+      "2026-09-28",
+      "2026-09-30"
+    ],
+    "new_unique_daily_rows": 3,
+    "provider_failure_observed": false
+  },
+  "limitations": [
+    "compressed daily outer integrity unverified; research readable, received denied",
+    "no historical PIT or complete market coverage",
+    "no 1m, 14:55 closed-bar certification, strategy/trading acceptance",
+    "commercial redistribution permission unconfirmed"
+  ],
   "pushed": false,
   "published": false,
-  "code_history_rewritten": false,
-  "limitations": [
-    "new independent acceptance still pending",
-    "caller-modified result copies are not reauthenticated or rehashed",
-    "local bounded performance controls do not establish production latency or large-scale throughput",
-    "verified historical PIT/finality unavailable; legacy Bao receipt time unknown",
-    "source-grid matching is not full trading/session/status admission",
-    "Sina daily money unsupported; source turnover discrepancy unresolved",
-    "target true minute history and 14:55 semantics not established",
-    "no full A-width engine/strategy acceptance or cross-platform long run"
-  ]
+  "deployed": false
 }

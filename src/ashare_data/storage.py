@@ -150,6 +150,18 @@ class Store:
             finally:
                 fcntl.flock(f, fcntl.LOCK_UN)
 
+    def baostock(self, capture_id):
+        from .baostock import BaoStockView
+        return BaoStockView(self, capture_id)
+
+    def baostock_snapshots(self):
+        from .baostock import snapshots
+        return snapshots(self)
+
+    def recover_baostock(self):
+        from .baostock import recover
+        return recover(self)
+
     def research(self, dataset_id):
         """Reopen a fixed, verified local research dataset without network access."""
         from .research import ResearchView
