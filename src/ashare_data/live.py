@@ -120,7 +120,8 @@ class Client:
         self._clock, self._visibility = None, None
         self._requirements = {}
 
-    def at(self, as_of, *, visibility="verified", require_complete=False, require_fresh=False, require_final=False):
+    def at(self, as_of, *, visibility="verified", require_complete=False, require_fresh=False, require_final=False,
+           require_tradable=False):
         """A pinned, offline context. Strategies supply a clock and desired guarantees."""
         clock = timestamp(as_of)
         require(clock <= datetime.now(TZ), "INVALID_TIME", "策略时钟不能在未来")
@@ -128,33 +129,49 @@ class Client:
         require(visibility != "verified", "VISIBILITY_UNKNOWN",
                 "当前公开源尚无证据级历史 PIT；可显式选择 assumed 研究模型或 received 本机观测等级",
                 {"as_of": clock.isoformat(), "point_in_time_verified": False, "source": "sina_public"})
-        require(all(type(v) is bool for v in (require_complete, require_fresh, require_final)),
+        require(all(type(v) is bool for v in (require_complete, require_fresh, require_final, require_tradable)),
                 "INVALID_REQUEST", "准入要求须为布尔值")
         context = Client(cache=self.transport.root, cache_mode="only", coverage_contract=self.coverage_contract)
         context.transport = self.transport.freeze(received_by=clock if visibility == "received" else None)
         context._clock, context._visibility = clock, visibility
         context._requirements = {"require_complete": require_complete, "require_fresh": require_fresh,
-                                 "require_final": require_final}
+                                 "require_final": require_final, "require_tradable": require_tradable}
         return context
+
+    def trading_status(self, security, *, as_of=None):
+        """No HTTP/cache dependency: calendar and interval-state admission only."""
+        _security(security)
+        require(as_of is None or self._clock is None, "INVALID_REQUEST", "固定上下文不能替换策略时钟")
+        clock = timestamp(as_of) if as_of is not None else self._clock or datetime.now(TZ)
+        require(clock <= datetime.now(TZ), "INVALID_TIME", "策略时钟不能在未来")
+        if self.coverage_contract is None:
+            return {"state": "unknown", "tradable": False, "as_of": clock.isoformat(),
+                    "reasons": ["CALENDAR_UNKNOWN", "TRADING_STATUS_UNKNOWN"], "contract_id": None}
+        require(self.coverage_contract._data["provider"] == "sina_public", "CONTRACT_SCOPE_MISMATCH", "契约来源不符")
+        return self.coverage_contract.trading_status(security, clock)
 
     def get_price(self, security, start_date=None, end_date=None, frequency="daily", fields=None,
                   skip_paused=False, fq=None, count=None, panel=False, fill_paused=False,
                   round=False, *, strict=False, as_of=None, visibility="verified",
-                  require_complete=False, require_fresh=False, require_final=False):
+                  require_complete=False, require_fresh=False, require_final=False, require_tradable=False):
         """Inclusive source labels; count counts returned source bars, never fabricated grid rows."""
+        require(all(type(v) is bool for v in (require_complete, require_fresh, require_final, require_tradable)),
+                "INVALID_REQUEST", "准入要求须为布尔值")
         require(visibility in LEVELS, "INVALID_VISIBILITY", "visibility 支持 assumed/received/verified")
         require(self._clock is None or visibility == "verified", "INVALID_REQUEST", "上下文的可见性等级已固定，不能在查询中替换")
         if as_of is not None:
             require(self._clock is None, "INVALID_REQUEST", "固定上下文不能替换策略时钟")
             return self.at(as_of, visibility=visibility, require_complete=require_complete,
-                           require_fresh=require_fresh, require_final=require_final).get_price(
+                           require_fresh=require_fresh, require_final=require_final,
+                           require_tradable=require_tradable).get_price(
                 security, start_date, end_date, frequency, fields, skip_paused, fq, count,
                 panel, fill_paused, round, strict=strict)
         require_complete = require_complete or self._requirements.get("require_complete", False)
         require(self._clock is not None or visibility == "verified", "INVALID_REQUEST", "visibility 须与 as_of 或固定上下文一起使用")
         require_fresh = require_fresh or self._requirements.get("require_fresh", False)
         require_final = require_final or self._requirements.get("require_final", False)
-        require(all(type(v) is bool for v in (require_complete, require_fresh, require_final)), "INVALID_REQUEST", "准入要求须为布尔值")
+        require_tradable = require_tradable or self._requirements.get("require_tradable", False)
+        require(all(type(v) is bool for v in (require_complete, require_fresh, require_final, require_tradable)), "INVALID_REQUEST", "准入要求须为布尔值")
         require(not require_final, "BAR_NOT_FINAL", "当前源没有最终发布/修订水位证据；时间门槛不能证明 FINALIZED")
         require(not require_complete or self.coverage_contract is not None, "COVERAGE_UNKNOWN",
                 "缺来源标签、日历和证券状态契约，不能保证完整覆盖", unknown_coverage())
@@ -203,6 +220,10 @@ class Client:
         requested = min(MAX_BARS, count + 1) if count and end_date is None and self._clock is None else MAX_BARS
         all_records, provenance = [], []
         for code, source_symbol in zip(securities, symbols):
+            decision = self.trading_status(code)
+            require(not require_tradable or decision["tradable"],
+                    {"closed_market": "MARKET_CLOSED", "session_break": "SESSION_BREAK", "suspended": "SUSPENDED"}.get(decision["state"], "TRADING_STATUS_UNKNOWN"),
+                    "A数达声明时段/证券状态准入未满足", decision)
             url = KLINE_URL + "?" + urlencode({"symbol": source_symbol, "scale": scale, "ma": "no", "datalen": requested})
             raw, meta = self.transport.read(url, lambda b: _bars(b, scale))
             # A later query must never upgrade a partial observation in an old response.
@@ -243,9 +264,20 @@ class Client:
             freshness = data_age(raw, chosen, meta, now, daily=scale == 240)
             if self.coverage_contract:
                 freshness.update(self.coverage_contract.freshness(code, [r["day"] for r in complete], now))
-            require(not require_fresh or freshness["status"] == "fresh",
-                    "STALE_SOURCE" if freshness["status"] == "stale" else "FRESHNESS_UNKNOWN",
-                    "行情标签未达到策略时钟所需的最新闭合槽；HTTP 成功不代表行情新鲜", freshness)
+                selected = self.coverage_contract.freshness(code, [r["day"] for r in chosen], now)
+                freshness["selected_window_status"] = selected["source_watermark_status"]
+                freshness["selected_latest_label"] = selected["last_eligible_label"]
+                if freshness["status"] == "fresh" and selected["source_watermark_status"] != "fresh":
+                    freshness["status"] = "stale_selected_window" if selected["source_watermark_status"] == "stale" else "unknown"
+                freshness["admissible"] = freshness["status"] == "fresh"
+            else:
+                freshness.update(source_watermark_status="unknown", selected_window_status="unknown",
+                                 trading_status=decision, admissible=False)
+            require(not require_fresh or freshness["admissible"],
+                    {"stale": "STALE_SOURCE", "stale_selected_window": "STALE_SELECTED_WINDOW",
+                     "closed_market": "MARKET_CLOSED", "session_break": "SESSION_BREAK",
+                     "suspended": "SUSPENDED"}.get(freshness["status"], "FRESHNESS_UNKNOWN"),
+                    "数据准入须同时满足源及所选窗口水位、声明时段与证券状态；HTTP 成功不等于可用于 paper", freshness)
             gaps = []
             if scale != 240:
                 for left, right in zip(chosen, chosen[1:]):
@@ -264,7 +296,9 @@ class Client:
             provenance.append({**meta, **bounds, "completion_cutoff": cutoff.isoformat(),
                                "completion_basis": "request_started_at" if "request_started_at" in meta
                                else "legacy_observed_at", "irregular_intervals": gaps, "source_rows": chosen,
-                               "coverage_report": coverage, "freshness": freshness, "visibility": visible})
+                               "coverage_report": coverage, "freshness": freshness, "trading_status": decision,
+                               "completion_model": "legacy_software_15_05" if scale == 240 else "source_label_as_end",
+                               "closure_verified": False, "visibility": visible})
         frame = pd.DataFrame(all_records).sort_values(["time", "code"], ignore_index=True)
         if scalar:
             frame = frame.drop(columns="code").set_index("time")
@@ -404,12 +438,12 @@ def get_price(security, start_date=None, end_date=None, frequency="daily", field
               skip_paused=False, fq=None, count=None, panel=False, fill_paused=False,
               round=False, *, cache=None, cache_mode="prefer", cache_ttl=300, timeout=15, strict=False,
               coverage_contract=None, as_of=None, visibility="verified", require_complete=False,
-              require_fresh=False, require_final=False):
+              require_fresh=False, require_final=False, require_tradable=False):
     return Client(cache=cache, cache_mode=cache_mode, cache_ttl=cache_ttl, timeout=timeout,
                   coverage_contract=coverage_contract).get_price(
         security, start_date, end_date, frequency, fields, skip_paused, fq, count, panel, fill_paused, round,
         strict=strict, as_of=as_of, visibility=visibility, require_complete=require_complete,
-        require_fresh=require_fresh, require_final=require_final)
+        require_fresh=require_fresh, require_final=require_final, require_tradable=require_tradable)
 
 
 def get_security_info(security, **client_options):
@@ -435,7 +469,7 @@ def _observation_time(value):
 
 
 def capabilities():
-    return {"version": "0.3.0.dev1", "mode": "direct_public_source", "source": "sina_public",
+    return {"version": "0.3.0.dev2", "mode": "direct_public_source", "source": "sina_public",
             "frequency": ["daily", "1m", "5m"], "adjustment": [None],
             "default_fields": DEFAULT_FIELDS.copy(), "minute_extra_fields": ["money"],
             "count": [1, 1000], "max_securities": 10, "max_source_window": MAX_BARS,
@@ -445,6 +479,9 @@ def capabilities():
             "get_all_securities": "unsupported: no full historical membership evidence",
             "visibility_levels": ["assumed", "received"], "verified_live_pit": False,
             "coverage_contract": "explicit calendar/session/status facts; no real Sina contract bundled",
+            "coverage_contract_versions": [1, 2],
+            "trading_status": "offline calendar/session/half-open interval status decision; supplied evidence only",
+            "require_fresh": "source watermark + selected window + tradable; not finality or verified PIT",
             "corporate_actions": "unavailable", "historical_trading_status": "unavailable without evidence contract",
             "finalized_bars": False, "turnover_completeness": "unverified; reconciliation discrepancies block acceptance",
             "joinquant_equivalent": False, "historical_minute_coverage_guaranteed": False,

@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
+import sys
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from zoneinfo import ZoneInfo
@@ -90,6 +92,11 @@ def validate_ohlc(o, h, low, c, *, code="INVALID_OHLC"):
     require(all(x.is_finite() and 0 < x < Decimal("1e17") for x in (o, h, low, c))
             and low <= min(o, c) <= max(o, c) <= h, code,
             "OHLC 必须为有限正数、小于 1e17 并满足 low <= open/close <= high")
+    # Public DataFrame prices are binary64. Reject subnormal/underflow values
+    # before a response can enter the cache; original decimal text is retained.
+    require(all(x >= Decimal.from_float(sys.float_info.min) and math.isfinite(float(x))
+                and float(x) > 0 for x in (o, h, low, c)), code,
+            "OHLC 超出公开 float64 的正常正数表示范围；不下溢、补零或截断")
 
 
 def normalize(bundle):

@@ -48,6 +48,7 @@ def parser():
     price.add_argument("--visibility", choices=["assumed", "received", "verified"], default="verified")
     price.add_argument("--require-complete", action="store_true")
     price.add_argument("--require-fresh", action="store_true")
+    price.add_argument("--require-tradable", action="store_true")
     price.add_argument("--require-final", action="store_true")
     price.add_argument("--coverage-contract", help="A数达本地证据契约 JSON；不从缺 bar 推测状态")
     coverage = sub.add_parser("live-coverage", help="检查声明日历/session/status 下的标签覆盖")
@@ -56,6 +57,10 @@ def parser():
     coverage.add_argument("--end", required=True)
     coverage.add_argument("--frequency", choices=["daily", "1m", "5m"], default="1m")
     coverage.add_argument("--coverage-contract")
+    state = sub.add_parser("trading-status", help="仅读本地事实契约，判断休市/午休/停牌/可交易/未知")
+    state.add_argument("security")
+    state.add_argument("--as-of", required=True)
+    state.add_argument("--coverage-contract")
     acquire = sub.add_parser("acquire-price", help="显式刷新一个有限源窗口；无历史分页或造数补齐")
     acquire.add_argument("security")
     acquire.add_argument("--start", required=True)
@@ -71,7 +76,7 @@ def parser():
     days.add_argument("--start")
     days.add_argument("--end")
     days.add_argument("--count", type=int)
-    for live in (price, info, days, coverage, acquire, reconcile):
+    for live in (price, info, days, coverage, acquire, reconcile, state):
         live.add_argument("--cache", help="可选缓存目录")
         live.add_argument("--cache-mode", choices=["prefer", "only", "refresh"], default="prefer")
         live.add_argument("--timeout", type=float, default=15)
@@ -98,7 +103,7 @@ def parser():
 def main(argv=None):
     args = parser().parse_args(argv)
     try:
-        if args.command in {"price", "security", "trade-days", "live-coverage", "acquire-price", "reconcile-day"}:
+        if args.command in {"price", "security", "trade-days", "live-coverage", "acquire-price", "reconcile-day", "trading-status"}:
             contract_path = getattr(args, "coverage_contract", None)
             client = Client(cache=args.cache, cache_mode=args.cache_mode, timeout=args.timeout,
                             coverage_contract=CoverageContract(read_json(contract_path)) if contract_path else None)
@@ -108,11 +113,14 @@ def main(argv=None):
                                          frequency=args.frequency, fields=args.fields,
                                          fq=None if args.fq == "none" else args.fq, strict=args.strict,
                                          as_of=args.as_of, visibility=args.visibility, require_complete=args.require_complete,
-                                         require_fresh=args.require_fresh, require_final=args.require_final)
+                                         require_fresh=args.require_fresh, require_final=args.require_final,
+                                         require_tradable=args.require_tradable)
                 result = {"rows": (frame.reset_index() if frame.index.name == "time" else frame).to_dict("records"),
                           "metadata": frame.attrs}
             elif args.command == "live-coverage":
                 result = client.coverage(args.security, args.start, args.end, frequency=args.frequency)
+            elif args.command == "trading-status":
+                result = client.trading_status(args.security, as_of=args.as_of)
             elif args.command == "acquire-price":
                 result = client.acquire_price(args.security, args.start, args.end, frequency=args.frequency)
             elif args.command == "reconcile-day":
@@ -165,8 +173,8 @@ def main(argv=None):
                     else:
                         result = getattr(view, ds.replace("-", "_"))()
         print(json.dumps(result, ensure_ascii=False, sort_keys=True, default=json_value))
-        if args.command in {"live-coverage", "acquire-price", "reconcile-day"}:
-            return 0 if result.get({"live-coverage": "complete", "acquire-price": "requirements_met", "reconcile-day": "accepted"}[args.command]) else 2
+        if args.command in {"live-coverage", "acquire-price", "reconcile-day", "trading-status"}:
+            return 0 if result.get({"live-coverage": "complete", "acquire-price": "requirements_met", "reconcile-day": "accepted", "trading-status": "tradable"}[args.command]) else 2
         return 0 if args.command != "validate" or result["passed"] else 2
     except DataError as exc:
         print(json.dumps({"error": exc.as_dict()}, ensure_ascii=False, default=json_value), file=sys.stderr)

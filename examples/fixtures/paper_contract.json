@@ -1,0 +1,58 @@
+{
+  "schema_version": 2,
+  "id": "test-facts-v1",
+  "provider": "sina_public",
+  "frequency": "1m",
+  "trading_scope": "synthetic_continuous",
+  "evidence_kind": "synthetic",
+  "evidence": "generated, not vendor evidence",
+  "label_semantics": "verified",
+  "calendar": [
+    {
+      "date": "2026-09-30",
+      "is_open": true,
+      "available_at": "2026-09-01T00:00:00+08:00",
+      "evidence": "synthetic schedule only",
+      "sessions": [
+        {
+          "id": "am",
+          "start": "2026-09-30T09:30:00+08:00",
+          "end": "2026-09-30T09:33:00+08:00",
+          "mapping": "end_labels"
+        },
+        {
+          "id": "pm",
+          "start": "2026-09-30T13:00:00+08:00",
+          "end": "2026-09-30T13:03:00+08:00",
+          "mapping": "end_labels"
+        }
+      ]
+    }
+  ],
+  "statuses": [
+    {
+      "security": "600000.XSHG",
+      "effective_start": "2026-09-30T00:00:00+08:00",
+      "effective_end": "2026-09-30T09:32:00+08:00",
+      "state": "trading",
+      "available_at": "2026-09-01T00:00:00+08:00",
+      "evidence": "synthetic interval, not a vendor status"
+    },
+    {
+      "security": "600000.XSHG",
+      "effective_start": "2026-09-30T09:32:00+08:00",
+      "effective_end": "2026-09-30T13:00:00+08:00",
+      "state": "suspended",
+      "available_at": "2026-09-01T00:00:00+08:00",
+      "evidence": "synthetic interval, not a vendor status"
+    },
+    {
+      "security": "600000.XSHG",
+      "effective_start": "2026-09-30T13:00:00+08:00",
+      "effective_end": "2026-10-01T00:00:00+08:00",
+      "state": "trading",
+      "available_at": "2026-09-01T00:00:00+08:00",
+      "evidence": "synthetic interval, not a vendor status"
+    }
+  ]
+}

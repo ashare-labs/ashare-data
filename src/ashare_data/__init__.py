@@ -7,4 +7,4 @@ from .live import Client, capabilities, get_all_securities, get_price, get_secur
 
 __all__ = ["Store", "DataError", "Client", "get_price", "get_security_info", "get_trade_days",
            "get_all_securities", "capabilities", "CoverageContract", "reconcile_turnover"]
-__version__ = "0.3.0.dev1"
+__version__ = "0.3.0.dev2"

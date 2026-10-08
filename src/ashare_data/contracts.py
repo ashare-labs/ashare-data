@@ -26,7 +26,8 @@ class CoverageContract:
         try:
             # Detach caller-owned containers. No input object is retained or returned.
             data = json.loads(canonical(data))
-            require(data["schema_version"] == 1, "INVALID_CONTRACT", "仅支持覆盖契约 v1")
+            require(type(data["schema_version"]) is int and data["schema_version"] in {1, 2},
+                    "INVALID_CONTRACT", "支持覆盖契约 v1 整日状态和 v2 区间状态")
             for key in ("id", "provider", "trading_scope", "evidence"):
                 nonempty(data[key], key)
             require(data["frequency"] in {"daily", "1m", "5m"}, "INVALID_CONTRACT", "未知频率")
@@ -37,6 +38,7 @@ class CoverageContract:
             require(isinstance(data["statuses"], list) and len(data["statuses"]) <= 3660,
                     "INVALID_CONTRACT", "状态记录过多或格式错误")
             self._days, self._status, self._slots = {}, {}, {}
+            self._intervals = {}
             for cal in data["calendar"]:
                 d = day(cal["date"])
                 require(d not in self._days and type(cal["is_open"]) is bool,
@@ -81,13 +83,26 @@ class CoverageContract:
                 require(len({s["label"] for s in slots}) == len(slots), "INVALID_CONTRACT", "标签重复")
                 self._days[d], self._slots[d] = cal, slots
             for state in data["statuses"]:
-                key = (symbol(state["security"]), day(state["date"]))
-                require(key not in self._status, "INVALID_CONTRACT", "重复证券日状态")
+                security = symbol(state["security"])
                 timestamp(state["available_at"])
                 nonempty(state["evidence"], "status.evidence")
                 require(state["state"] in {"trading", "suspended", "unknown"},
                         "INVALID_CONTRACT", "未知状态；缺失不可视作正常交易")
-                self._status[key] = state
+                if data["schema_version"] == 1:
+                    key = (security, day(state["date"]))
+                    require(key not in self._status, "INVALID_CONTRACT", "重复证券日状态")
+                    self._status[key] = state
+                    a = label_time(state["date"])
+                    b = a + timedelta(days=1)
+                else:
+                    require("date" not in state, "INVALID_CONTRACT", "v2 状态使用生效区间，不混用整日 date")
+                    a, b = timestamp(state["effective_start"]), timestamp(state["effective_end"])
+                    require(a < b and b-a <= timedelta(days=366), "INVALID_CONTRACT", "状态区间须为正且不超过366天")
+                self._intervals.setdefault(security, []).append((a, b, state))
+            for intervals in self._intervals.values():
+                intervals.sort(key=lambda entry: entry[0])
+                require(all(left[1] <= right[0] for left, right in zip(intervals, intervals[1:])),
+                        "INVALID_CONTRACT", "证券状态区间不得重叠；修订须建立新契约，不能静默择一")
             self._data, self.contract_id = data, digest(data)
         except (KeyError, TypeError, ValueError) as exc:
             raise DataError("INVALID_CONTRACT", "覆盖契约字段缺失或格式错误") from exc
@@ -96,20 +111,89 @@ class CoverageContract:
     def frequency(self):
         return self._data["frequency"]
 
+    def _state_at(self, security, clock, cutoff):
+        for a, b, fact in self._intervals.get(security, []):
+            if a <= clock < b:
+                if timestamp(fact["available_at"]) <= cutoff and fact["state"] != "unknown":
+                    return fact["state"], {"effective_start": a.isoformat(), "effective_end": b.isoformat(),
+                                          "available_at": fact["available_at"], "evidence": fact["evidence"]}
+                break
+        return "unknown", None
+
+    def _state_span(self, security, start, end, cutoff):
+        """Cover the full half-open interval; unknown facts never bridge gaps."""
+        cursor, states = start, set()
+        for a, b, fact in self._intervals.get(security, []):
+            if b <= cursor or a >= end:
+                continue
+            if a > cursor or fact["state"] == "unknown" or (cutoff and timestamp(fact["available_at"]) > cutoff):
+                return "unknown"
+            states.add(fact["state"])
+            cursor = min(b, end)
+            if cursor == end:
+                return next(iter(states)) if len(states) == 1 else "mixed"
+        return "unknown"
+
+    def _slot_state(self, security, slot, cutoff):
+        if self.frequency != "daily":
+            return self._state_span(security, slot["start"], slot["end"], cutoff)
+        # A daily aggregate may span known intraday halts, but unknown portions
+        # of an active session cannot be filled by a later resumption fact.
+        spans = self._days[slot["label"].date().isoformat()]["sessions"]
+        states = [self._state_span(security, timestamp(s["start"]), timestamp(s["end"]), cutoff) for s in spans]
+        if "unknown" in states:
+            return "unknown"
+        return "suspended" if set(states) == {"suspended"} else "trading"
+
+    def trading_status(self, security, clock):
+        """Offline, evidence-declared eligibility, separate from data freshness."""
+        symbol(security)
+        clock = timestamp(clock)
+        cal = self._days.get(clock.date().isoformat())
+        state, reason, session, evidence = "unknown", "CALENDAR_UNKNOWN", None, None
+        if cal and timestamp(cal["available_at"]) <= clock:
+            if not cal["is_open"]:
+                state, reason = "closed_market", "MARKET_CLOSED"
+            else:
+                instrument, evidence = self._state_at(security, clock, clock)
+                if instrument == "unknown":
+                    reason = "TRADING_STATUS_UNKNOWN"
+                elif instrument == "suspended":
+                    state, reason = "suspended", "SUSPENDED"
+                else:
+                    spans = cal["sessions"]
+                    session = next((s["id"] for s in spans if timestamp(s["start"]) <= clock < timestamp(s["end"])), None)
+                    if session is not None:
+                        state, reason = "tradable", None
+                    elif timestamp(spans[0]["start"]) <= clock < timestamp(spans[-1]["end"]):
+                        state, reason = "session_break", "SESSION_BREAK"
+                    else:
+                        state, reason = "closed_market", "MARKET_CLOSED"
+        return {"state": state, "tradable": state == "tradable", "as_of": clock.isoformat(),
+                "reasons": [reason] if reason else [], "session_id": session, "status_evidence": evidence,
+                "calendar_evidence": cal["evidence"] if cal and timestamp(cal["available_at"]) <= clock else None,
+                "contract_id": self.contract_id, "evidence_kind": self._data["evidence_kind"],
+                "meaning": "按可见声明时段及证券状态判断；不证明成交、撮合、PIT或真实来源资质"}
+
     def _expected(self, security, start, end, cutoff=None):
         require(start <= end and (end-start).days <= 366, "INVALID_RANGE", "覆盖窗口须有效且不超过一年")
         expected, unknown = [], []
         d = start.date()
         while d <= end.date():
             key = d.isoformat()
-            cal, state = self._days.get(key), self._status.get((security, key))
+            cal = self._days.get(key)
             if cal is None or (cutoff and timestamp(cal["available_at"]) > cutoff):
                 unknown.append({"date": key, "code": "CALENDAR_UNKNOWN"})
             elif cal["is_open"]:
-                if state is None or state["state"] == "unknown" or (cutoff and timestamp(state["available_at"]) > cutoff):
-                    unknown.append({"date": key, "code": "TRADING_STATUS_UNKNOWN"})
-                elif state["state"] == "trading":
-                    expected.extend(s for s in self._slots[key] if start <= s["label"] <= end)
+                for slot in self._slots[key]:
+                    if start <= slot["label"] <= end:
+                        state = self._slot_state(security, slot, cutoff)
+                        if state in {"unknown", "mixed"}:
+                            issue = {"date": key, "code": "PARTIAL_BAR_STATUS" if state == "mixed" else "TRADING_STATUS_UNKNOWN"}
+                            if issue not in unknown:
+                                unknown.append(issue)
+                        elif state == "trading":
+                            expected.append(slot)
             d += timedelta(days=1)
         return sorted(expected, key=lambda s: s["label"]), unknown
 
@@ -128,7 +212,9 @@ class CoverageContract:
                 unknown.append({"code": "CALENDAR_COVERAGE", "required_count": count})
             slots = slots[-count:]
         expected = {s["label"] for s in slots}
-        selected = [label_time(t) for t in labels if start <= label_time(t) <= end]
+        labels = [label_time(t) for t in labels]
+        selected = [t for t in labels if start <= t <= end]
+        outside = [t.isoformat() for t in labels if not start <= t <= end]
         if count is not None:
             selected = selected[-count:]
         present = set(selected)
@@ -140,13 +226,27 @@ class CoverageContract:
         unexpected = [t.isoformat() for t in sorted(present-expected)]
         duplicates = len(selected) != len(present)
         complete = not unknown and not missing and not unexpected and not duplicates
+        empty_state = None
+        if complete and not expected:
+            calendars = [cal for d, cal in self._days.items() if start.date().isoformat() <= d <= end.date().isoformat()]
+            candidate_slots = [s for d, slots in self._slots.items() for s in slots if start <= s["label"] <= end]
+            if calendars and all(not cal["is_open"] for cal in calendars):
+                empty_state = "closed_market"
+            elif candidate_slots and all(self._slot_state(security, s, cutoff) == "suspended" for s in candidate_slots):
+                empty_state = "suspended"
+            else:
+                empty_state = "session_break"
         return {"contract_id": self.contract_id, "provider": self._data["provider"],
                 "frequency": self.frequency, "trading_scope": self._data["trading_scope"],
                 "evidence_kind": self._data["evidence_kind"], "evidence": self._data["evidence"],
-                "status": "unknown" if unknown else "complete" if complete else "incomplete",
+                "status": "unknown" if unknown else empty_state or ("complete" if complete else "incomplete"),
                 "complete": complete, "grid_complete": complete, "trade_totals_verified": False,
+                "tradable": bool(expected) if not unknown else None,
+                "tradable_basis": "queried range contains declared trading slots; not current-time permission",
+                "trading_status": self.trading_status(security, cutoff) if cutoff else None,
                 "expected_count": len(expected), "present_count": len(present),
                 "missing": missing, "unexpected": unexpected, "duplicates": duplicates, "unknown": unknown,
+                "out_of_request_labels": outside, "assessment_scope": "requested inclusive source-label range",
                 "range": {"start": start.isoformat(), "end": end.isoformat(), "as_of": cutoff.isoformat() if cutoff else None},
                 "meaning": "仅证据声明的标签槽覆盖；不认证证据真伪、成交全量、PIT或供应商最终值"}
 
@@ -164,23 +264,68 @@ class CoverageContract:
                         "evidence_kind": self._data["evidence_kind"]}
         return None
 
+    def _latest_expected(self, security, clock):
+        if self._data["label_semantics"] != "verified":
+            return None, "SESSION_SCOPE_UNKNOWN"
+        d, first = clock.date(), label_time(min(self._days)).date()
+        # Only facts at/after the newest eligible slot can change the latest
+        # watermark. Unknown old history must not hide a known resumed session.
+        while d >= first:
+            key = d.isoformat()
+            cal = self._days.get(key)
+            if cal is None or timestamp(cal["available_at"]) > clock:
+                return None, "CALENDAR_UNKNOWN"
+            for slot in reversed(self._slots[key]):
+                if slot["end"] > clock:
+                    continue
+                state = self._slot_state(security, slot, clock)
+                if state in {"unknown", "mixed"}:
+                    return None, "PARTIAL_BAR_STATUS" if state == "mixed" else "TRADING_STATUS_UNKNOWN"
+                if state == "trading":
+                    return slot["label"], None
+            d -= timedelta(days=1)
+        return None, "NO_CLOSED_TRADABLE_BAR"
+
     def freshness(self, security, labels, clock):
+        symbol(security)
         clock = timestamp(clock)
-        start = label_time(min(self._days))
-        slots, unknown = self._expected(security, start, clock, clock)
-        closed = [s for s in slots if s["end"] <= clock]
-        if self._data["label_semantics"] != "verified" or unknown or not closed:
-            return {"status": "unknown", "expected_latest_label": None, "reasons": unknown or ["session_mapping_unknown"]}
-        expected = closed[-1]["label"]
-        actual = max((label_time(t) for t in labels if label_time(t) <= clock), default=None)
-        return {"status": "fresh" if actual == expected else "stale", "expected_latest_label": expected.isoformat(),
-                "last_eligible_label": actual.isoformat() if actual else None, "contract_id": self.contract_id}
+        decision = self.trading_status(security, clock)
+        expected, reason = self._latest_expected(security, clock)
+        eligible, future = [], []
+        for value in labels:
+            label = label_time(value)
+            bounds = self.bounds(value, as_of=clock)
+            if label > clock or (bounds and timestamp(bounds["bar_end"]) > clock):
+                future.append(label.isoformat())
+            else:
+                eligible.append(label)
+        actual = max(eligible, default=None)
+        if future and actual is None:
+            watermark, reason = "unknown", "FUTURE_SOURCE_LABEL"
+        else:
+            watermark = "unknown" if expected is None else "fresh" if actual == expected else "stale"
+        # Retain stale diagnostics outside market hours. A fresh watermark alone
+        # cannot permit paper use during a break, closure or suspension.
+        if watermark == "stale":
+            status = "stale"
+        elif decision["state"] in {"suspended", "closed_market", "session_break"}:
+            status = decision["state"]
+        elif decision["state"] == "unknown" or watermark == "unknown":
+            status = "unknown"
+        else:
+            status = "fresh"
+        return {"status": status, "source_watermark_status": watermark,
+                "expected_latest_label": expected.isoformat() if expected else None,
+                "last_eligible_label": actual.isoformat() if actual else None,
+                "admissible": status == "fresh", "trading_status": decision,
+                "future_source_labels": future, "reasons": ([reason] if reason else []) + decision["reasons"],
+                "contract_id": self.contract_id}
 
 
 def unknown_coverage():
     return {"status": "unknown", "complete": False, "grid_complete": False,
             "trade_totals_verified": False, "expected_count": None,
-            "unknown": [{"code": "SESSION_SCOPE_UNKNOWN"}, {"code": "TRADING_STATUS_UNKNOWN"}],
+            "unknown": [{"code": "CALENDAR_UNKNOWN"}, {"code": "SESSION_SCOPE_UNKNOWN"}, {"code": "TRADING_STATUS_UNKNOWN"}],
             "meaning": "缺来源标签映射、版本化时段或证券状态，不能从返回根数推算全量覆盖"}
 
 

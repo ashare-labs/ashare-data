@@ -65,6 +65,7 @@ class Transport:
         self.root = Path(cache).expanduser() if cache is not None else None
         self.mode, self.ttl, self.timeout = cache_mode, cache_ttl, timeout
         self._frozen = None
+        self._received_by = None
         self.snapshot_id = None
 
     def freeze(self, *, received_by=None):
@@ -93,6 +94,7 @@ class Transport:
         # A late-only entry remains identifiable, so the visibility gate can explain
         # why it is not available at the requested historical clock.
         frozen._frozen = {**latest, **eligible}
+        frozen._received_by = received_by
         frozen.snapshot_id = digest(frozen._frozen)
         return frozen
 
@@ -101,7 +103,10 @@ class Transport:
         path = self.root / "requests" / (key + ".json") if self.root else None
         pinned = self._frozen.get(key) if self._frozen is not None else None
         reused_window = False
-        if self._frozen is not None and pinned is None:
+        def eligible(entry):
+            return self._received_by is None or timestamp(entry["observed_at"]) <= self._received_by
+
+        if self._frozen is not None and (pinned is None or not eligible(pinned)):
             # A fixed context can reuse another pinned window of the exact same
             # endpoint/security/frequency. It never changes source or fetches.
             def signature(value):
@@ -115,8 +120,12 @@ class Transport:
                               if signature(entry["url"])[0] == wanted and
                               str(signature(entry["url"])[1]).isdigit()]
                 if candidates:
-                    pinned = max(candidates, key=lambda entry: (int(signature(entry["url"])[1]), timestamp(entry["observed_at"])))
-                    reused_window = True
+                    available = [entry for entry in candidates if eligible(entry)]
+                    # Future receipts remain diagnostic fallback only. An exact
+                    # unavailable URL must not hide an eligible other window.
+                    pinned = max(available or candidates, key=lambda entry: (
+                        int(signature(entry["url"])[1]), timestamp(entry["observed_at"])))
+                    reused_window = pinned["url"] != url
         exists = pinned is not None if self._frozen is not None else path and path.exists()
         if path and self.mode != "refresh" and exists:
             try:

@@ -1,55 +1,77 @@
 {
-  "version": "0.3.0.dev1",
-  "frozen_at_utc": "2026-10-08T14:57:40.879969+00:00",
-  "status": "local candidate; author validation passed; new independent review pending; real-source turnover acceptance failed",
-  "base_commit": "3d41d28600481bff163242a8775a6e682cb995f2",
+  "version": "0.3.0.dev2",
+  "status": "local repair candidate; author regressions passed; independent re-review pending; not full acceptance",
+  "frozen_at_utc": "2026-10-08T15:52:52.415051+00:00",
+  "base_commit": "2d0c19e1e9bef0661760a2bfb7a7f9b5d277487c",
   "branch": "fix/data-admission-contracts",
-  "public_manifest_sha256": "55c8d4021cc81fdd5ba5c3fb9931c718ec3c14fc3997044175fa982b43ede3d9",
-  "payload_files": 39,
-  "public_files_including_metadata": 41,
-  "tests": {
-    "executor": "author",
-    "original_project_passed": 153,
-    "new_project_passed": 53,
-    "unchanged_independent_cases_replayed": 33,
-    "total_passed": 239,
+  "public_manifest_sha256": "f71f001643f3110c792db088f0688408fb4531504d70d8503acafc50434d712f",
+  "public_files_including_metadata": 45,
+  "payload_files": 43,
+  "prior_independent_review": {
+    "commit": "2d0c19e1e9bef0661760a2bfb7a7f9b5d277487c",
+    "PASS": 45,
+    "SAFE_LIMITED": 12,
+    "FAIL": 9,
+    "BLOCKED_BINDING": 2
+  },
+  "author_regression": {
+    "prior_project": 206,
+    "new_project": 47,
+    "project_total": 253,
+    "unchanged_external_cases": 33,
+    "total_passed": 286,
     "failed": 0,
     "skipped": 0,
-    "network_guard_enabled": true
+    "network_guard": true
   },
-  "wheel_verification": {
-    "sha256": "efc05240c78cfc4af79e43b4e71f03f349e3244e51b6c4f35a9158f0a339d3c6",
-    "passed": 86,
-    "failed": 0,
-    "skipped": 0,
-    "repeated_cases_not_additional": true,
-    "method": "Fresh venv; byte-verified copies of existing locked dependencies; offline no-deps wheel installation; no new empty-cache online install claimed"
+  "author_unchanged_supplement": {
+    "PASS": 19,
+    "FAIL": 0,
+    "DIAGNOSTIC": 3,
+    "before_fix_PASS": 14,
+    "before_fix_FAIL": 5
   },
-  "new_independent_review": {
-    "status": "pending",
-    "sealed_cases_reported_by_reviewer": 68,
-    "executed_by_author": false
+  "author_frozen68_replay": {
+    "fixture_and_oracle_unchanged": true,
+    "original_binding": {
+      "PASS": 51,
+      "SAFE_LIMITED": 12,
+      "FAIL": 3,
+      "BLOCKED_BINDING": 2
+    },
+    "proposed_v2_binding_pending_review": {
+      "PASS": 54,
+      "SAFE_LIMITED": 12,
+      "FAIL": 2,
+      "BLOCKED_BINDING": 0
+    },
+    "not_independent_acceptance": true,
+    "unresolved": [
+      "C14 requested subset versus full response scope",
+      "C15 missing status facts for postmarket interval",
+      "A01-A12 verified/finalized source capability unavailable"
+    ]
   },
-  "bounded_real_source_check": {
-    "http_requests": 6,
-    "http_200": 6,
-    "date": "2026-10-08",
-    "turnover_accepted": false,
-    "sina_1m_volume_residual_shares": "52300",
-    "sina_1m_amount_residual_cny": "507179.1011",
-    "sina_5m_amount_residual_cny": "507179.1008"
+  "wheel": {
+    "sha256": "8942b7c0ccb555642e635fce76599be1c04feb756d67551501bc25945242d2c7",
+    "runtime_modules_equal": 11,
+    "RECORD_entries_verified": 14,
+    "regression_repeated_passed": 286,
+    "supplement_repeated_passed": 19,
+    "supplement_diagnostic": 3,
+    "method": "offline no-deps install in separate venv; byte-verified copies of existing locked dependencies; not fresh online dependency install"
   },
   "dependency_versions_changed": false,
+  "new_market_requests_in_this_repair": 0,
   "code_history_rewritten": false,
   "pushed": false,
   "published": false,
   "limitations": [
-    "No verified vendor historical publication/revision PIT",
-    "No proven finality",
-    "No real Sina coverage contract supplied",
-    "Full historical minute target remains unsupported",
-    "Same-vendor minute/day trading scopes and turnover residual unresolved",
-    "No historical security universe, corporate-action or adjustment dataset",
-    "No full strategy, live trading or long-running latency validation"
+    "source turnover discrepancy remains SOURCE_UNRESOLVED",
+    "real status/session/label contracts not supplied",
+    "verified PIT/finality still unsupported",
+    "historical minute coverage and corporate-action assets unavailable",
+    "C14/C15 need independent adjudication",
+    "no full strategy, trade execution, long-running latency or cross-platform validation"
   ]
 }
