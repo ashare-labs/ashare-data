@@ -1,0 +1,35 @@
+{
+  "version": "0.2.0rc2",
+  "frozen_at_utc": "2026-10-08T11:27:41.980713+00:00",
+  "status": "L1/L2/L3 fixed; author validation passed; independent incremental review pending",
+  "public_manifest_sha256": "16083294f64d00182511cb6b4dd31f85e46622663447494a358f267ce776f89a",
+  "payload_files": 32,
+  "public_files_including_metadata": 34,
+  "tests": {
+    "executor": "author",
+    "project_passed": 153,
+    "unchanged_independent_cases_passed": 13,
+    "total_passed": 166,
+    "failed": 0,
+    "skipped": 0,
+    "network_guard_enabled": true
+  },
+  "prior_independent_review": {
+    "version": "0.2.0rc1",
+    "passed": 133,
+    "failed": 6,
+    "skipped": 0
+  },
+  "real_source_validation": "Prior HTTP responses replayed unchanged; no new live market request in this fix round",
+  "official_pypi_fresh_install": "author passed; prior reviewer DNS failure remains recorded",
+  "wheel_isolated_install": "author passed with official empty cache; earlier explicit offline attempt failed due to incomplete cache",
+  "code_history_rewritten": false,
+  "limitations": [
+    "independent incremental review pending",
+    "no verified JoinQuant equivalence",
+    "no adjustment or paused fill",
+    "no complete historical minute coverage",
+    "no historical universe PIT",
+    "no production stability validation"
+  ]
+}

@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+.data/
+.local-evidence/
+evidence/
+exports/
+CONTENT.sha256
+RELEASE.json

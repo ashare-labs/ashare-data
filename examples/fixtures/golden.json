@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "source": {
+    "id": "synthetic-golden-v1",
+    "kind": "synthetic",
+    "location": "generated:golden-v1",
+    "observed_at": "2026-04-09T15:10:00+08:00",
+    "label": "end",
+    "time_semantics": "verified",
+    "time_evidence": "synthetic construction, not vendor verification",
+    "volume_unit": "lots",
+    "lot_size": 100,
+    "amount_unit": "CNY_10K",
+    "price_unit": "CNY",
+    "price_basis": "unadjusted",
+    "unit_evidence": "synthetic fixture: 2 lots = 200 shares; 0.2 CNY_10K = 2000 CNY"
+  },
+  "bars": [
+    {
+      "symbol": "000001.XSHE",
+      "timestamp": "2026-04-09T14:54:00+08:00",
+      "open": "10",
+      "high": "10.2",
+      "low": "9.8",
+      "close": "10.1",
+      "volume": "2",
+      "amount": "0.2",
+      "quality": "synthetic",
+      "quality_reason": "golden fixture only",
+      "available_at": "2026-04-09T14:54:00+08:00",
+      "visibility_evidence": "synthetic scheduled visibility",
+      "provider_extra": "preserved"
+    },
+    {
+      "symbol": "000001.XSHE",
+      "timestamp": "2026-04-09T14:55:00+08:00",
+      "open": "10",
+      "high": "10.2",
+      "low": "9.8",
+      "close": "10.1",
+      "volume": "2",
+      "amount": "0.2",
+      "quality": "synthetic",
+      "quality_reason": "golden fixture only",
+      "available_at": "2026-04-09T14:55:00+08:00",
+      "visibility_evidence": "synthetic scheduled visibility",
+      "provider_extra": "preserved"
+    },
+    {
+      "symbol": "000001.XSHE",
+      "timestamp": "2026-04-09T14:56:00+08:00",
+      "open": "10",
+      "high": "10.2",
+      "low": "9.8",
+      "close": "10.1",
+      "volume": "2",
+      "amount": "0.2",
+      "quality": "synthetic",
+      "quality_reason": "golden fixture only",
+      "available_at": "2026-04-09T14:56:00+08:00",
+      "visibility_evidence": "synthetic scheduled visibility",
+      "provider_extra": "preserved"
+    }
+  ],
+  "calendar": [
+    {
+      "date": "2026-04-09",
+      "is_open": true,
+      "sessions": [
+        [
+          "2026-04-09T09:30:00+08:00",
+          "2026-04-09T11:30:00+08:00"
+        ],
+        [
+          "2026-04-09T13:00:00+08:00",
+          "2026-04-09T15:00:00+08:00"
+        ]
+      ],
+      "available_at": "2026-04-08T00:00:00+08:00",
+      "evidence": "synthetic calendar fixture only"
+    }
+  ],
+  "instrument_sets": [
+    {
+      "effective_date": "2026-04-09",
+      "available_at": "2026-04-08T12:00:00+08:00",
+      "observed_at": "2026-04-09T15:10:00+08:00",
+      "scope": "sample",
+      "evidence": "synthetic dated universe; not today's real stock pool",
+      "instruments": [
+        {
+          "symbol": "000001.XSHE",
+          "name": "合成平安样本",
+          "type": "stock",
+          "source_fields": {
+            "fixture": true
+          }
+        }
+      ]
+    }
+  ]
+}

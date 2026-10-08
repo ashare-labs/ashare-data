@@ -1,0 +1,106 @@
+# A数达（ashare-data）
+
+## 项目简介
+
+A数达是直接获取 A 股行情的 Python 库和命令行工具。调用 `get_price` 即可从公开行情源取得数据，无需账号、手工导入、初始化数据库或指定快照。
+
+当前支持沪深 A 股的日线、近期1分钟和5分钟行情，单股、多股、日期筛选及按条数查询；可选择本地缓存，用同一接口离线读取。另提供证券名称查询、上交所年度交易日历，以及高级离线数据管理能力。
+
+接口名称、证券代码和 DataFrame 形态向聚宽本地 SDK 靠拢，长期目标是逐步扩展兼容范围。当前 **0.2.0rc2 为修正候选版**，尚不能直接替换 `jqdatasdk`，支持范围见[接口说明](docs/live-api.md)。
+
+## 安装指南
+
+需要 uv 和已安装的 Python 3.12。在交付源码的项目目录中执行：
+
+```sh
+uv sync --locked --no-config --python 3.12
+```
+
+依赖锁文件使用官方 PyPI，环境安装到项目的 `.venv`，不修改全局 Python 环境。项目声明 Python 3.11～3.13；当前实测 macOS arm64 / Python 3.12。安装和查询命令在项目根目录执行。
+
+## 快速开始
+
+直接获取浦发银行最近三条日线：
+
+```sh
+.venv/bin/python - <<'PY'
+from ashare_data import get_price
+
+prices = get_price("600000.XSHG", count=3)
+print(prices)
+PY
+```
+
+返回以北京时间日期为索引的 DataFrame，列为 `open`、`close`、`high`、`low`、`volume`。价格单位为元/股，成交量为股。数据来自实际网络请求，数值随源更新；请求失败会抛出明确错误，不返回合成行情。
+
+获取最近两条5分钟记录：
+
+```sh
+.venv/bin/ashare-data price 600000.XSHG --frequency 5m --count 2
+```
+
+## 使用指南
+
+### 查询行情
+
+```python
+from ashare_data import get_price
+
+# 最近两条1分钟源记录；包含成交额（元）
+minute = get_price("600000.XSHG", frequency="1m", count=2,
+                   fields=["close", "volume", "money"])
+
+# 指定结束日期，向前取条数；须在源可提供的近期窗口内
+history = get_price("600000.XSHG", end_date="2026-09-30", count=2)
+
+# 多股返回 time、code 和所选字段组成的长表
+multiple = get_price(["600000.XSHG", "000001.XSHE"], frequency="5m", count=2)
+```
+
+也可使用 `start_date` 与 `end_date` 查询区间，两端均包含；`start_date` 与 `count` 互斥。分钟查询按源时间标签筛选，不平移标签或补齐缺行。无时区时间按北京时间解释。默认保留源实际报价，`fq=None` 表示不复权。
+
+`prices.attrs` 保存来源、请求时间、原始字段、单位、缓存状态和不规则时间间隔。当前源只暴露有上限的近期窗口；超出窗口或条数不足会报 `COVERAGE_INCOMPLETE`。返回记录不代表区间内每分钟或每个交易日都完整。
+
+### 使用缓存
+
+```python
+from ashare_data import Client
+
+client = Client(cache=".data/market")
+online = client.get_price("600000.XSHG", frequency="5m", count=2)
+
+offline = Client(cache=".data/market", cache_mode="only")
+saved = offline.get_price("600000.XSHG", frequency="5m", count=2)
+```
+
+不指定 `cache` 就不落盘。默认缓存有效期为300秒；`only` 仅读取已缓存的同一请求，缺失即报错；`refresh` 明确重新联网取数。网络失败不会静默使用过期缓存或更换来源。历史原始响应对象不会因刷新而被覆盖。记录能否视为结束受抓取时刻限制：时间走到收盘不会把盘中缓存升级为完整日线；可用 `refresh` 获取新的收盘后响应。
+
+### 证券、日历和命令行
+
+```python
+from ashare_data import get_security_info, get_trade_days
+
+info = get_security_info("600000.XSHG")
+days = get_trade_days(end_date="2026-10-08", count=2)
+```
+
+证券信息提供当前名称及代码，不冒充历史股票池。日历来自上交所当前发布年度的休市安排；暂不支持其他年份及历史公告时点查询。
+
+```sh
+.venv/bin/ashare-data capabilities
+.venv/bin/ashare-data security 600000.XSHG
+.venv/bin/ashare-data trade-days --end 2026-10-08 --count 2
+.venv/bin/ashare-data --help
+```
+
+`price` 可追加 `--start`、`--end`、`--fields`、`--cache`、`--cache-mode only`。CLI 输出 JSON；错误输出至 stderr，退出码为2。
+
+需要手工管理自有数据时，仍可使用 `Store` 和 `import / validate / publish / query / snapshots`。这些高级操作要求 `--store`，按[离线快照契约](docs/interface.md)执行；普通行情查询不需要它们。
+
+## 限制与说明
+
+- 数据源固定为新浪公开行情接口，不自动换源。无登录、付费、下单或全市场批量下载功能；公共服务可能中断或改变格式。
+- 原生默认值与聚宽有明确差异：`fq=None`、`panel=False`、`fill_paused=False`、`round=False`，默认字段为 OHLCV。前后复权、停牌过滤/填充、因子及完整历史证券集合尚不支持；[逐项差异](docs/joinquant-compat.md)列明替代方式。
+- 日线源没有成交额，因此 `money` 仅支持分钟查询。未结束的当天日线不返回。首版没有证明历史可见性，观测时间不能代替当时可见时间。
+- 1分钟源存在14:57到15:00的竞价间隔，保留两条原记录，不生成14:58/14:59。14:55与聚宽已闭合 bar 的等价性仍待核验；`strict=True` 会拒绝不规则时间间隔。
+- 真实小样通过不代表2026-04-09至09-30完整分钟历史可用，也不代表真实成交全覆盖。本轮未验收完整策略、Windows、大规模性能或生产稳定性，详见[来源与单位](docs/sources.md)和[验证说明](docs/validation.md)。
