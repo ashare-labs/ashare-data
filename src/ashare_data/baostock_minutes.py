@@ -1,13 +1,75 @@
 """Source minute labels and explicit grid hypotheses, never fabricated bars."""
 
 from datetime import datetime, time, timedelta
+import re
 
-from .model import require, validate_ohlc
+from .model import DataError, TZ, require, validate_ohlc
 from .research import _day, _decimal
 
 FREQUENCIES = {"5m": "5", "15m": "15", "30m": "30", "60m": "60"}
 FIELDS = "date,time,code,open,high,low,close,volume,amount,adjustflag"
 VERSION = "baostock-research-2/receipt-4.1"
+
+
+def cutoff(end, inclusive=True):
+    """Explicit aware source-label ceiling; never a publication/closure clock."""
+    require(type(inclusive) is bool, "INVALID_ARGUMENT", "end_inclusive须为布尔值")
+    if end is None:
+        require(inclusive, "INVALID_ARGUMENT", "排除端点须同时提供end")
+        return None
+    try:
+        if isinstance(end, str):
+            require(
+                re.fullmatch(
+                    r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}"
+                    r"(?:\.[0-9]{1,6})?(?:Z|[+-][0-9]{2}:[0-9]{2})",
+                    end,
+                )
+                is not None,
+                "INVALID_TIME",
+                "end须为含秒及明确时区的ISO时间，不接受日期或无时区时间",
+            )
+            # fromisoformat normalizes invalid offset minutes; reject them first.
+            if not end.endswith("Z"):
+                require(int(end[-5:-3]) < 24 and int(end[-2:]) < 60, "INVALID_TIME", "时区偏移无效")
+            end = datetime.fromisoformat(end.replace("Z", "+00:00"))
+        require(
+            type(end) is datetime and end.tzinfo is not None and end.utcoffset() is not None,
+            "INVALID_TIME",
+            "end须为带时区datetime或ISO时间",
+        )
+        return end.astimezone(TZ), inclusive
+    except (ValueError, OverflowError, TypeError) as exc:
+        raise DataError("INVALID_TIME", "end不是有效日期时间") from exc
+
+
+def intersect(first, second):
+    if first is None:
+        return second
+    if second is None:
+        return first
+    if first[0] == second[0]:
+        return first[0], first[1] and second[1]
+    return min(first, second, key=lambda bound: bound[0])
+
+
+def within(stamp, bound):
+    if bound is None:
+        return True
+    value = stamp.replace(tzinfo=TZ)
+    return value <= bound[0] if bound[1] else value < bound[0]
+
+
+def selection(bound):
+    return {
+        "mode": "source_label" if bound else "unrestricted_research",
+        "end": bound[0].isoformat() if bound else None,
+        "end_inclusive": bound[1] if bound else None,
+        "timezone": "Asia/Shanghai",
+        "closed_bar_verified": False,
+        "historical_pit_verified": False,
+        "actual_visibility_verified": False,
+    }
 
 
 def label(row):
@@ -66,7 +128,7 @@ def validate(rows, params):
         previous = stamp
 
 
-def diagnostics(rows, params):
+def diagnostics(rows, params, bound=None):
     """Apply an end-label hypothesis on dates actually observed, not a calendar."""
     step = int(params["frequency"])
     observed = {}
@@ -79,7 +141,11 @@ def diagnostics(rows, params):
             start = datetime.combine(_day(day), datetime.min.time()).replace(
                 hour=hour, minute=minute
             )
-            grid.extend(start + timedelta(minutes=n) for n in range(step, 121, step))
+            grid.extend(
+                t
+                for n in range(step, 121, step)
+                if within(t := start + timedelta(minutes=n), bound)
+            )
         got, expected = set(labels), set(grid)
 
         def encode(values):
@@ -112,7 +178,8 @@ def diagnostics(rows, params):
     requested = []
     day = _day(params["start_date"])
     while day <= _day(params["end_date"]):
-        requested.append(day.isoformat())
+        if within(datetime.combine(day, datetime.min.time()), bound):
+            requested.append(day.isoformat())
         day += timedelta(days=1)
     return {
         "frequency": str(step) + "m",

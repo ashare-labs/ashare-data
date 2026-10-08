@@ -29,6 +29,31 @@ FIELDS = "date,code,open,high,low,close,volume,amount,adjustflag,tradestatus"
 TABLE = """CREATE TABLE IF NOT EXISTS baostock_captures
 (id TEXT PRIMARY KEY, body TEXT NOT NULL, status TEXT NOT NULL)"""
 VERSION = "baostock-research-1/receipt-4.1"
+METADATA_POLICY = "baostock-basic-validation-1"
+
+
+def validate_basic(rows, code):
+    require(len(rows) <= 1, "SOURCE_SCHEMA_ERROR", "证券资料应至多一行")
+    for row in rows:
+        require(
+            set(row) == {"code", "code_name", "ipoDate", "outDate", "type", "status"}
+            and all(isinstance(v, str) for v in row.values())
+            and row["code"] == code,
+            "SOURCE_SCHEMA_ERROR",
+            "证券资料字段、字符串类型或代码异常",
+        )
+        # Supported reader profile, not a promise to recognize future source enums.
+        require(
+            row["type"] in {"1", "2", "3"} and row["status"] in {"0", "1"},
+            "SOURCE_SCHEMA_ERROR",
+            "证券type/status未获支持；未知不能映射为正常",
+        )
+        dates = {name: _day(row[name]) if row[name] else None for name in ("ipoDate", "outDate")}
+        require(
+            not all(dates.values()) or dates["ipoDate"] <= dates["outDate"],
+            "SOURCE_SCHEMA_ERROR",
+            "证券退出日期早于上市日期",
+        )
 
 
 def request(kind, security=None, start_date=None, end_date=None, frequency=None):
@@ -121,9 +146,27 @@ class BaoStockSource:
             "daily_outer_integrity": "unverified",
             "minute_data": "bounded_research; compressed_outer_integrity_unverified",
             "one_minute": "unsupported",
+            "minute_label_cutoff": "aware end, inclusive or exclusive; not closure/PIT",
+            "basic_validation_policy": METADATA_POLICY,
         }
 
-    def get_price(self, security, *, store, start_date, end_date, frequency="daily"):
+    def get_price(
+        self,
+        security,
+        *,
+        store,
+        start_date,
+        end_date,
+        frequency="daily",
+        end=None,
+        end_inclusive=True,
+    ):
+        bound = minutes.cutoff(end, end_inclusive)
+        require(
+            bound is None or (isinstance(frequency, str) and frequency in minutes.FREQUENCIES),
+            "UNSUPPORTED_FREQUENCY",
+            "end源标签筛选仅支持分钟版本",
+        )
         sid = self.fetch(
             store,
             kind="daily" if frequency == "daily" else "minute",
@@ -132,7 +175,7 @@ class BaoStockSource:
             end_date=end_date,
             frequency=frequency,
         )
-        return self._acquired(store.baostock(sid).get_price())
+        return self._acquired(store.baostock(sid).get_price(end=end, end_inclusive=end_inclusive))
 
     def get_security_info(self, security, *, store):
         return self._acquired(
@@ -432,16 +475,7 @@ def _verify_impl(blobs):
                 calendar=True,
             )
         elif kind == "basic":
-            require(
-                len(rows) <= 1
-                and all(
-                    set(r) == {"code", "code_name", "ipoDate", "outDate", "type", "status"}
-                    and r["code"] == code
-                    for r in rows
-                ),
-                "INTEGRITY",
-                "证券资料结构异常",
-            )
+            validate_basic(rows, code)
     except DataError:
         return attempt, receipt, storage, [], "source_schema_invalid"
     return attempt, receipt, storage, rows, "research_rows" if rows else "empty_unknown"
@@ -573,6 +607,25 @@ class BaoStockView:
             raise DataError("INTEGRITY", "证据清单无效") from exc
         self._attempt, self._receipt, self._storage, self._rows, self._status = values
         self._id, self._visibility = sid, "unrestricted_research"
+        self._label_end = None
+
+    def _selected_rows(self):
+        return [
+            r
+            for r in self._rows
+            if self._label_end is None or minutes.within(minutes.label(r), self._label_end)
+        ]
+
+    def _with_end(self, end, inclusive):
+        bound = minutes.cutoff(end, inclusive)
+        require(
+            bound is None or self._manifest["version"] == minutes.VERSION,
+            "UNSUPPORTED_FREQUENCY",
+            "end/source_label筛选仅支持分钟版本",
+        )
+        view = copy.copy(self)
+        view._label_end = minutes.intersect(self._label_end, bound)
+        return view
 
     def descriptor(self):
         return copy.deepcopy(
@@ -582,7 +635,7 @@ class BaoStockView:
                 "source": "baostock",
                 "status": self._status,
                 "request": self._attempt["request"],
-                "rows": len(self._rows),
+                "rows": len(self._selected_rows()),
                 "artifacts": self._manifest["artifacts"],
                 "quality": self.quality(),
                 "coverage": self.coverage(),
@@ -591,6 +644,19 @@ class BaoStockView:
         )
 
     def lineage(self):
+        if self._label_end is not None:
+            # Full receipts contain future raw rows. A bounded view exposes only
+            # selected row hashes; unrestricted audit access requires a new view.
+            return copy.deepcopy(
+                {
+                    "capture_id": self._id,
+                    "selection": minutes.selection(self._label_end),
+                    "rows": [
+                        {"source_row": r, "raw_record_sha256": sh(r)} for r in self._selected_rows()
+                    ],
+                    "receipt_scope": "full receipt omitted from label-bounded view",
+                }
+            )
         return copy.deepcopy(
             {
                 "capture_id": self._id,
@@ -623,11 +689,29 @@ class BaoStockView:
             "bar_end": None,
             "timezone": "Asia/Shanghai",
             "available_at": None,
+            "selection": minutes.selection(self._label_end),
+            "basic_validation_policy": METADATA_POLICY,
+            "basic_validation": (
+                "invalid"
+                if self._status == "source_schema_invalid"
+                else "valid_source_fields"
+                if self._rows
+                else "unknown"
+            )
+            if self._attempt["request"]["method"] == "query_stock_basic"
+            else "not_applicable",
+            "missing_basic_dates": [
+                name
+                for r in self._rows
+                for name in ("ipoDate", "outDate")
+                if name in r and r[name] == ""
+            ],
         }
 
     def coverage(self):
         result = {
-            "rows": len(self._rows),
+            "rows": len(self._selected_rows()),
+            "source_status": self._status,
             "query_complete": bool(self._receipt and self._receipt["query_complete"]),
             "query_status": self._receipt["query_status"]
             if self._receipt
@@ -639,13 +723,26 @@ class BaoStockView:
         }
         if self._manifest["version"] == minutes.VERSION:
             result["minute_labels"] = minutes.diagnostics(
-                self._rows, self._attempt["request"]["params"]
+                self._selected_rows(), self._attempt["request"]["params"], self._label_end
             )
+            result["selection"] = minutes.selection(self._label_end)
         return result
 
-    def at(self, as_of, *, visibility="received"):
+    def at(self, as_of, *, visibility="received", inclusive=True):
+        if visibility == "source_label":
+            require(as_of is not None, "INVALID_TIME", "source_label必须提供as_of")
+            view = self._with_end(as_of, inclusive)
+            view._visibility = "source_label"
+            return view
         require(
-            visibility in {"received", "verified"}, "INVALID_ARGUMENT", "仅支持 received/verified"
+            type(inclusive) is bool and inclusive,
+            "INVALID_ARGUMENT",
+            "inclusive=False只适用于source_label",
+        )
+        require(
+            isinstance(visibility, str) and visibility in {"received", "verified"},
+            "INVALID_ARGUMENT",
+            "仅支持 received/verified/source_label",
         )
         require(visibility != "verified", "PIT_UNAVAILABLE", "无历史发布时刻证据")
         timestamp(as_of)
@@ -677,12 +774,18 @@ class BaoStockView:
             "证据版本类型不匹配",
         )
         require(
+            not (method == "query_stock_basic" and self._status == "source_schema_invalid"),
+            "SOURCE_SCHEMA_ERROR",
+            "证券日期、枚举或字段校验失败；原始证据已保留",
+            {"capture_id": self._id, "policy": METADATA_POLICY, "status": self._status},
+        )
+        require(
             self._status in {"research_rows", "empty_unknown"},
             "SOURCE_REQUEST_FAILED",
             "源响应未达到研究读取条件",
             {"capture_id": self._id, "coverage": self.coverage()},
         )
-        rows = copy.deepcopy(self._rows)
+        rows = copy.deepcopy(self._selected_rows())
         if method == "query_history_k_data_plus":
             is_minute = self._manifest["version"] == minutes.VERSION
             for r in rows:
@@ -709,6 +812,8 @@ class BaoStockView:
                 + ["security", "source_label", "source_row", "raw_record_sha256"],
             )
             data.index = pd.DatetimeIndex(pd.to_datetime(data["source_label"]), name="time")
+            if data.empty:
+                data["volume"] = pd.Series(index=data.index, dtype="int64")
         else:
             columns = (
                 ["calendar_date", "is_trading_day"]
@@ -726,8 +831,8 @@ class BaoStockView:
             },
         )
 
-    def get_price(self):
-        return self._result("query_history_k_data_plus")
+    def get_price(self, *, end=None, end_inclusive=True):
+        return self._with_end(end, end_inclusive)._result("query_history_k_data_plus")
 
     def get_security_info(self):
         return self._result("query_stock_basic")

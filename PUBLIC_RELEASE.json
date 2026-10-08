@@ -1,73 +1,43 @@
 {
-  "version": "0.5.0.dev2",
-  "status": "local bounded BaoStock minute candidate; author source/wheel verified; independent review pending",
-  "frozen_at_utc": "2026-10-08T20:13:54.373765+00:00",
-  "base_commit": "6b0a24ad4719657410f7621cf42ade41c93a6d21",
-  "branch": "feature/baostock-minutes",
-  "public_files_including_metadata": 70,
-  "payload_files": 68,
-  "public_manifest_sha256": "5657d96f71273ec0ba31cce251348904800e68bf2b9bcb85d33bb253ae1d5840",
-  "source_and_wheel_passed_each": 928,
-  "previous_project_tests": 833,
-  "new_minute_tests": 62,
-  "unchanged_external_tests": 33,
-  "prior_reviewer_replays_each": {
-    "research72": {
-      "PASS": 71,
-      "DIAGNOSTIC": 1
+  "version": "0.5.0.dev3",
+  "status": "author-verified local repair candidate; new independent review pending",
+  "base_commit": "71c6b4a1656c49908feea28c2c7b083c51b32d54",
+  "branch": "feature/baostock-query-fixes",
+  "created_utc": "2026-10-08T20:44:53.826857+00:00",
+  "public_files_including_metadata": 73,
+  "payload_files": 71,
+  "public_manifest_sha256": "9166b19232ac4070bea2d5e4eb94d5ece7f0e629246dbb4577faae2801fbe08a",
+  "source_and_wheel_passed_each": 1368,
+  "previous_tests": 928,
+  "new_parameter_and_contract_tests": 440,
+  "real_capture_replays": 10,
+  "real_minute_rows_unchanged": 172,
+  "new_remote_queries": 0,
+  "old_reviewer_script_replays_each": {
+    "daily_original": {
+      "PASS": 97,
+      "FAIL": 1,
+      "reason": "old basic_semantic_validation_gap expects invalid metadata acceptance; new SOURCE_SCHEMA_ERROR is intentional"
     },
-    "review119": 119,
-    "dev3": 18,
-    "boundaries": 22,
-    "windows": 2,
-    "supplement": {
-      "PASS": 19,
-      "DIAGNOSTIC": 3
+    "minutes_original": {
+      "PASS": 87,
+      "DIAGNOSTIC": 1,
+      "reason": "legacy diagnostic probes unsupported end_date, not new end/source_label APIs"
     },
-    "frozen68": {
-      "PASS": 54,
-      "SAFE_LIMITED": 12,
-      "FAIL": 2
+    "minute_integrity": {
+      "PASS": 5
     }
   },
-  "receipt_worker_sdk_core": "unchanged from 6b0a24a, fingerprint verified; no new R1/R2 semantics",
-  "scope": {
-    "frequencies": [
-      "5m",
-      "15m",
-      "30m",
-      "60m"
-    ],
-    "max_securities_per_request": 1,
-    "max_calendar_days": 2,
-    "max_rows": 128,
-    "max_pages": 2
-  },
-  "real_probe": {
-    "business_queries": 6,
-    "anonymous_logins": 6,
-    "retry_count": 0,
-    "minute_rows": 172,
-    "daily_reference_rows_new": 2,
-    "securities": [
-      "600000.XSHG",
-      "000001.XSHE"
-    ],
-    "dates": [
-      "2026-09-29",
-      "2026-09-30"
-    ],
-    "provider_failure_observed": false
-  },
+  "receipt_protocol": "AST unchanged except corrected docstring; SDK and worker bytes unchanged",
+  "dependencies": "same locked dependencies; no downloads; isolated wheel uses hash-verified installed dependency copies",
   "limitations": [
-    "compressed outer integrity remains unverified",
-    "session-end label is an observed grid hypothesis, not verified bar closure",
-    "no 1m, PIT or full historical/market coverage",
-    "600000 2026-09-30 minute amount totals are CNY0.38 below daily; difference preserved"
+    "source-label filtering is not verified closure, actual historical visibility or strict PIT",
+    "compressed outer integrity remains unknown; received remains rejected for minute/daily",
+    "empty metadata dates remain unknown; supported enums do not establish historical eligibility",
+    "existing 600000 minute/day amount difference -0.3800 CNY preserved",
+    "no new 1m, full target history, market truth, corporate action, rules or execution admission"
   ],
-  "dependencies": "unchanged locked dependencies; existing SDK only; no new downloads",
   "pushed": false,
-  "published": false,
   "deployed": false,
   "akuan_dependency_changed": false
 }

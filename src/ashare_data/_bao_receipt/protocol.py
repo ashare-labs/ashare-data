@@ -1,8 +1,8 @@
 """Independent, bounded BaoStock response validation from pinned SDK schemas.
 
 Uncompressed length/CRC contract is checked against the saved real type-46 wire.
-Compressed type-96 can be decoded for diagnostics, but its outer integrity
-contract has no captured real sample here: it cannot receive strict admission.
+Saved real compressed type-96 samples support diagnostic decoding. Its outer
+integrity algorithm remains unverified: it cannot receive strict admission.
 """
 
 from datetime import date

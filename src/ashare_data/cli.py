@@ -132,7 +132,9 @@ def parser():
     bq.add_argument("dataset", choices=["price", "security", "trade-days", "descriptor", "quality", "coverage", "lineage"])
     bq.add_argument("--capture", required=True)
     bq.add_argument("--as-of")
-    bq.add_argument("--visibility", choices=["received", "verified"], default="received")
+    bq.add_argument("--visibility", choices=["received", "verified", "source_label"], default="received")
+    bq.add_argument("--end", help="分钟源标签上限，含秒和时区；非发布/闭合时间")
+    bq.add_argument("--end-exclusive", action="store_true", help="排除--end恰好相等的标签")
     sub.add_parser("baostock-snapshots")
     sub.add_parser("baostock-recover")
     return p
@@ -188,8 +190,14 @@ def main(argv=None):
                 require(result["status"] in {"research_rows", "empty_unknown"},
                         "SOURCE_REQUEST_FAILED", "源响应未达到研究读取条件；失败证据已封存", result)
             elif args.command == "baostock-query":
+                require(args.as_of is not None or args.visibility == "received",
+                        "INVALID_ARGUMENT", "visibility须与as-of同传")
+                require(not args.end_exclusive or args.end is not None,
+                        "INVALID_ARGUMENT", "end-exclusive须与end同传")
                 view = store.baostock(args.capture)
-                if args.as_of:
+                if args.end is not None:
+                    view = view.at(args.end, visibility="source_label", inclusive=not args.end_exclusive)
+                if args.as_of is not None:
                     view = view.at(args.as_of, visibility=args.visibility)
                 method = {"price": "get_price", "security": "get_security_info", "trade-days": "get_trade_days"}.get(args.dataset, args.dataset)
                 value = getattr(view, method)()
