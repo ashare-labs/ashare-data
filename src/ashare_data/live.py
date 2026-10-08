@@ -154,7 +154,7 @@ class Client:
         """Materialize actual pinned observations, never synthesize missing labels."""
         windows = self.transport.read_windows(url, lambda body: _bars(body, scale))
         require(sum(len(rows) for rows, _ in windows) <= 100000, "BOUNDED_QUERY", "固定观测原始记录总数超过100000")
-        raw_by_label, by_label, observations, conflicts = {}, {}, {}, set()
+        raw_by_label, by_label, observations, versions = {}, {}, {}, {}
         any_completed = False
         for raw, meta in windows:
             completed, cutoff = _completed_rows(raw, meta, wall_now, scale)
@@ -173,19 +173,42 @@ class Client:
                 raw_by_label[row["day"]] = row
             for row in completed:
                 label = row["day"]
-                if label in by_label:
-                    old, old_id = by_label[label]
-                    before = timestamp(observations[old_id]["observed_at"])
-                    current = timestamp(meta["observed_at"])
-                    if before == current and canonical(old) != canonical(row):
-                        conflicts.add(label)
-                    elif current > before:
-                        conflicts.discard(label)
+                received = timestamp(meta["observed_at"])
+                versions.setdefault(label, {}).setdefault(received, []).append((row, identity))
                 by_label[label] = (row, identity)
         require(allow_empty or any_completed, "NO_COMPLETED_BARS", "固定观测抓取时没有通过软件闭合阈值的记录")
         require(allow_empty or by_label, "NO_VISIBLE_BARS", "此策略时钟下没有满足所选可见性模型的记录")
+        conflicts, history = set(), []
+        def evidence(items):
+            return [{"observation_id": identity, "source_row": row,
+                     **{key: observations[identity].get(key) for key in
+                        ("url", "sha256", "observed_at", "request_started_at", "completion_cutoff")}}
+                    for row, identity in items]
+        for label, times in sorted(versions.items()):
+            latest = max(times)
+            latest_ambiguous = len({canonical(row) for row, _ in times[latest]}) > 1
+            if latest_ambiguous:
+                conflicts.add(label)
+            for received, items in sorted(times.items()):
+                if len({canonical(row) for row, _ in items}) <= 1:
+                    continue
+                history.append({"source_label": label, "observed_at": received.isoformat(),
+                                "state": "unresolved" if received == latest else
+                                "superseded_by_conflict" if latest_ambiguous else "resolved",
+                                "observations": evidence(items),
+                                "resolved_by": evidence(times[latest]) if not latest_ambiguous else []})
         return ([raw_by_label[k] for k in sorted(raw_by_label)],
-                [by_label[k][0] for k in sorted(by_label)], by_label, observations, conflicts)
+                [by_label[k][0] for k in sorted(by_label)], by_label, observations, conflicts, history)
+
+    @staticmethod
+    def _selected_conflicts(rows, conflicts, history):
+        """Value conflicts are scoped after stream, visibility and label selection."""
+        labels = {row["day"] for row in rows}
+        relevant = [item for item in history if item["source_label"] in labels]
+        require(not (conflicts & labels), "OBSERVATION_CONFLICT",
+                "请求中的同一标签最新合格观测仍有等时冲突，不能按窗口或日志顺序择一",
+                {"source_labels": sorted(conflicts & labels), "observation_conflicts": relevant})
+        return relevant
 
     @staticmethod
     def _observation_metadata(chosen, by_label, observations):
@@ -283,7 +306,7 @@ class Client:
                     {"closed_market": "MARKET_CLOSED", "session_break": "SESSION_BREAK", "suspended": "SUSPENDED"}.get(decision["state"], "TRADING_STATUS_UNKNOWN"),
                     "A数达声明时段/证券状态准入未满足", decision)
             url = KLINE_URL + "?" + urlencode({"symbol": source_symbol, "scale": scale, "ma": "no", "datalen": requested})
-            raw, complete, by_label, observations, conflicts = self._bar_observations(url, scale, wall_now)
+            raw, complete, by_label, observations, conflicts, history = self._bar_observations(url, scale, wall_now)
             labels = [_dt(r["day"]) for r in complete]
             chosen = [r for r, t in zip(complete, labels) if (start is None or t >= start) and t <= end]
             bounds = {"security": code, "source_first": complete[0]["day"], "source_last": complete[-1]["day"],
@@ -306,10 +329,9 @@ class Client:
                     "源近期窗口内记录不足；缩短日期/count 或等待有数据的交易时段", bounds)
             if count:
                 chosen = chosen[-count:]
-            require(not (conflicts & {row["day"] for row in chosen}), "OBSERVATION_CONFLICT",
-                    "请求中的同一标签在同一观测时刻有冲突值，不能按窗口大小择一",
-                    {"source_labels": sorted(conflicts & {row["day"] for row in chosen})})
+            conflict_history = self._selected_conflicts(chosen, conflicts, history)
             meta, visible = self._observation_metadata(chosen, by_label, observations)
+            meta["observation_conflicts"] = conflict_history
             freshness = data_age(raw, chosen, meta, now, daily=scale == 240)
             if self.coverage_contract:
                 freshness.update(self.coverage_contract.freshness(code, [r["day"] for r in complete], now))
@@ -378,9 +400,13 @@ class Client:
         if empty["complete"]:
             return empty  # Evidenced closed/suspended slots do not require a source call or filled bars.
         url = KLINE_URL + "?" + urlencode({"symbol": _security(security), "scale": scale, "ma": "no", "datalen": MAX_BARS})
-        _, rows, _, _, _ = self._bar_observations(url, scale, datetime.now(TZ), allow_empty=True)
-        return self.coverage_contract.assess(security, [r["day"] for r in rows], _dt(start_date),
-                                             _dt(end_date, end=True), as_of=clock)
+        _, rows, _, _, conflicts, history = self._bar_observations(url, scale, datetime.now(TZ), allow_empty=True)
+        selected = [r for r in rows if _dt(start_date) <= _dt(r["day"]) <= _dt(end_date, end=True)]
+        conflict_history = self._selected_conflicts(selected, conflicts, history)
+        report = self.coverage_contract.assess(security, [r["day"] for r in rows], _dt(start_date),
+                                              _dt(end_date, end=True), as_of=clock)
+        report["observation_conflicts"] = conflict_history
+        return report
 
     def acquire_price(self, security, start_date, end_date, *, frequency="1m"):
         """Explicit one-window replenishment. Unsupported history stays a failed requirement."""
@@ -515,7 +541,7 @@ def _observation_time(value):
 
 
 def capabilities():
-    return {"version": "0.3.0.dev3", "mode": "direct_public_source", "source": "sina_public",
+    return {"version": "0.3.0.dev4", "mode": "direct_public_source", "source": "sina_public",
             "frequency": ["daily", "1m", "5m"], "adjustment": [None],
             "default_fields": DEFAULT_FIELDS.copy(), "minute_extra_fields": ["money"],
             "count": [1, 1000], "max_securities": 10, "max_source_window": MAX_BARS,

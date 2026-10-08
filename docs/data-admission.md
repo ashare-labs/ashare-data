@@ -1,6 +1,6 @@
 # 数据准入契约 v1
 
-0.3.0.dev3是本地修复候选，未发布。A数达负责采集、缺口检测及补齐能力、单位/量额、复权/状态资产、可见性模型与保证检查。上层只传策略逻辑时钟和所需保证，消费结果或明确错误，不再另建清洗、填价或猜测停牌逻辑。
+0.3.0.dev4是本地修复候选，未发布。A数达负责采集、缺口检测及补齐能力、单位/量额、复权/状态资产、可见性模型与保证检查。上层只传策略逻辑时钟和所需保证，消费结果或明确错误，不再另建清洗、填价或猜测停牌逻辑。
 
 ## 接口
 
@@ -45,7 +45,11 @@ assert not bars.attrs["point_in_time_verified"]
 
 上下文有query_snapshot_id，创建时固定请求索引与不可变观测日志；随后刷新不会改变该上下文。received先按observed_at <= as_of过滤，assumed可使用创建时已有的历史回填但不声称历史公布时间。每份响应先独立执行抓取时刻和策略时钟的闭合/可见性过滤，再对同一endpoint、证券、频率的实际标签取最新合格观测。精确URL和大窗口都没有优先权。相交、嵌套或不相交窗口均可提供各自实有记录；较新小窗口不会被旧大窗口遮蔽，较旧窗口仍可提供较新窗口未含的历史标签。窗口缺行不构成删除或修订撤回证明，不造bar、不换源、不联网。已有请求索引只是当前指针，旧观测与原文对象保持不变。
 
-同一时刻同一标签出现不同值，没有可证明先后的版本；请求选中该标签时报OBSERVATION_CONFLICT。严格较新的合格观测可以解除该标签的冲突。一个查询最多读取128份同流观测、合计100000条原始行；固定上下文最多10000个索引/日志文件，超限报BOUNDED_QUERY。只有没有任何received合格窗口时才保留晚到版本用于解释VISIBILITY_UNKNOWN，不返回该版本作为历史行情。
+固定上下文只保存全部观测，不因缓存中出现同URL等时不同原文而全局拒绝。查询先限定endpoint/证券/频率、所选visibility及闭合规则，再按标签和observed_at分组；同一标签最新合格时刻有多个不同源行时，才存在未消解值冲突。同URL与不同datalen采用同一规则；原文JSON空白差异、相同解码行不构成值冲突。比较完整源行，不能仅因请求fields没包含冲突字段就忽略它。
+
+最后按count或显式start/end选标签：请求选中未消解标签则报OBSERVATION_CONFLICT；received的未来观测、其他流或区间外标签不能阻断本次查询。严格较新的合格同标签观测可消解旧冲突；同一时刻的重复值、较新但不含该标签的窗口、固定上下文创建后的观测均不能消解。后续最新时刻再次冲突仍拒绝。assumed仍可使用创建时已有的晚到历史回填，因此晚于as_of的接收时间不使其自动排除；该模型不证明历史可见性。
+
+provenance.observation_conflicts列出所选标签的历史冲突；错误details同样返回相关证据。每项含source_label、observed_at、state、observations、resolved_by。state为unresolved（最新时刻仍歧义）、resolved（有严格较新且唯一值的合格版本）或superseded_by_conflict（旧冲突已被较新冲突取代，仍无唯一结果）。每份证据含完整source_row及observation_id/url/sha256/observed_at/request_started_at/completion_cutoff；resolved_by指向本视图内最新无歧义观测。未选中或不可见的冲突不混入当前结果，其原始日志/对象保持完整，可通过对应时点、标签重放。coverage读取行情时也对所请求范围执行该门禁，并保留已消解证据；无须读取行情的已证休市/停牌空集合仍只检查事实。一个查询最多读取128份同流观测、合计100000条原始行；固定上下文最多10000个索引/日志文件，超限报BOUNDED_QUERY。只有没有任何received合格窗口时才保留晚到版本用于解释VISIBILITY_UNKNOWN，不返回该版本作为历史行情。
 
 逐行来源见provenance中的row_observations（source_label、sha256、observed_at、url、observation_id和completion_cutoff），所贡献的原响应摘要见response_observations。仅一份响应贡献结果时保留单一sha256/url；多响应组合时单一sha256/url/observation_id/request_started_at/completion_cutoff均为None，completion_basis为per_observation。汇总observed_at仅为最新贡献观测时刻，不能替代逐行溯源；visibility.raw_hashes列出贡献原文，raw_hash为None。这是固定本地观测的组合视图，不是供应商原子快照或PIT/最终版本认证。每份旧响应的未闭合记录仍不会随时间自动成熟。
 

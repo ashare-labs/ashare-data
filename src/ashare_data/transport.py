@@ -73,16 +73,15 @@ class Transport:
         require(self.root is not None, "CACHE_REQUIRED", "策略时钟查询须先显式采集到缓存，再固定本地观测版本")
         paths = list((self.root / "requests").glob("*.json")) + list((self.root / "observations").glob("*.json"))
         require(len(paths) <= 10000, "BOUNDED_QUERY", "观测索引过多，请使用独立小范围缓存")
-        entries, timestamps = {}, {}
+        entries = {}
         try:
             for path in paths:
                 require(path.stat().st_size <= 65536, "CACHE_CORRUPT", "观测索引过大")
                 entry = json.loads(path.read_text())
-                observed = timestamp(entry["observed_at"])
-                key = (entry["url"], observed)
-                previous = timestamps.get(key)
-                require(previous is None or previous == entry["sha256"], "OBSERVATION_CONFLICT", "同一请求和观测时刻存在冲突版本")
-                timestamps[key] = entry["sha256"]
+                timestamp(entry["observed_at"])
+                # Pin every receipt, including equal-time different bodies. Only
+                # the query knows the visible stream, selected labels and later
+                # eligible versions that determine whether ambiguity is active.
                 entries[digest(entry)] = entry
         except (OSError, ValueError, KeyError, TypeError) as exc:
             raise DataError("CACHE_CORRUPT", "不能固定观测索引") from exc
