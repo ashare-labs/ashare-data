@@ -1,6 +1,7 @@
 """Offline, fixed-snapshot queries with explicit evidence and missingness."""
 from __future__ import annotations
 
+import copy
 import json
 from datetime import date, timedelta
 
@@ -15,14 +16,15 @@ POLICIES = {"observed": {"observed"}, "synthetic": {"synthetic"},
 
 class DataView:
     def __init__(self, loaded, *, snapshot_id, manifest=None):
-        self.snapshot_id, self.manifest, self.loaded = snapshot_id, manifest, loaded
+        self.snapshot_id = snapshot_id
+        self._manifest, self._loaded = copy.deepcopy(manifest), copy.deepcopy(loaded)
         self._conn = duck()
         try:
-            paths = [str(x["parquet"]) for x in loaded]
+            paths = [str(x["parquet"]) for x in self._loaded]
             self._conn.execute("CREATE TABLE bars AS SELECT * FROM read_parquet(?)", [paths])
             self._conn.execute("SET enable_external_access=false")
             self._calendar, self._universes, self._metadata_conflicts = {}, {}, []
-            for x in loaded:
+            for x in self._loaded:
                 for name, key, target in (("calendar", "date", self._calendar),
                                           ("instrument_sets", "effective_date", self._universes)):
                     for value in x["bundle"].get(name, []):
@@ -34,6 +36,14 @@ class DataView:
         except Exception:
             self.close()
             raise
+
+    @property
+    def manifest(self):
+        return copy.deepcopy(self._manifest)
+
+    @property
+    def loaded(self):
+        return copy.deepcopy(self._loaded)
 
     def close(self):
         if self._conn is not None:
@@ -54,7 +64,7 @@ class DataView:
 
     def conflicts(self):
         bars = self._records("SELECT symbol,bar_start,count(*) AS count FROM bars GROUP BY symbol,bar_start HAVING count(*)>1 ORDER BY symbol,bar_start")
-        return self._metadata_conflicts + bars
+        return copy.deepcopy(self._metadata_conflicts) + bars
 
     def quality_counts(self):
         return self._records("SELECT quality,count(*) AS count FROM bars GROUP BY quality ORDER BY quality")
@@ -172,11 +182,11 @@ class DataView:
     def lineage(self):
         return {"snapshot_id": self.snapshot_id, "batches": [
             {"id": x["id"], "parquet_hash": x["parquet_hash"], "row_count": x["row_count"],
-             "source": json.loads(json.dumps(x["bundle"]["source"]))} for x in self.loaded]}
+             "source": json.loads(json.dumps(x["bundle"]["source"]))} for x in self._loaded]}
 
     def quality(self):
         return {"snapshot_id": self.snapshot_id, "counts": self.quality_counts(),
-                "validation": json.loads(json.dumps(self.manifest["report"])) if self.manifest else None}
+                "validation": json.loads(json.dumps(self._manifest["report"])) if self._manifest else None}
 
     def corporate_actions(self, *args, **kwargs):
         raise DataError("UNSUPPORTED", "公司行动尚未导入；不能将未知解释成无事件")

@@ -1,35 +1,47 @@
 {
-  "version": "0.4.0.dev1",
-  "status": "local research vertical candidate; author source/wheel passed; independent review pending; not full strategy acceptance",
-  "frozen_at_utc": "2026-10-08T18:23:43.818137+00:00",
-  "base_commit": "f17ec2181dbb552bec690fc9aa171872d52fbab4",
+  "version": "0.4.0.dev2",
+  "status": "local reference-isolation repair candidate; author source/wheel passed; independent re-review pending",
+  "frozen_at_utc": "2026-10-08T19:03:49.256677+00:00",
+  "base_commit": "9675cc44d44db036c0474153bd260fbf9e41eb25",
   "branch": "feature/research-snapshots",
-  "public_manifest_sha256": "3fc6dab4fe70e532b4c89f57016934cb0d9acdea7054ef359c18e94f2c41c3f7",
-  "public_files_including_metadata": 53,
-  "payload_files": 51,
+  "public_manifest_sha256": "b17e9d2e50c8ac37108c838aac25c7190d19b15e18ae016ccc431a9f7b641a51",
+  "public_files_including_metadata": 55,
+  "payload_files": 53,
   "prior_independent_review": {
-    "commit": "f17ec2181dbb552bec690fc9aa171872d52fbab4",
-    "dev4_accepted": true,
-    "source_and_wheel_passed_each": 671,
-    "additional_review119_passed": 119,
-    "frozen68": {
-      "PASS": 54,
-      "SAFE_LIMITED": 12,
-      "FAIL": 2
-    }
+    "commit": "9675cc44d44db036c0474153bd260fbf9e41eb25",
+    "research72": {
+      "PASS": 68,
+      "FAIL": 3,
+      "DIAGNOSTIC": 1
+    },
+    "blocking_root_cause": "S1 public nested report references mutated fixed Bao view and siblings",
+    "source_and_wheel_passed_each": 721
   },
+  "repair": [
+    "detach whole ResearchResult report, DataFrame cells/axes/attrs, and serialization",
+    "detach complete lineage envelope including nested legacy metadata",
+    "capture Store root value; detach saved coverage contract",
+    "detach legacy DataView constructor inputs/public metadata/conflicts",
+    "detach DataError input and serialized details",
+    "clarify Sina daily amount UNSUPPORTED_FIELD"
+  ],
   "author_regression": {
-    "prior_project": 638,
-    "new_project": 50,
-    "project_total": 688,
+    "prior_project": 688,
+    "new_project": 58,
+    "project_total": 746,
     "unchanged_external_cases": 33,
-    "source_total_passed": 721,
-    "wheel_total_passed": 721,
+    "source_total_passed": 779,
+    "wheel_total_passed": 779,
     "failed": 0,
     "skipped": 0,
     "network_guard": true
   },
   "author_reviewer_replays_each_environment": {
+    "research72": {
+      "PASS": 71,
+      "FAIL": 0,
+      "DIAGNOSTIC": 1
+    },
     "review119_passed": 119,
     "dev3_passed": 18,
     "boundaries_passed": 22,
@@ -48,7 +60,7 @@
     "not_independent_acceptance": true
   },
   "wheel": {
-    "sha256": "5831ad77767be9e10f1a6349a0ef14cbf42630dcbf51bbf8e0ee92844e044ebc",
+    "sha256": "148f80f2272c844e9f0e0e6ef7443bf825b73ae982ec489987b2439e6695e5aa",
     "runtime_modules_equal": 12,
     "RECORD_entries_verified": 15,
     "method": "byte-verified copies of prior locked installed dependencies; offline no-deps wheel install; not fresh online dependency resolution",
@@ -57,33 +69,54 @@
   "real_data": {
     "approved_local_daily_rows": 12,
     "all_approved_row_hashes_match": true,
-    "local_files_modified": false,
-    "new_sina_bounded_requests": 1,
-    "sina_raw_rows": 3,
-    "sina_queried_rows": 2,
+    "existing_sina_queried_rows": 2,
+    "both_original_dataset_ids_preserved": true,
     "source_and_wheel_public_offline_reopen_verified": true,
+    "original_files_unchanged": true,
+    "new_market_requests": 0,
     "baostock_collector_adopted": false
   },
-  "interface": [
-    "Store.fetch_price",
-    "Client.save_research",
-    "Store.import_research",
-    "Store.research",
-    "ResearchView.descriptor/at/get_price/coverage/quality/lineage",
-    "Store.research_snapshots/recover_research"
-  ],
+  "performance_control": {
+    "baseline_version": "0.4.0.dev1",
+    "candidate_version": "0.4.0.dev2",
+    "dataset_id": "45c5f5d39140e005142dc8c36471ee03595a76d1f5e392a11c62071c1b9c15e7",
+    "interpretation": "local bounded repeat-read and serialization comparison, not production latency SLA",
+    "rows": {
+      "2": {
+        "repeats_per_trial": 20,
+        "trials": 3,
+        "baseline_median_seconds": 0.024198958999477327,
+        "candidate_median_seconds": 0.03157745899807196,
+        "ratio": 1.304909810325064,
+        "same_full_result_hash": true
+      },
+      "366": {
+        "repeats_per_trial": 20,
+        "trials": 3,
+        "baseline_median_seconds": 0.44905308399756905,
+        "candidate_median_seconds": 0.600944999998319,
+        "ratio": 1.338249354950588,
+        "same_full_result_hash": true
+      }
+    },
+    "context_seconds": {
+      "baseline": 0.011172792001161724,
+      "candidate": 0.01225483299640473
+    }
+  },
+  "manifest_schema_parser_policy_changed": false,
   "dependency_versions_changed": false,
   "pushed": false,
   "published": false,
   "code_history_rewritten": false,
   "limitations": [
-    "verified historical PIT/finality unavailable",
-    "legacy Bao complete-receipt time unknown",
+    "new independent acceptance still pending",
+    "caller-modified result copies are not reauthenticated or rehashed",
+    "local bounded performance controls do not establish production latency or large-scale throughput",
+    "verified historical PIT/finality unavailable; legacy Bao receipt time unknown",
     "source-grid matching is not full trading/session/status admission",
-    "Sina daily amount unavailable",
-    "source turnover discrepancy remains unresolved",
-    "target 2026-04-09..09-30 true minute coverage and 14:55 semantics not established",
-    "no historical universe/actions/limits/execution projection",
-    "no full strategy, server or cross-platform validation"
+    "Sina daily money unsupported; source turnover discrepancy unresolved",
+    "target true minute history and 14:55 semantics not established",
+    "no full A-width engine/strategy acceptance or cross-platform long run"
   ]
 }

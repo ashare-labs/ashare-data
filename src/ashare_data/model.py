@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import copy
 import json
 import math
 import re
@@ -24,10 +25,10 @@ INSTRUMENT_SET_FIELDS = (
 class DataError(Exception):
     def __init__(self, code: str, message: str, details=None):
         super().__init__(message)
-        self.code, self.message, self.details = code, message, details or {}
+        self.code, self.message, self.details = code, message, copy.deepcopy(details or {})
 
     def as_dict(self):
-        return {"code": self.code, "message": self.message, "details": self.details}
+        return {"code": self.code, "message": self.message, "details": copy.deepcopy(self.details)}
 
 
 def require(condition, code, message, details=None):

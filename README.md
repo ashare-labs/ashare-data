@@ -1,4 +1,5 @@
-> 0.4.0.dev1 新增持久研究数据集：[公开研究接口契约](docs/research-api.md)。
+> 0.4.0.dev2 修复研究结果深层引用隔离，详见 [隔离修复说明](docs/research-isolation-fix.md)。
+> 持久研究数据集：[公开研究接口契约](docs/research-api.md)。
 > `Store.fetch_price` 显式有界拉取新浪；`Store.import_research` 只读导入已核实 Bao 原价日线。
 > `Store.research(dataset_id)` 跨进程离线重开，`get_price` 返回 Decimal 行情和缺口/谱系报告。
 > 这是研究数据读取内核；严格 PIT、最终性及缺证据的交易准入继续拒绝。

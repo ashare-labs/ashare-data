@@ -546,7 +546,7 @@ def _observation_time(value):
 
 
 def capabilities():
-    return {"version": "0.4.0.dev1", "mode": "direct_public_source", "source": "sina_public",
+    return {"version": "0.4.0.dev2", "mode": "direct_public_source", "source": "sina_public",
             "frequency": ["daily", "1m", "5m"], "adjustment": [None],
             "default_fields": DEFAULT_FIELDS.copy(), "minute_extra_fields": ["money"],
             "count": [1, 1000], "max_securities": 10, "max_source_window": MAX_BARS,

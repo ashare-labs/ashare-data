@@ -493,7 +493,9 @@ def save_client(client, store):
         "source": "sina_public",
         "objects": sorted(objects),
         "observations": sorted(entries, key=digest),
-        "coverage_contract": client.coverage_contract._data if client.coverage_contract else None,
+        "coverage_contract": copy.deepcopy(client.coverage_contract._data)
+        if client.coverage_contract
+        else None,
         "upstream_query_snapshot_id": pinned.snapshot_id,
     }
     return _publish(store, manifest, objects)
@@ -541,12 +543,36 @@ class _SealedTransport(Transport):
 
 @dataclass
 class ResearchResult:
+    """Caller-owned result; no mutable input or dataset object is retained.
+
+    pandas deep copies its arrays, but not Python containers in object cells.
+    Detach those cells explicitly, and copy attrs/report separately so editing
+    either public representation cannot rewrite the other or a fixed view.
+    """
+
     data: pd.DataFrame
     report: dict
 
+    def __post_init__(self):
+        self.data = self.data.copy(deep=True)
+        self.data.index = self.data.index.copy(deep=True)
+        self.data.columns = self.data.columns.copy(deep=True)
+        for position, dtype in enumerate(self.data.dtypes):
+            if pd.api.types.is_object_dtype(dtype):
+                self.data.isetitem(
+                    position,
+                    pd.Series(
+                        [copy.deepcopy(value) for value in self.data.iloc[:, position].array],
+                        index=self.data.index,
+                        dtype=object,
+                    ),
+                )
+        self.data.attrs = copy.deepcopy(self.data.attrs)
+        self.report = copy.deepcopy(self.report)
+
     def to_dict(self):
         frame = self.data.reset_index() if self.data.index.name == "time" else self.data
-        return {"rows": frame.to_dict("records"), "report": copy.deepcopy(self.report)}
+        return copy.deepcopy({"rows": frame.to_dict("records"), "report": self.report})
 
 
 class ResearchView:
@@ -574,7 +600,12 @@ class ResearchView:
         manifest = _json(body)
         objects = _objects(store, manifest)
         records, scopes, calendar = _validate(manifest, objects)
-        self._store, self._id, self._manifest, self._objects = store, sid, manifest, objects
+        self._root, self._id, self._manifest, self._objects = (
+            Path(store.root),
+            sid,
+            manifest,
+            objects,
+        )
         self._records, self._scopes, self._calendar = records, scopes, calendar
         self._clock, self._visibility = None, "unrestricted_research"
 
@@ -647,16 +678,20 @@ class ResearchView:
         }
 
     def lineage(self):
-        return {
-            "descriptor": self.descriptor(),
-            "observations": copy.deepcopy(self._manifest.get("observations", [])),
-            "raw_records": copy.deepcopy(self._records),
-            "source_calendar": copy.deepcopy(self._calendar),
-            "coverage_contract": copy.deepcopy(self._manifest.get("coverage_contract")),
-            "receipt_semantics": self._manifest.get(
-                "receipt_semantics", "local complete response, not historical PIT"
-            ),
-        }
+        # Detach the entire envelope, including extension/legacy metadata whose
+        # value may be a nested JSON object rather than a known scalar.
+        return copy.deepcopy(
+            {
+                "descriptor": self.descriptor(),
+                "observations": self._manifest.get("observations", []),
+                "raw_records": self._records,
+                "source_calendar": self._calendar,
+                "coverage_contract": self._manifest.get("coverage_contract"),
+                "receipt_semantics": self._manifest.get(
+                    "receipt_semantics", "local complete response, not historical PIT"
+                ),
+            }
+        )
 
     def at(self, as_of, *, visibility="verified"):
         clock = timestamp(as_of)
@@ -683,12 +718,12 @@ class ResearchView:
     def _client(self):
         contract = self._manifest.get("coverage_contract")
         client = Client(
-            cache=self._store.root,
+            cache=self._root,
             cache_mode="only",
             coverage_contract=CoverageContract(contract) if contract else None,
         )
         client.transport = _SealedTransport(
-            self._store.root, self._manifest["observations"], self._objects
+            self._root, self._manifest["observations"], self._objects
         )
         return (
             client.at(self._clock, visibility=self._visibility)
@@ -929,8 +964,11 @@ class ResearchView:
             "interval_boundaries_verified": False,
             "research_only": True,
         }
-        result.attrs = copy.deepcopy(report)
-        return ResearchResult(result, report)
+        # ResearchResult owns the public boundary. Internal Bao rows may be
+        # shared by sibling views, but no mutable reference escapes here.
+        public = ResearchResult(result, report)
+        public.data.attrs = copy.deepcopy(public.report)
+        return public
 
     @staticmethod
     def _record(code, label, raw, wanted):
