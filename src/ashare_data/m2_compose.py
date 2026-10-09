@@ -220,6 +220,13 @@ def _assemble(inputs, manifests, objects):
             exact_day(coverage["start"]) <= start <= end <= exact_day(coverage["end"])
         ):
             gap("M2_FACT_MISSING", window_id=wid, field="coverage_domains")
+        spec["owner_validation_dependencies"] = {
+            "security": "600000.XSHG",
+            "raw_price_dates": sorted({anchor, *spec["listing_read_dates"]}),
+            "state_dates": list(spec["listing_read_dates"]),
+            "calendar": {"start": anchor, "end": spec["settlement_successor"]},
+            "consumer_read_permission": False,
+        }
         spec["calendar_evidence_references"] = sorted(set(calendar_refs))
         spec["evidence_references"] = {
             "input_manifest_sha256": p["input_manifest_sha256"],

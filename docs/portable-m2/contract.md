@@ -25,7 +25,7 @@ CLI 使用 `ashare-data --store DIR m2 {import-component,component,validate,comp
 
 ## 范围及原有分工
 
-三窗几何保持；暖启动 2020-01-02，最后终后继 2020-01-20。为核 01-02 source preclose 与 P raw close，需 **2019-12-31 原价锚点**及连至01-02的源日历；这是校验域，不是执行日/额外策略读取。既有原文可包含2019-12-30等有界冗余，绝不据此开放角色。
+三窗几何保持；暖启动 2020-01-02，最后终后继 2020-01-20。为核 01-02 source preclose 与 P raw close，需 **2019-12-31 原价锚点**及连至01-02的源日历；这是校验域，不是执行日/额外策略读取。新产品 WindowPlan 的 `owner_validation_dependencies` 逐项列出原价/状态日期和源日历区间，并明确 consumer_read_permission=false；原 read_roles 不增加。既有原文可包含2019-12-30等有界冗余，绝不据此开放角色。
 
 m2a 执行01-03/06；w1执行01-03～16十日；w2执行01-06～17十日。P/T/next需源日历逐日证实，不能凭周末算法补日。
 P-only T09 strategy、T15/日末 engine、terminal仅有界挂牌全部沿原契约。四项 owner 假设与三项 backend 假设不变。

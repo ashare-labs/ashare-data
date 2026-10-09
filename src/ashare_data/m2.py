@@ -171,6 +171,8 @@ class M2View:
             "read_roles": spec["read_roles"],
             "source_evidence": spec["evidence_references"],
         }
+        if "owner_validation_dependencies" in spec:
+            body["owner_validation_dependencies"] = spec["owner_validation_dependencies"]
         return M2Document.of({**body, "window_plan_sha256": canonical_hash(body)})
 
     def windows(self):

@@ -109,3 +109,5 @@ origin为内部保留字段，用户配方/目录必须null；研究来源由`co
 `m2 import-sources --request recipe.json` 中路径相对当前工作目录；示例脚本会明确将配方相对路径解析到配方所在目录。
 `import-component`请求directory；`component`请求component_id；validate/compose请求六项price_dataset_id/facts_component_id/calendar_component_id/state_component_id/window_ids/mode（两个可选ID在CLI明确写null）；report请求report_id；export请求dataset_id/directory。
 validate打印完整报告，BLOCKED时exit2；compose阻断时exit2且错误details含report_id/gaps。结构/原件损坏返回明确DataError，不当成缺数据继续生产。
+
+新v2产品的WindowPlan增加`owner_validation_dependencies`（security/raw_price_dates/state_dates/calendar/consumer_read_permission=false），供数据依赖检查；不是新的消费者角色。m2a/w1的校验锚点为2019-12-31，w2为2020-01-02。下游应保留完整Plan及其owner摘要；不把这个依赖表变成可调用的read_roles。

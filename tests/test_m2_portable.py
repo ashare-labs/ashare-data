@@ -221,6 +221,13 @@ def test_real_compose_export_move_reopen_and_cli(prepared, tmp_path, capsys):
             assert getattr(old, method)() == getattr(new, method)()
             assert str(tmp_path) not in json.dumps(getattr(new, method)().to_dict())
         assert old.windows() == new.windows()
+        for plan in new.windows():
+            body = plan.to_dict()
+            deps = body["owner_validation_dependencies"]
+            anchor = "2020-01-02" if body["geometry"]["window_id"] == "w2" else "2019-12-31"
+            assert deps["raw_price_dates"][0] == anchor and deps["calendar"]["start"] == anchor
+            assert deps["consumer_read_permission"] is False
+            assert all(r["target_date"] != anchor for r in body["read_roles"])
     assert exported.to_dict()["dataset_id"] == sid
     cli = tmp_path / "request.json"
     cli.write_text(json.dumps(req))
