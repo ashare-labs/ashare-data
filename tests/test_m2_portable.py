@@ -295,6 +295,8 @@ def test_gaps_block_without_inference(prepared, private_components, tmp_path, fa
     r = s.validate_m2(**request(p, f)).to_dict()
     assert r["status"] == "BLOCKED"
     assert expected in {g["code"] for g in r["gaps"]}
+    if fault == "missing_calendar":
+        assert r["quality"]["calendar_query_complete"] is None
     err = rejects("M2_COMPOSITION_BLOCKED", lambda: s.compose_m2(**request(p, f)))
     assert err.details["report_id"] == r["report_id"]
     assert not s.m2_snapshots()
@@ -392,6 +394,7 @@ def test_missing_component_has_durable_gap_report(tmp_path):
     s = Store.init(tmp_path / "store")
     r = s.validate_m2(**request("1" * 64, "2" * 64)).to_dict()
     assert r["status"] == "BLOCKED"
+    assert r["quality"]["calendar_query_complete"] is None
     assert {g["role"] for g in r["gaps"]} == {"prices", "states", "calendar", "facts"}
     assert s.m2_report(r["report_id"]).to_dict() == r
     rejects("M2_COMPOSITION_BLOCKED", lambda: s.compose_m2(**request("1" * 64, "2" * 64)))

@@ -265,6 +265,10 @@ def _assemble(inputs, manifests, objects):
                     reason="required_fact_or_row_invalid",
                     detail=type(exc).__name__,
                 )
+    # Do not describe an absent calendar as complete merely because a policy expects completeness.
+    report_quality = dict(p["quality"])
+    if any(g["code"] == "M2_CALENDAR_MISSING" or g.get("role") == "calendar" for g in gaps):
+        report_quality["calendar_query_complete"] = None
     # A deterministic report, including the original unknowns, is not an independent PASS.
     report = {
         "schema": "m2.composition-report.v1",
@@ -272,7 +276,7 @@ def _assemble(inputs, manifests, objects):
         "producer_sha256": _code(),
         "inputs": inputs,
         "gaps": sorted(gaps, key=canonical_bytes),
-        "quality": p["quality"],
+        "quality": report_quality,
         "external_product_review": "PENDING",
         "execution_permission": False,
     }
@@ -352,7 +356,7 @@ def prepare(
             "producer_sha256": _code(),
             "inputs": {**ids, "window_ids": selected, "mode": mode},
             "gaps": missing,
-            "quality": source.policy()["quality"],
+            "quality": {**source.policy()["quality"], "calendar_query_complete": None},
             "external_product_review": "PENDING",
             "execution_permission": False,
         }
