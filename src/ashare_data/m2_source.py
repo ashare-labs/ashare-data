@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from datetime import timedelta
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from importlib.resources import files
 from pathlib import Path
 
@@ -28,6 +29,72 @@ TABLE = """CREATE TABLE IF NOT EXISTS m2_snapshots
 
 def raw_hash(blob):
     return hashlib.sha256(blob).hexdigest()
+
+
+def source_volume(value):
+    """Bound raw digits before int conversion; preserve the original source string."""
+    require(
+        type(value) is str and 0 < len(value) <= 24 and value.isascii() and value.isdigit(),
+        "M2_INTEGER",
+        "源股数须为1..24位ASCII非负整数字符串",
+    )
+    return exact_int(int(value))
+
+
+def source_prices(row):
+    o, hi, lo, c = [Decimal(decimal_text(row[k])) for k in ("open", "high", "low", "close")]
+    require(0 < lo <= min(o, c) <= max(o, c) <= hi, "M2_SOURCE_CONFLICT", "OHLC关系错误")
+    source_volume(row["volume"])
+    if row.get("amount"):
+        require(Decimal(decimal_text(row["amount"])) >= 0, "M2_SOURCE_CONFLICT", "amount非法")
+
+
+def source_limits(preclose):
+    """Validate both raw preclose and the actual consumer-derived decimal fields."""
+    ref = Decimal(decimal_text(preclose))
+    require(ref > 0, "M2_DECIMAL", "源前收须为正数")
+    limits = tuple(
+        (ref * Decimal(ratio)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        for ratio in ("0.9", "1.1")
+    )
+    for value in limits:
+        decimal_text(value)
+    return limits
+
+
+def event_identities(events):
+    """Check every event before security relevance filtering; identity is not truth proof."""
+    require(type(events) is list and len(events) <= 128, "M2_COMPONENT_SCHEMA", "事件集合无效")
+    ids = set()
+    for event in events:
+        require(type(event) is dict, "M2_COMPONENT_SCHEMA", "事件须为对象")
+        for field in ("id", "event_type"):
+            value = event.get(field)
+            require(
+                type(value) is str and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}", value),
+                "M2_COMPONENT_SCHEMA",
+                "事件ID/类型须为明确的非空标识符",
+            )
+        security = event.get("entitled_security")
+        require(
+            type(security) is str and re.fullmatch(r"[0-9]{6}\.(XSHG|XSHE|XBSE)", security),
+            "M2_COMPONENT_SCHEMA",
+            "事件权益证券须为明确代码；未知归属不能视作无关",
+        )
+        require(event["id"] not in ids, "M2_SOURCE_CONFLICT", "重复事件ID")
+        ids.add(event["id"])
+        for key in (
+            "record_date",
+            "ex_date",
+            "pay_date",
+            "effective_date",
+            "subscription_date",
+            "conversion_start",
+            "new_share_listing_date",
+        ):
+            if key in event and event[key] is not None:
+                require(type(event[key]) is str, "M2_COMPONENT_SCHEMA", "事件日期须为字符串或null")
+                exact_day(event[key])
 
 
 def policy():
@@ -270,6 +337,8 @@ def check_window(data, spec):
     for d in spec["listing_read_dates"]:
         require(d in data["bars"] and d in data["states"], "M2_DATA_MISSING", "必要行/状态缺失")
         r, s = data["bars"][d], data["states"][d]
+        source_prices(r)
+        source_limits(s["preclose"])
         require(
             r.get("tradestatus") == "1" and s.get("isST") == "0",
             "M2_STATE_UNKNOWN",
@@ -278,7 +347,8 @@ def check_window(data, spec):
         prev = data["opened"][data["opened"].index(d) - 1]
         require(prev in data["bars"], "M2_DATA_MISSING", "价基锚点缺失")
         require(
-            Decimal(s["preclose"]) == Decimal(data["bars"][prev]["close"]),
+            Decimal(decimal_text(s["preclose"]))
+            == Decimal(decimal_text(data["bars"][prev]["close"])),
             "M2_SOURCE_CONFLICT",
             "preclose不等于P raw close；不得选择一个值或静默改价基",
         )
@@ -291,6 +361,7 @@ def check_window(data, spec):
     )
     screen_start = spec["warmup"]
     screen_end = spec["settlement_successor"]
+    event_identities(data["events"])
     for e in data["events"]:
         if e["entitled_security"] != "600000.XSHG":
             continue

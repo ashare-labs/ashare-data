@@ -111,3 +111,5 @@ origin为内部保留字段，用户配方/目录必须null；研究来源由`co
 validate打印完整报告，BLOCKED时exit2；compose阻断时exit2且错误details含report_id/gaps。结构/原件损坏返回明确DataError，不当成缺数据继续生产。
 
 新v2产品的WindowPlan增加`owner_validation_dependencies`（security/raw_price_dates/state_dates/calendar/consumer_read_permission=false），供数据依赖检查；不是新的消费者角色。m2a/w1的校验锚点为2019-12-31，w2为2020-01-02。下游应保留完整Plan及其owner摘要；不把这个依赖表变成可调用的read_roles。
+
+0.8.0.dev2 的数值范围、事件最小结构及错误行为详见[发布前校验契约](validation-fix.md)。

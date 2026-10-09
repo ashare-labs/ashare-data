@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import fields
 from datetime import datetime, time
-from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -23,7 +22,7 @@ from .m2_types import (
 )
 from .model import DataError, require
 
-VERSION = "0.8.0.dev1"
+VERSION = "0.8.0.dev2"
 MODE = "conditional_research"
 TZ = ZoneInfo("Asia/Shanghai")
 
@@ -400,7 +399,7 @@ class M2UseView:
             row = data["bars"][t]
             result.update({k: row[k] for k in ("open", "high", "low", "close")})
             result.update(
-                volume=int(row["volume"]),
+                volume=source.source_volume(row["volume"]),
                 amount=row.get("amount") or None,
                 price_basis="raw_unadjusted",
                 price_unit="CNY/share",
@@ -419,19 +418,15 @@ class M2UseView:
             ]
         elif op == "trading_state":
             s = data["states"][t]
-            ref = Decimal(s["preclose"])
+            lower, upper = source.source_limits(s["preclose"])
             rule = p["rules"]
             result.update(
                 suspended=False,
                 is_st=False,
                 state_evidence_status="source_observed",
                 source_preclose=s["preclose"],
-                lower_limit=(ref * Decimal("0.9")).quantize(
-                    Decimal("0.01"), rounding=ROUND_HALF_UP
-                ),
-                upper_limit=(ref * Decimal("1.1")).quantize(
-                    Decimal("0.01"), rounding=ROUND_HALF_UP
-                ),
+                lower_limit=lower,
+                upper_limit=upper,
                 price_tick=rule["price_tick"],
                 buy_round_lot=rule["buy_round_lot"],
                 resale_rule=rule["resale_rule"],

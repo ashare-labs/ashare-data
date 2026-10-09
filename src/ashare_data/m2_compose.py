@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import copy
 from datetime import timedelta
-from decimal import Decimal
 from pathlib import Path
 
 from . import m2_components as components
@@ -14,7 +13,6 @@ from .m2_types import (
     M2Document,
     canonical_bytes,
     canonical_hash,
-    decimal_text,
     exact_day,
     keys,
     json_loads,
@@ -116,19 +114,14 @@ def _assemble(inputs, manifests, objects):
                     )
     for day, row in bars.items():
         try:
-            o, hi, lo, c = [Decimal(decimal_text(row[k])) for k in ("open", "high", "low", "close")]
-            require(0 < lo <= min(o, c) <= max(o, c) <= hi, "M2_SOURCE_CONFLICT", "OHLC关系错误")
-            require(
-                row["volume"].isascii() and row["volume"].isdigit(),
-                "M2_UNIT_UNKNOWN",
-                "源股数须为非负整数字符串",
-            )
-            if row.get("amount"):
-                require(
-                    Decimal(decimal_text(row["amount"])) >= 0, "M2_SOURCE_CONFLICT", "amount非法"
-                )
+            source.source_prices(row)
         except DataError as exc:
             gap(exc.code, role="prices", date=day, field="OHLCV/amount")
+    for day, row in states.items():
+        try:
+            source.source_limits(row["preclose"])
+        except DataError as exc:
+            gap(exc.code, role="states", date=day, field="preclose/limits")
     fact_body = manifests[inputs["facts"]]
     require(fact_body["kind"] == "facts", "M2_COMPONENT_SCHEMA", "须提供facts组件")
     claims = fact_body["claims"]

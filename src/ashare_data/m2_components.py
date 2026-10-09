@@ -10,6 +10,7 @@ from . import research
 from ._bao_receipt.protocol import check_identity, decode_request, decode_response
 from .d1 import _read, _safe_path
 from .m2_types import canonical_bytes, canonical_hash, exact_day, json_loads, keys, sha
+from .m2_source import event_identities
 from .model import DataError, require
 from .storage import identifier, immutable_write
 
@@ -334,6 +335,7 @@ def _validate(body, objects):
             _refs(f["evidence"], names)
             ids.append(f["id"])
         require(len(ids) == len(set(ids)), "M2_SOURCE_CONFLICT", "重复事实")
+        event_identities(claims["events"])
         for event in claims["events"]:
             _refs(event["evidence"], names)
         coverage = claims["coverage"]
