@@ -1,113 +1,26 @@
-> **0.7.0.dev1：M2 有限日频条件研究候选。** [公开API/codec](docs/m2-api.md) · [R1–R4裁决](docs/m2-revision-decisions.md) · [A宽字段对接](docs/m2-backend-diff-r2.md)。600000的m2a/w1/w2、完整源日历与新四项ack、P-only策略/engine T日模型隔离、不可变Evidence和当前授权。仅离线数据/codec消费验证；产品待独审，未运行原生M2，后端执行许可恒false。
-
-> **0.6.0.dev3：BR1 有界上市状态。** [新增查询契约](docs/d1-br1-listing.md)：四日条件状态、双日期/用途边界、真实后继校验和缓存复核。绝对退市日 unknown，原事实/数据 ID 不变；须另 pin 新契约与 wheel。执行仍拒绝，原生 adapter 和重跑留待独审。
-
-> **0.6.0.dev2：D1-BR1显式条件研究投影。** [独立公开契约](docs/d1-br1-api.md)。委托方已接受有限A-EQ/A-NORMAL/A-AD08假设用于条件验证；实现与后端绑定仍待独审，执行许可保持false。
-> `Store.compose_br1(..., mode="conditional_research", assumption_ids=("A-EQ","A-NORMAL","A-AD08"))`创建新组合；读取也须显式传mode。
-> 模型空事件、有限前收与限价另行标注假设依赖；严格D1、原verified_absent=false和complete=false不变。没有运行成交或认证历史收益。
-
-> **0.6.0.dev1：D1有限官方事实与固定组合版本。** [公共接口及分字段裁决](docs/d1-api.md) · [当时冻结的缺口与假设提议](docs/d1-evidence-options.md)。
-> 7/11必需字段可作限定事后研究读取；历史资格、每日限价、权益无事件证明、AD08前收仍阻断。`complete=false`；没有执行引擎或放行D1。
-> `Store.import_d1_facts`显式封存已审本地包，`Store.compose_d1`固定价格/事实/计划，`Store.d1(ID)`离线返回typed字段与owner回执。
-> 所有D1读操作不联网；原始价格ID不变。正向事实、源观察、历史推断和候选值分开保留。
-
-> **0.5.0.dev3：分钟盘中源标签截止筛选与证券资料校验。** [接口、错误与兼容说明](docs/baostock-query-fixes.md)。
-> 14:55 截止不会返回更晚标签；闭合、实际可见性与严格 PIT 仍未获证明。
-
-> **0.5.0.dev2：BaoStock 5/15/30/60分钟有界研究查询。** [分钟接口与实测边界](docs/baostock-minutes.md)。
-> 仅显式证券、短日期窗口；原标签不平移，压缩外层校验未知继续明示。没有1m或完整历史保证。
-
-> 0.5.0.dev1 新增 BaoStock 免费日线、显式证券资料、短窗口日历及不可变请求证据。
-> [接口契约](docs/baostock-api.md) · [来源与许可边界](docs/baostock-source.md)。日线压缩外层校验待验，允许明确标注的研究读取；不提供历史 PIT 或 BaoStock 1m。
-
-> 0.4.0.dev2 修复研究结果深层引用隔离，详见 [隔离修复说明](docs/research-isolation-fix.md)。
-> 持久研究数据集：[公开研究接口契约](docs/research-api.md)。
-> `Store.fetch_price` 显式有界拉取新浪；`Store.import_research` 只读导入已核实 Bao 原价日线。
-> `Store.research(dataset_id)` 跨进程离线重开，`get_price` 返回 Decimal 行情和缺口/谱系报告。
-> 这是研究数据读取内核；严格 PIT、最终性及缺证据的交易准入继续拒绝。
-
 # A数达（ashare-data）
 
-## 项目简介
+**0.7.0.dev1 开发预览**：用于少量、明确范围的 A 股行情查询和离线研究。普通查询直接从新浪公开行情接口取数；可选 BaoStock 通道提供有界日线、5/15/30/60分钟、证券资料和交易日历。它不是交易执行器，也不能直接替换 `jqdatasdk`。
 
-A数达是直接获取 A 股行情的 Python 库和命令行工具。调用 `get_price` 即可从公开行情源取得数据，无需账号、手工导入、初始化数据库或指定快照。
+本次公开运行代码与已审候选 `75c19209276625975cb788604cfd4c4c09e94fba` 相同。M2 owner API／公开 codec 的独审结论为有限条件通过；固定 M2 数据包不随源码公开，因此克隆仓库即可尝试普通取数，但不能直接重放 M2。[发布与独审附录](docs/releases/0.7.0.dev1.md) · [许可状态](docs/licensing.md)
 
-当前支持沪深 A 股的日线、近期1分钟和5分钟行情，单股、多股、日期筛选及按条数查询；可选择本地缓存，用同一接口离线读取。另提供证券名称查询、上交所年度交易日历，以及高级离线数据管理能力。
+## 安装
 
-接口名称、证券代码和 DataFrame 形态向聚宽本地 SDK 靠拢，长期目标是逐步扩展兼容范围。当前 **0.5.0.dev3 为 BaoStock 截止筛选与资料校验修复候选**，尚不能直接替换 `jqdatasdk`，支持范围见[接口说明](docs/live-api.md)。
-
-## BaoStock 分钟直接查询
-
-```python
-from ashare_data import BaoStockSource, Store
-
-store = Store("./bao-store")  # 首次使用先 Store.init("./bao-store")
-source = BaoStockSource(sdk_path="/path/to/existing/baostock-0.9.4")
-result = source.get_price("600000.XSHG", store=store,
-                          start_date="2026-09-30", end_date="2026-09-30",
-                          frequency="5m")  # 同样支持15m / 30m / 60m
-print(result.data)
-print(result.report["coverage"]["minute_labels"])
-
-# 固定版本离线重开，不触发网络，不需要SDK
-capture_id = result.report["capture_id"]
-result = Store("./bao-store").baostock(capture_id).get_price()
-```
+需要已安装的 Python 3.12 和 [uv](https://docs.astral.sh/uv/getting-started/installation/)。在一个新目录中执行：
 
 ```sh
-.venv/bin/ashare-data --store ./bao-store baostock-fetch minute --frequency 5m --security 600000.XSHG --start 2026-09-30 --end 2026-09-30 --sdk-path /path/to/existing/baostock-0.9.4
-.venv/bin/ashare-data --store ./bao-store baostock-query price --capture CAPTURE_ID
-```
-
-此入口显式使用BaoStock，最多2个连续自然日；默认`frequency="daily"`保持日线接口。
-下面的通用顶层`get_price`沿用原新浪通道，不会自动替换来源。
-
-## BaoStock 显式研究查询
-
-使用已有官方0.9.4 SDK（不自动安装或登录付费账号）：
-
-```python
-from ashare_data import BaoStockSource, Store
-
-store = Store.init("./bao-store")  # 新建一次；以后使用 Store("./bao-store")
-source = BaoStockSource(sdk_path="/path/to/existing/baostock-0.9.4")
-result = source.get_price("600000.XSHG", store=store,
-                          start_date="2026-09-28", end_date="2026-09-30")
-print(result.data)
-print(result.report)  # 单位、原始/待验质量、完整性、capture_id
-
-# 以后无需 SDK 和联网：固定版本重新验证磁盘证据
-capture_id = result.report["capture_id"]
-result = Store("./bao-store").baostock(capture_id).get_price()
-```
-
-`source.get_security_info("600000.XSHG", store=store)`查询显式证券资料；
-`source.get_trade_days(store=store, start_date="2026-09-28", end_date="2026-09-30")`查询源交易日。
-当前资料不回填为历史股票池。每次仅一个证券和最多31个自然日。
-
-```sh
-.venv/bin/ashare-data --store ./bao-store baostock-fetch daily --security 600000.XSHG --start 2026-09-28 --end 2026-09-30 --sdk-path /path/to/existing/baostock-0.9.4
-.venv/bin/ashare-data --store ./bao-store baostock-query price --capture CAPTURE_ID
-.venv/bin/ashare-data --store ./bao-store baostock-snapshots
-.venv/bin/ashare-data --store ./bao-store baostock-recover
-```
-
-采集失败也封存失败版本；descriptor给出status，行查询抛出`SOURCE_REQUEST_FAILED`。
-业务种类错误、超范围参数、SDK指纹不符在请求前拒绝。恢复不会重试远程请求。
-
-## 安装指南
-
-需要 uv 和已安装的 Python 3.12。在交付源码的项目目录中执行：
-
-```sh
+git clone --branch release/0.7.0-dev1-preview https://github.com/ashare-labs/ashare-data.git
+cd ashare-data
 uv sync --locked --no-config --python 3.12
 ```
 
-依赖锁文件使用官方 PyPI，环境安装到项目的 `.venv`，不修改全局 Python 环境。项目声明 Python 3.11～3.13；当前实测 macOS arm64 / Python 3.12。安装和查询命令在项目根目录执行。
+依赖从官方 PyPI 按 `uv.lock` 安装到项目 `.venv`，不修改全局 Python。首次安装需要正常联网；不要加 `--offline`，除非已准备完整缓存。项目声明 Python 3.11～3.13；本预览实际验证环境为 macOS arm64／Python 3.12，其他平台尚未验证。本页后续命令均在项目根目录执行；Windows 的环境可执行文件位于 `.venv\Scripts`，Windows 本轮未验收。
 
-## 快速开始
+这是 Git 源码开发预览，不表示该版本已发布到 PyPI。
 
-直接获取浦发银行最近三条日线：
+## 第一次真实取数：新浪日线
+
+查询浦发银行最近三条日线，不需要账号、API key、手工导入或数据库初始化：
 
 ```sh
 .venv/bin/python - <<'PY'
@@ -115,87 +28,86 @@ from ashare_data import get_price
 
 prices = get_price("600000.XSHG", count=3)
 print(prices)
+print(prices.attrs)
 PY
 ```
 
-返回以北京时间日期为索引的 DataFrame，列为 `open`、`close`、`high`、`low`、`volume`。价格单位为元/股，成交量为股。数据来自实际网络请求，数值随源更新；请求失败会抛出明确错误，不返回合成行情。
+返回北京时间日期索引的 DataFrame，默认字段为 `open`、`close`、`high`、`low`、`volume`；价格单位为元／股，成交量单位为股，默认不复权。`attrs` 保存来源、实际观察时间、原始字段及缺口信息。行情来自实际网络响应，不足、超时或源拒绝会报错，不返回合成行情，也不会静默换源。
 
-获取最近两条5分钟记录：
+近期分钟行情可用同一入口：
 
 ```sh
 .venv/bin/ashare-data price 600000.XSHG --frequency 5m --count 2
 ```
 
-## 使用指南
+新浪支持 `daily`／`1d`、`1m`／`minute`、`5m`，仅源能够提供的有限近期窗口；分钟可额外查询 `money`（元），日线不提供成交额。`count` 与 `start_date` 互斥，时间按 Asia/Shanghai 解释。完整参数与错误码见[直接行情接口](docs/live-api.md)。
 
-### 查询行情
+## 可选：BaoStock 官方 SDK 与有界日线
 
-```python
-from ashare_data import get_price
+BaoStock 不随默认安装或公开源码捆绑。若要使用此通道，从其[官方 PyPI 项目](https://pypi.org/project/baostock/0.9.4/)安装固定 `0.9.4` wheel；公开来源说明见[平台介绍](https://www.baostock.com/mainContent?file=home.md)。在上面的项目环境中执行：
 
-# 最近两条1分钟源记录；包含成交额（元）
-minute = get_price("600000.XSHG", frequency="1m", count=2,
-                   fields=["close", "volume", "money"])
-
-# 指定结束日期，向前取条数；须在源可提供的近期窗口内
-history = get_price("600000.XSHG", end_date="2026-09-30", count=2)
-
-# 多股返回 time、code 和所选字段组成的长表
-multiple = get_price(["600000.XSHG", "000001.XSHE"], frequency="5m", count=2)
+```sh
+uv pip install --no-config --python .venv/bin/python --index-url https://pypi.org/simple --only-binary :all: --no-deps baostock==0.9.4
 ```
 
-也可使用 `start_date` 与 `end_date` 查询区间，两端均包含；`start_date` 与 `count` 互斥。分钟查询按源时间标签筛选，不平移标签或补齐缺行。无时区时间按北京时间解释。默认保留源实际报价，`fq=None` 表示不复权。
+这是可选环境安装，不改变 `pyproject.toml` 或锁文件。再次 `uv sync` 可能移除未声明的 SDK，届时可重新执行此命令。A数达会校验 SDK 的逐源码指纹；官方 wheel SHA-256 为 `0bf71c6069ab5890ff3596632f9c3f8f1fbc6bfcac582c2f9d6a5c11ab2cfaf8`。已在其他目录准备 SDK 时，也可显式传 `sdk_path`，详见[接口契约](docs/baostock-api.md)。
 
-`prices.attrs` 保存来源、请求时间、原始字段、单位、缓存状态和不规则时间间隔。当前源只暴露有上限的近期窗口；超出窗口或条数不足会报 `COVERAGE_INCOMPLETE`。返回记录不代表区间内每分钟或每个交易日都完整。
+只运行一个 BaoStock 采集进程，关闭其他并发 BaoStock 查询。下面只查询一只证券、三个自然日：
 
-### 使用缓存
+```sh
+.venv/bin/python - <<'PY'
+from pathlib import Path
+from ashare_data import BaoStockSource, Store
+
+root = Path(".data/bao-store")
+store = Store(root) if root.exists() else Store.init(root)
+result = BaoStockSource().get_price(
+    "600000.XSHG", store=store,
+    start_date="2026-09-28", end_date="2026-09-30",
+)
+print(result.data)
+print(result.report)
+
+# 固定版本可离线重开；这一行不再次采集
+capture_id = result.report["capture_id"]
+print(Store(root).baostock(capture_id).get_price().data)
+PY
+```
+
+每次只查询一个证券、一个业务种类。日线最多31个连续自然日；分钟通过 `frequency="5m"`（或15m／30m／60m）显式选择，最多2个连续自然日。没有 BaoStock 1m。日期仅作示例，不表示任何日期均可取得完整数据。源压缩外层校验、历史可见性等未知状态会保留在报告中；免费查询不代表拥有数据再分发权。[来源与许可边界](docs/baostock-source.md) · [分钟与截止时间](docs/baostock-query-fixes.md)
+
+## 缓存与离线研究
+
+新浪查询默认不落盘；显式传缓存目录后，可重开同一请求：
 
 ```python
 from ashare_data import Client
 
-client = Client(cache=".data/market")
-online = client.get_price("600000.XSHG", frequency="5m", count=2)
-
-offline = Client(cache=".data/market", cache_mode="only")
-saved = offline.get_price("600000.XSHG", frequency="5m", count=2)
+client = Client(cache=".data/sina")
+online = client.get_price("600000.XSHG", count=3)
+offline = Client(cache=".data/sina", cache_mode="only")
+saved = offline.get_price("600000.XSHG", count=3)
 ```
 
-不指定 `cache` 就不落盘。默认缓存有效期为300秒；`only` 仅读取已缓存的同一请求，缺失即报错；`refresh` 明确重新联网取数。网络失败不会静默使用过期缓存或更换来源。历史原始响应对象不会因刷新而被覆盖。记录能否视为结束受抓取时刻限制：时间走到收盘不会把盘中缓存升级为完整日线；可用 `refresh` 获取新的收盘后响应。
+`only` 不联网，缺失或损坏明确报错；`refresh` 才强制重新查询，网络失败不会静默使用过期值。需要持久、内容寻址的研究数据集时，使用 [Store 研究接口](docs/research-api.md)。策略时钟 `Client.at(...)` 及各项保证见[数据准入契约](docs/data-admission.md)；`assumed`／`received` 都不等于严格 PIT。
 
-### 数据保证与策略时钟
+## M2 与验证范围
 
-每股元数据现在分别报告行情标签年龄、HTTP观测年龄、覆盖状态及可见性等级。旧 `strict` 仍只检查相邻返回标签；完整标签覆盖使用 `require_complete=True`；`require_fresh=True` 现在同时检查源水位、所选窗口水位和当前可交易状态。`client.trading_status(..., as_of=...)` 独立返回休市、午休、停牌、可交易或未知，不将缺数据当停牌。
+M2 仅支持 `600000.XSHG`、日频、`m2a/w1/w2` 三个固定窗口及显式条件假设。它需要另行授权取得的、精确摘要匹配的固定输入包；仓库不提供该包、下载地址或自动采集替代品。`examples/m2_prepare_bundle.py` 是维护者对已有材料的离线打包工具，不是数据下载器。[M2契约](docs/m2-api.md)中的冻结 `PENDING` 等字段原样保留，后续独审通过由[独立附录](docs/releases/0.7.0.dev1.md)关联，不回写证据。
 
-策略时钟使用 `client.at(as_of, visibility=...)` 固定本地缓存，查询不联网。可显式选择 `assumed` 做非空历史研究，或 `received` 使用当时本机收到的版本；二者均不冒充PIT。默认 `verified` 要求真实公布/修订证据，当前源缺证据会拒绝。`end_date`仍只负责标签过滤。固定上下文按每个标签选择最新合格观测，保留逐行来源；较早大窗口不会遮蔽较新小窗口。冲突按可见流和所选标签判断，严格较新合格版本可消解旧冲突；结果保留冲突与消解原文证据，当前有效冲突仍拒绝。count=N的完整性检查仅覆盖取得这N个有据槽所需的范围，所需范围内的未知和缺口仍会拒绝。
-
-`acquire-price`显式尝试单窗口补齐，`live-coverage`检查声明事实，`reconcile-day`诊断量额；无法完成的要求返回未满足状态，不造数。详见[数据准入接口与schema](docs/data-admission.md)及[归因与剩余阻塞](docs/data-attribution.md)。
-
-### 证券、日历和命令行
-
-```python
-from ashare_data import get_security_info, get_trade_days
-
-info = get_security_info("600000.XSHG")
-days = get_trade_days(end_date="2026-10-08", count=2)
-```
-
-证券信息提供当前名称及代码，不冒充历史股票池。日历来自上交所当前发布年度的休市安排；暂不支持其他年份及历史公告时点查询。
+公开测试使用合成或协议夹具，不会主动采集真实行情：
 
 ```sh
-.venv/bin/ashare-data capabilities
-.venv/bin/ashare-data security 600000.XSHG
-.venv/bin/ashare-data trade-days --end 2026-10-08 --count 2
-.venv/bin/ashare-data --help
+.venv/bin/python -m pytest -q
 ```
 
-`price` 可追加 `--start`、`--end`、`--fields`、`--cache`、`--cache-mode only`。CLI 输出 JSON；错误输出至 stderr，退出码为2。
+缺少私有固定材料的测试会明确跳过，不能把跳过计为通过。独审阶段使用授权固定包执行过的结果与本次发布验证分别记录在[发布附录](docs/releases/0.7.0.dev1.md)。
 
-需要手工管理自有数据时，仍可使用 `Store` 和 `import / validate / publish / query / snapshots`。这些高级操作要求 `--store`，按[离线快照契约](docs/interface.md)执行；普通行情查询不需要它们。
+## 当前边界
 
-## 限制与说明
+- 普通 `get_price` 固定使用新浪；BaoStock 必须显式选择，不自动切换或混合来源。公共服务可能限流、停机或改变格式。
+- 不承诺全市场、完整历史、完整分钟成交、最终定稿或历史当时可见。1分钟源的14:57／15:00标签及竞价缺口保留原样，不补造记录。
+- 不提供前后复权、完整公司行动、历史股票池、聚宽等价、生产 SLA、模拟盘或实盘准入。交易日历为上交所当前发布年度；证券资料不作为历史资格证明。
+- 公开仓库不包含实际采集响应、M2固定数据包、实验数据库、检查点或 SDK 本体。软件依赖许可和行情来源条件独立适用；项目尚未指定自有源码开源许可证，详见[许可状态](docs/licensing.md)。
 
-- 数据源固定为新浪公开行情接口，不自动换源。无登录、付费、下单或全市场批量下载功能；公共服务可能中断或改变格式。
-- 原生默认值与聚宽有明确差异：`fq=None`、`panel=False`、`fill_paused=False`、`round=False`，默认字段为 OHLCV。前后复权、停牌过滤/填充、因子及完整历史证券集合尚不支持；[逐项差异](docs/joinquant-compat.md)列明替代方式。
-- 日线源没有成交额，因此 `money` 仅支持分钟查询。无 `as_of` 的研究入口沿用15:05软件阈值，它不证明当天统计范围已经结束或记录已经最终定稿。有 `as_of` 的声明区间模型另行过滤；供应商历史可见性仍未证明。
-- 1分钟源存在14:57到15:00的竞价间隔，保留两条原记录，不生成14:58/14:59。14:55与聚宽已闭合 bar 的等价性仍待核验；`strict=True` 会拒绝不规则时间间隔。
-- 真实小样通过不代表2026-04-09至09-30完整分钟历史可用，也不代表真实成交全覆盖。本轮未验收完整策略、Windows、大规模性能或生产稳定性，详见[来源与单位](docs/sources.md)和[验证说明](docs/validation.md)。
+[聚宽参数差异](docs/joinquant-compat.md) · [新浪来源与单位](docs/sources.md) · [离线快照](docs/interface.md) · [历史阶段验证记录](docs/validation.md)

@@ -2,9 +2,9 @@
 import copy
 import json
 import os
+import shutil
 import subprocess
 import sys
-import tarfile
 from datetime import datetime
 from pathlib import Path
 
@@ -140,13 +140,8 @@ def test_only_null_or_omitted_availability_means_unknown(store, bundle, availabl
 def test_rc1_published_invalid_time_is_blocked_without_rewriting_old_snapshot(
         tmp_path, bundle, requirements):
     old_source = tmp_path / "rc1-src"
-    archive = ROOT / "releases/0.1.0-rc1/frozen-files.tar.gz"
-    with tarfile.open(archive) as tar:
-        for member in tar.getmembers():
-            if member.isfile() and member.name.startswith("src/ashare_data/"):
-                target = old_source / Path(member.name).relative_to("src")
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes(tar.extractfile(member).read())
+    fixture = ROOT / "tests/fixtures/legacy_rc1/src"
+    shutil.copytree(fixture, old_source)
     bundle["source"].update(kind="local_observation", observed_at="2026-04-09T14:00:00+08:00")
     for row in bundle["bars"]:
         row.update(quality="observed", available_at=None)

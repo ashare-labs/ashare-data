@@ -10,3 +10,15 @@ evidence/
 exports/
 CONTENT.sha256
 RELEASE.json
+.cache/
+.state/
+.env
+.env.*
+*.sqlite
+*.sqlite3
+*.db
+*.chk
+*.whl
+*.zip
+*.tar
+*.tar.gz

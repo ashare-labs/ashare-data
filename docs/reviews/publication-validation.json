@@ -1,0 +1,89 @@
+{
+  "schema": "ashare-data.publication-validation.v1",
+  "date_utc": "2026-10-09",
+  "environment": "macOS arm64 / CPython 3.12.13",
+  "runtime_source_commit": "75c19209276625975cb788604cfd4c4c09e94fba",
+  "runtime_code_sha256": "260c2c4a669ee3b95a3af9ea16f0b358b2a81415924bf1b1ce2b95879e860a84",
+  "source_install": {
+    "new_environment": true,
+    "initially_empty_cache": true,
+    "registry": "https://pypi.org/simple",
+    "locked": true,
+    "result": "PASS"
+  },
+  "public_source_tests": {
+    "cases": 1548,
+    "passed": 1508,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 40
+  },
+  "private_fixed_input_m2_tests": {
+    "cases": 72,
+    "passed": 72,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "tests_network": "denied by audit guard",
+  "live_reads": {
+    "started_at": "2026-10-09T11:57:10.507675+00:00",
+    "finished_at": "2026-10-09T11:57:16.169395+00:00",
+    "security": "600000.XSHG",
+    "sina": {
+      "frequency": "daily",
+      "count": 3,
+      "rows": 3,
+      "offline_equal": true,
+      "network_requests": 1,
+      "status": "PASS"
+    },
+    "baostock": {
+      "frequency": "daily",
+      "start": "2026-09-28",
+      "end": "2026-09-30",
+      "rows": 3,
+      "offline_equal": true,
+      "business_queries": 1,
+      "sdk": "0.9.4",
+      "status": "PASS"
+    },
+    "raw_data_published": false,
+    "retries": 0,
+    "claim": "Only these bounded requests passed; no full-history, PIT, or trading admission."
+  },
+  "wheel": {
+    "wheel": "ashare_data-0.7.0.dev1-py3-none-any.whl",
+    "wheel_sha256": "8802d025668ae7a302ae0cd98d02f6457e3927679f01491951e126fbca1a61ae",
+    "package_files_identical_to_source": 33,
+    "record_entries_verified": 36,
+    "no_test_docs_data_or_dependency_payloads": true,
+    "original_reviewed_wheel_sha256": "95078db7bdb8141159e5d9e7f9fba33eda3c14e1957e60b2ce0c034026ff2a45",
+    "same_runtime_new_metadata": true
+  },
+  "wheel_install": {
+    "wheel": "ashare_data-0.7.0.dev1-py3-none-any.whl",
+    "isolated_import_confirmed": true,
+    "editable_install": false,
+    "dependency_install": "locked runtime hashes; official PyPI",
+    "fresh_empty_cache": true
+  },
+  "wheel_golden_fixture": {
+    "kind": "synthetic",
+    "network": "none",
+    "status": "PASS"
+  },
+  "ruff": "PASS: runtime source and changed regression test",
+  "failure_history": [
+    "First public test run: 1507 passed, 40 skipped, 1 missing legacy fixture; unpacked six original files, preserved assertions, full rerun passed.",
+    "First offline wheel install: required DuckDB artifact unavailable in cache; fresh empty-cache official-PyPI hash-locked installation passed."
+  ],
+  "not_run": [
+    "Windows",
+    "other Python versions",
+    "native engine",
+    "paper/live trading",
+    "general security penetration tests"
+  ],
+  "independent_publication_review": "External review must identify the final Git commit; this file is author validation."
+}

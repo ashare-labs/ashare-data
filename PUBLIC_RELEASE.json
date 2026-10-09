@@ -1,23 +1,66 @@
 {
-  "version": "0.6.0.dev3",
-  "base_commit": "ebfaf0c5767aa4e4f97a9781ede66759c29b2316",
-  "branch": "feature/d1-bounded-listing",
-  "status": "conditional bounded listing author-verified; independent implementation and adapter reviews pending",
-  "public_manifest_sha256": "50aaf0e1a803a76885bf83c436d460b1bf619214a3af52973b2581291b0cc11e",
-  "payload_files": 87,
-  "source_and_wheel_passed_each": 1509,
-  "new_tests": 51,
-  "listing_contract_sha256": "d496e9d95d4a32e41c49bfe646578f67a7f818d49171f6ccf43615ee2bb04628",
-  "listing_policy_sha256": "4e66bfe529a8e82178b48ad85c00840c73c4b5ee9df4e74e3227de6bea7747eb",
-  "original_data_and_public_outputs": "unchanged; old fixed IDs remain; extension contract and wheel must be pinned separately",
-  "absolute_delisting_date": null,
-  "absolute_date_status": "unknown",
-  "execution_permission": false,
-  "native_execution": "NOT_RUN",
-  "original_experiment": "FAIL unchanged; no rerun or checkpoint resume",
-  "dependencies": "unchanged locked dependencies; existing hash-verified copies, offline local wheel install",
-  "new_remote_queries": 0,
-  "backend_modified": false,
-  "pushed": false,
-  "deployed": false
+  "schema": "ashare-data.public-preview.v1",
+  "version": "0.7.0.dev1",
+  "release_revision": "public-preview.1",
+  "artifact_kind": "development_preview_source",
+  "repository": "https://github.com/ashare-labs/ashare-data",
+  "proposed_branch": "release/0.7.0-dev1-preview",
+  "remote_base_commit": "3d41d28600481bff163242a8775a6e682cb995f2",
+  "reviewed_runtime_commit": "75c19209276625975cb788604cfd4c4c09e94fba",
+  "reviewed_runtime_tree": "15f4b705c524979db59e2f4421e06139510c27ea",
+  "runtime_code_sha256": "260c2c4a669ee3b95a3af9ea16f0b358b2a81415924bf1b1ce2b95879e860a84",
+  "reviewed_runtime_unchanged": true,
+  "version_and_dependency_lock_unchanged": true,
+  "review": {
+    "scope": "finite conditional M2 owner API and public codec only",
+    "status": "PASS_CONDITIONAL_OWNER_API_AND_PUBLIC_CODEC",
+    "receipt": "docs/reviews/m2-owner-admission.json",
+    "receipt_sha256": "8c27d758c59052d652a5ee9150819ecadca5654b56bfdfacaa5e409aa36dfd6b",
+    "original_reviewed_wheel_sha256": "95078db7bdb8141159e5d9e7f9fba33eda3c14e1957e60b2ce0c034026ff2a45",
+    "publication_review": "See external review bound to the final Git commit."
+  },
+  "preview_wheel_sha256": "8802d025668ae7a302ae0cd98d02f6457e3927679f01491951e126fbca1a61ae",
+  "preview_wheel_replaces_original_reviewed_wheel": false,
+  "validation": "docs/reviews/publication-validation.json",
+  "license": {
+    "own_source_open_source_license": null,
+    "status": "No additional license granted; see docs/licensing.md",
+    "third_party_terms_separate": true
+  },
+  "distribution": {
+    "m2_fixed_inputs": false,
+    "actual_market_responses": false,
+    "third_party_sdk_or_wheels": false,
+    "experiment_databases_or_checkpoints": false,
+    "compressed_payloads_in_current_tree": false,
+    "synthetic_test_fixtures": true,
+    "historical_source_fixture": "tests/fixtures/legacy_rc1",
+    "legacy_source_archive_remains_in_existing_public_history": true
+  },
+  "scope": {
+    "direct_sources": [
+      "sina_public",
+      "explicit_baostock_0.9.4"
+    ],
+    "m2_security": "600000.XSHG",
+    "m2_windows": [
+      "m2a",
+      "w1",
+      "w2"
+    ],
+    "historical_pit_verified": false,
+    "backend_execution_authorized": false,
+    "paper_or_live_admitted": false,
+    "joinquant_equivalence_proven": false
+  },
+  "pypi_publication": "not_part_of_this_source_preview",
+  "manifest": {
+    "path": "PUBLIC_CONTENT.sha256",
+    "excludes": [
+      "PUBLIC_CONTENT.sha256",
+      "PUBLIC_RELEASE.json"
+    ],
+    "sha256": "17dc22c6b84096caf9e6e3238381bbbc1bb252885302bd91f60e1b06ab021b3a",
+    "payload_files": 110
+  }
 }
