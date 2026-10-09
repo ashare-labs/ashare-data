@@ -35,7 +35,12 @@ def policy():
 
 
 def source_identity():
-    return raw_hash(files("ashare_data").joinpath("m2_source.py").read_bytes())
+    return canonical_hash(
+        {
+            name: raw_hash(files("ashare_data").joinpath(name).read_bytes())
+            for name in ("m2_source.py", "m2_components.py", "m2_compose.py")
+        }
+    )
 
 
 def _manifest(blob):
@@ -349,6 +354,13 @@ def _exists(db):
 
 
 def _load_objects(store, body):
+    if body.get("schema") == "m2.dataset.v2":
+        from .m2_compose import validate_product
+
+        objects = {
+            h: _read(_safe_path(store.root, "m2-objects/" + identifier(h))) for h in body["files"]
+        }
+        return validate_product(body, objects)
     require(
         body
         == body_for(_read(_safe_path(store.root, "m2-objects/" + body["input_manifest_sha256"]))),
@@ -397,6 +409,12 @@ def load(store, dataset_id):
 def import_inputs(store, directory, *, _fault=None):
     root = Path(directory).expanduser().absolute()
     manifest_blob = _read(_safe_path(root, "manifest.json"))
+    candidate = json_loads(manifest_blob)
+    require(type(candidate) is dict, "M2_SCHEMA", "输入清单须为对象")
+    if candidate.get("schema") == "m2.export.v1":
+        from .m2_compose import import_export
+
+        return import_export(store, root, candidate)
     manifest = _manifest(manifest_blob)
     objects = {n: _read(_safe_path(root, n)) for n in manifest["files"]}
     _verify_objects(manifest_blob, objects)

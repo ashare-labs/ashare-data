@@ -23,7 +23,7 @@ from .m2_types import (
 )
 from .model import DataError, require
 
-VERSION = "0.7.0.dev1"
+VERSION = "0.8.0.dev1"
 MODE = "conditional_research"
 TZ = ZoneInfo("Asia/Shanghai")
 
@@ -39,8 +39,8 @@ def code_identity():
     )
 
 
-def _profile(dataset_id, name):
-    p = source.policy()
+def _profile(dataset_id, name, policy=None):
+    p = policy if policy is not None else source.policy()
     require(name in p["profiles"], "M2_PROFILE_UNREVIEWED", "未登记的有限profile")
     specs = {wid: p["windows"][wid] for wid in p["profiles"][name]}
     assumptions = {}
@@ -83,10 +83,13 @@ def _profile(dataset_id, name):
 
 
 def profiles(store, dataset_id):
-    source.load(store, dataset_id)
+    _, data = source.load(store, dataset_id)
+    policy = data.get("_policy", source.policy())
     return tuple(
-        M2Document.of({"version": n, "profile_sha256": canonical_hash(_profile(dataset_id, n))})
-        for n in source.policy()["profiles"]
+        M2Document.of(
+            {"version": n, "profile_sha256": canonical_hash(_profile(dataset_id, n, policy))}
+        )
+        for n in policy["profiles"]
     )
 
 
@@ -100,7 +103,9 @@ class M2View:
         sha(dataset_id)
         sha(profile_sha256)
         self._store, self._id, self._profile_id = store, dataset_id, profile_sha256
-        candidates = [_profile(dataset_id, n) for n in source.policy()["profiles"]]
+        _, data = source.load(store, dataset_id)
+        self._policy = data.get("_policy", source.policy())
+        candidates = [_profile(dataset_id, n, self._policy) for n in self._policy["profiles"]]
         matches = [p for p in candidates if canonical_hash(p) == profile_sha256]
         require(len(matches) == 1, "M2_PROFILE_UNREVIEWED", "固定profile不属于此dataset/代码契约")
         self._profile = M2Document.of(matches[0])
@@ -117,7 +122,7 @@ class M2View:
                 "profile_sha256": self._profile_id,
                 "query_contract_sha256": QUERY_CONTRACT_SHA256,
                 "parser_sha256": source.source_identity(),
-                "rule_policy_sha256": canonical_hash(source.policy()["rules"]),
+                "rule_policy_sha256": canonical_hash(self._policy["rules"]),
             }
         )
 
@@ -181,7 +186,7 @@ class M2View:
 
     def quality(self):
         self._fresh()
-        return M2Document.of(source.policy()["quality"])
+        return M2Document.of(self._policy["quality"])
 
     def lineage(self):
         data = self._fresh()
@@ -190,7 +195,7 @@ class M2View:
                 "dataset_id": self._id,
                 "source_identities": data["identities"],
                 "expansion_annex": data["annex"],
-                "input_manifest_sha256": source.policy()["input_manifest_sha256"],
+                "input_manifest_sha256": self._policy["input_manifest_sha256"],
             }
         )
 
@@ -248,7 +253,7 @@ class M2UseView:
             "owner_pin_sha256": self._view._owner.sha256,
             "window_plan": plan,
             "assumption_refs": [x.to_dict() for x in self._view.assumptions(self._window_id)],
-            "original_quality": source.policy()["quality"],
+            "original_quality": self._view._policy["quality"],
             "data_read_status": "conditional_reads_permitted",
             "modeled_no_relevant_actions": True,
             "historical_pit_verified": False,
@@ -371,7 +376,7 @@ class M2UseView:
         op, t, target = q["operation"], q["current_date"], q["target_date"]
         result = {k: v for k, v in q.items() if k not in ("call", "n")}
         result["schema"] = "m2.result.v1"
-        p = source.policy()
+        p = self._view._policy
         sources = {
             "schema": "m2.source-references.v1",
             "rows": [],
@@ -485,7 +490,7 @@ class M2UseView:
             "role": q["role"],
             "current_date": q["current_date"],
             "target_date": q["target_date"],
-            "quality": source.policy()["quality"],
+            "quality": self._view._policy["quality"],
             "assumption_refs": [x.to_dict() for x in self._view.assumptions(self._window_id)],
             "source_evidence_kind": "source_claim_unverified",
         }

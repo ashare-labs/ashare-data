@@ -154,6 +154,43 @@ class Store:
         from .baostock import BaoStockView
         return BaoStockView(self, capture_id)
 
+    def import_m2_sources(self, *, kind, documents, classification, claims=None):
+        from .m2_components import import_sources
+        return import_sources(self, kind=kind, documents=documents,
+                              classification=classification, claims=claims)
+
+    def import_m2_component(self, directory):
+        from .m2_components import import_component
+        return import_component(self, directory)
+
+    def m2_component(self, component_id):
+        from .m2_components import load
+        from .m2_types import M2Document
+        body, _ = load(self, component_id)
+        return M2Document.of({"component_id": component_id, **body})
+
+    def validate_m2(self, price_dataset_id, *, facts_component_id, calendar_component_id=None,
+                    state_component_id=None, window_ids, mode):
+        from .m2_compose import validate
+        return validate(self, price_dataset_id, facts_component_id=facts_component_id,
+                        calendar_component_id=calendar_component_id, state_component_id=state_component_id,
+                        window_ids=window_ids, mode=mode)
+
+    def compose_m2(self, price_dataset_id, *, facts_component_id, calendar_component_id=None,
+                   state_component_id=None, window_ids, mode):
+        from .m2_compose import compose
+        return compose(self, price_dataset_id, facts_component_id=facts_component_id,
+                       calendar_component_id=calendar_component_id, state_component_id=state_component_id,
+                       window_ids=window_ids, mode=mode)
+
+    def m2_report(self, report_id):
+        from .m2_compose import report
+        return report(self, report_id)
+
+    def export_m2(self, dataset_id, directory):
+        from .m2_compose import export
+        return export(self, dataset_id, directory)
+
     def import_m2(self, directory):
         from .m2_source import import_inputs
         return import_inputs(self, directory)

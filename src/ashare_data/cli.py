@@ -169,7 +169,7 @@ def parser():
     bl.add_argument("--contract", dest="contract_sha256")
     bl.add_argument("--call", help="完整有界请求JSON；须含消费方context_sha256")
     m2 = sub.add_parser("m2", help="固定有限M2公开契约；离线，不授执行许可")
-    m2.add_argument("action", choices=["import", "profiles", "query", "canonical", "snapshots", "recover"])
+    m2.add_argument("action", choices=["import", "profiles", "query", "canonical", "snapshots", "recover", "import-sources", "import-component", "component", "validate", "compose", "report", "export"])
     m2.add_argument("--request", required=True, help="严格JSON请求文件；schema见m2-api.md")
     return p
 
@@ -182,7 +182,7 @@ def main(argv=None):
             from .m2_types import canonical_bytes, json_loads
             result = dispatch(args.store, args.action, json_loads(Path(args.request).read_bytes()))
             print(canonical_bytes(result).decode())
-            return 0
+            return 2 if args.action == "validate" and result.get("status") == "BLOCKED" else 0
         if args.command in {"price", "security", "trade-days", "live-coverage", "acquire-price", "reconcile-day", "trading-status"}:
             contract_path = getattr(args, "coverage_contract", None)
             client = Client(cache=args.cache, cache_mode=args.cache_mode, timeout=args.timeout,

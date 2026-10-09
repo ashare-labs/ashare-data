@@ -1,3 +1,26 @@
+# A数达 0.8.0.dev1：可移植 M2 生产候选
+
+从用户合法取得的市场原文与有来源的事实解释生成不可变数据产品；无需旧机器私有实验包。
+新增公共 `import_m2_sources/import_m2_component/validate_m2/compose_m2/export_m2`，既有 M2 消费接口不变。
+
+先读 [公共生产契约](docs/portable-m2/contract.md)、[完整组件格式](docs/portable-m2/component-format.md)。
+运行 [公共端到端示例](examples/portable_m2.py)：
+
+```sh
+python examples/portable_m2.py --store /新的私有目录/store \
+  --market-recipe /用户目录/market-recipe.json --facts-recipe /用户目录/facts-recipe.json \
+  --window m2a --window w1 --window w2 --output /新的私有目录/export
+```
+
+准备目录必须有可合法使用的实际原文及明确解释；示例不附行情，不伪造必需事实。缺少ST、前收、日历或权益/规则依据时返回缺口并阻断。
+软件许可不授予行情或官方原文的再分发权，输出默认仅供用户私下验证；提交与wheel不含这些文件。
+查询/组合/导出不联网，不自动换源。新增网络采集不是本版生产流程的必要步骤；既有采集若缺所需字段，同样被阻断。
+
+0.8候选不修改公开0.7代码、旧wheel或A宽前端；新产品需新的数据/profile/ack身份及独审，不继承旧PASS。
+原生执行许可仍为false，四项owner假设不放宽，PIT/可见性/权益完整性未知不变。generation/cursor/epoch的历史递增约束由宿主Session负责。
+
+以下为已有模块的历史说明；新M2生产入口以以上契约为准。
+
 # A数达（ashare-data）
 
 **0.7.0.dev1 开发预览**：用于少量、明确范围的 A 股行情查询和离线研究。普通查询直接从新浪公开行情接口取数；可选 BaoStock 通道提供有界日线、5/15/30/60分钟、证券资料和交易日历。它不是交易执行器，也不能直接替换 `jqdatasdk`。

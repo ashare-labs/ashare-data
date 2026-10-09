@@ -24,6 +24,32 @@ def dispatch(root, action, request):
             "sha256": canonical_hash(body),
         }
     store = Store(root)
+    if action == "import-sources":
+        keys(request, ("kind", "documents", "classification", "claims"))
+        return {"component_id": store.import_m2_sources(**request)}
+    if action == "import-component":
+        keys(request, ("directory",))
+        return {"component_id": store.import_m2_component(request["directory"])}
+    if action == "component":
+        keys(request, ("component_id",))
+        return store.m2_component(request["component_id"]).to_dict()
+    if action in ("validate", "compose"):
+        fields = (
+            "price_dataset_id",
+            "facts_component_id",
+            "calendar_component_id",
+            "state_component_id",
+            "window_ids",
+            "mode",
+        )
+        keys(request, fields)
+        return getattr(store, action + "_m2")(**request).to_dict()
+    if action == "report":
+        keys(request, ("report_id",))
+        return store.m2_report(request["report_id"]).to_dict()
+    if action == "export":
+        keys(request, ("dataset_id", "directory"))
+        return store.export_m2(**request).to_dict()
     if action == "import":
         keys(request, ("directory",))
         return {"dataset_id": store.import_m2(request["directory"])}

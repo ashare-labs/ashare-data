@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ashare-data"
-version = "0.7.0.dev1"
+version = "0.8.0.dev1"
 description = "A数达: direct A-share market data with optional local caching"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
