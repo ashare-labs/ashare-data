@@ -1,0 +1,2109 @@
+{
+  "annex_sha256": "71e2121a73bda82261857594a09c7c93904dd70ab30e7be3a4d01dd404b85321",
+  "assumptions": {
+    "A-AD08": {
+      "claim": "仅所列P/T/pre/1d/close/1/False/False调用，P raw close乘有限比值1，无绝对因子。",
+      "stop": [
+        "unlisted_tuple",
+        "source_preclose_disagrees",
+        "known_nonunit_adjustment"
+      ],
+      "unknowns": [
+        "native_chain_not_certified"
+      ]
+    },
+    "A-EQ": {
+      "claim": "有限价基/可能持有登记域采用无相关普通股权益模型，初始零旧权益；期末可持股，不认证域外未来。",
+      "stop": [
+        "known_relevant_event",
+        "unknown_critical_date_of_known_event"
+      ],
+      "unknowns": [
+        "verified_absent=false",
+        "unreported_or_amended_events_unknown"
+      ]
+    },
+    "A-NORMAL": {
+      "claim": "仅所列日期/用途投影普通非ST挂牌及10%正常限幅；0.01元tick、100股买lot、T+1；绑定原规则及01-20特定修订说明。",
+      "stop": [
+        "ST_or_suspended_or_unknown",
+        "known_listing_or_rule_exception"
+      ],
+      "unknowns": [
+        "absolute_delisting_date_unknown",
+        "historical_special_rule_registry_unknown"
+      ]
+    },
+    "A-VIS": {
+      "claim": "事后研究模型：P日末23:59:59.999999后视作模型闭合，T09策略只读P；T15撮合及日末仅engine可读T全日raw OHLCV；query_end只是模型边界，不证明当时发布。",
+      "stop": [
+        "phase_role_consumer_conflict",
+        "source_identity_or_value_conflict",
+        "missing_required_row"
+      ],
+      "unknowns": [
+        "available_at=null",
+        "PIT=false",
+        "finality=UNVERIFIED",
+        "daily_query_complete=false"
+      ]
+    }
+  },
+  "execution_permission": false,
+  "external_product_review": "PENDING",
+  "input_manifest_sha256": "5d2a2ba8690747028325cba9ebab0c0202d508c4a163d5972b728c44e6b4c436",
+  "profiles": {
+    "m2.daily.600000.m2a.v1": [
+      "m2a"
+    ],
+    "m2.daily.600000.multiday.v1": [
+      "w1",
+      "w2"
+    ]
+  },
+  "quality": {
+    "absolute_delisting_date": null,
+    "available_at": null,
+    "calendar_query_complete": true,
+    "compressed_outer_integrity": "unverified",
+    "daily_query_complete": false,
+    "finality": "UNVERIFIED",
+    "historical_pit_verified": false,
+    "source_atomic_snapshot": false,
+    "source_authenticity_verified": false,
+    "verified_absent": false
+  },
+  "rules": {
+    "buy_round_lot": 100,
+    "formula_version": "m2.normal-limits.v1",
+    "normal_daily_limit_ratio": "0.1",
+    "price_tick": "0.01",
+    "resale_rule": "T+1",
+    "rounding": "ROUND_HALF_UP",
+    "special_rule_status": "bounded_assumed_no_exception"
+  },
+  "version": "m2.policy.v1",
+  "windows": {
+    "m2a": {
+      "allowed_ad08_calls": [
+        {
+          "adjust_orig": "2020-01-03",
+          "adjustment_requested": "pre",
+          "bar_count": 1,
+          "field": "close",
+          "frequency": "1d",
+          "history_dt": "2020-01-02",
+          "include_now": false,
+          "security": "600000.XSHG",
+          "skip_suspended": false,
+          "trade_date": "2020-01-03"
+        },
+        {
+          "adjust_orig": "2020-01-06",
+          "adjustment_requested": "pre",
+          "bar_count": 1,
+          "field": "close",
+          "frequency": "1d",
+          "history_dt": "2020-01-03",
+          "include_now": false,
+          "security": "600000.XSHG",
+          "skip_suspended": false,
+          "trade_date": "2020-01-06"
+        }
+      ],
+      "calendar_evidence_references": [
+        "b436cc262b51a36bea2d48a5d35a0c92b9dca39791a79aa4aec9c2003df1bacd"
+      ],
+      "calendar_links": [
+        {
+          "current": "2020-01-03",
+          "next_open": "2020-01-06",
+          "previous_open": "2020-01-02"
+        },
+        {
+          "current": "2020-01-06",
+          "next_open": "2020-01-07",
+          "previous_open": "2020-01-03"
+        }
+      ],
+      "end": "2020-01-06",
+      "evidence_references": {
+        "expansion_annex_sha256": "71e2121a73bda82261857594a09c7c93904dd70ab30e7be3a4d01dd404b85321",
+        "input_manifest_sha256": "5d2a2ba8690747028325cba9ebab0c0202d508c4a163d5972b728c44e6b4c436",
+        "official_manifest_sha256": "499cc2b4e2985f6597f1d8923fbf1878fcb148f4a0764835607cb3919b040d82"
+      },
+      "execution_days": [
+        "2020-01-03",
+        "2020-01-06"
+      ],
+      "listing_read_dates": [
+        "2020-01-02",
+        "2020-01-03",
+        "2020-01-06",
+        "2020-01-07"
+      ],
+      "potential_holding_registration_domain": {
+        "end": "2020-01-07",
+        "start": "2020-01-03"
+      },
+      "price_basis_domain": {
+        "end": "2020-01-06",
+        "start": "2020-01-02"
+      },
+      "raw_valuation_dates": [
+        "2020-01-03",
+        "2020-01-06"
+      ],
+      "read_roles": [
+        {
+          "current_date": "2020-01-03",
+          "operations": [
+            "listing"
+          ],
+          "phase": "INITIALIZE",
+          "role": "warmup",
+          "target_date": "2020-01-02"
+        },
+        {
+          "current_date": "2020-01-03",
+          "operations": [
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "INITIALIZE",
+          "role": "current",
+          "target_date": "2020-01-03"
+        },
+        {
+          "current_date": "2020-01-03",
+          "operations": [
+            "decision_prev_close",
+            "listing"
+          ],
+          "phase": "DECIDE",
+          "role": "previous",
+          "target_date": "2020-01-02"
+        },
+        {
+          "current_date": "2020-01-03",
+          "operations": [
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "DECIDE",
+          "role": "current",
+          "target_date": "2020-01-03"
+        },
+        {
+          "current_date": "2020-01-03",
+          "operations": [
+            "execution_bar",
+            "trading_state",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SUBMIT_MATCH",
+          "role": "current",
+          "target_date": "2020-01-03"
+        },
+        {
+          "current_date": "2020-01-03",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "AFTER_TRADING",
+          "role": "current",
+          "target_date": "2020-01-03"
+        },
+        {
+          "current_date": "2020-01-03",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "current",
+          "target_date": "2020-01-03"
+        },
+        {
+          "current_date": "2020-01-03",
+          "operations": [
+            "successor",
+            "listing"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "settlement_successor",
+          "target_date": "2020-01-06"
+        },
+        {
+          "current_date": "2020-01-06",
+          "operations": [
+            "decision_prev_close",
+            "listing"
+          ],
+          "phase": "DECIDE",
+          "role": "previous",
+          "target_date": "2020-01-03"
+        },
+        {
+          "current_date": "2020-01-06",
+          "operations": [
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "DECIDE",
+          "role": "current",
+          "target_date": "2020-01-06"
+        },
+        {
+          "current_date": "2020-01-06",
+          "operations": [
+            "execution_bar",
+            "trading_state",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SUBMIT_MATCH",
+          "role": "current",
+          "target_date": "2020-01-06"
+        },
+        {
+          "current_date": "2020-01-06",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "AFTER_TRADING",
+          "role": "current",
+          "target_date": "2020-01-06"
+        },
+        {
+          "current_date": "2020-01-06",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "current",
+          "target_date": "2020-01-06"
+        },
+        {
+          "current_date": "2020-01-06",
+          "operations": [
+            "successor",
+            "listing"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "settlement_successor",
+          "target_date": "2020-01-07"
+        }
+      ],
+      "security": "600000.XSHG",
+      "settlement_successor": "2020-01-07",
+      "start": "2020-01-03",
+      "warmup": "2020-01-02",
+      "window_id": "m2a"
+    },
+    "w1": {
+      "allowed_ad08_calls": [
+        {
+          "adjust_orig": "2020-01-03",
+          "adjustment_requested": "pre",
+          "bar_count": 1,
+          "field": "close",
+          "frequency": "1d",
+          "history_dt": "2020-01-02",
+          "include_now": false,
+          "security": "600000.XSHG",
+          "skip_suspended": false,
+          "trade_date": "2020-01-03"
+        },
+        {
+          "adjust_orig": "2020-01-06",
+          "adjustment_requested": "pre",
+          "bar_count": 1,
+          "field": "close",
+          "frequency": "1d",
+          "history_dt": "2020-01-03",
+          "include_now": false,
+          "security": "600000.XSHG",
+          "skip_suspended": false,
+          "trade_date": "2020-01-06"
+        },
+        {
+          "adjust_orig": "2020-01-07",
+          "adjustment_requested": "pre",
+          "bar_count": 1,
+          "field": "close",
+          "frequency": "1d",
+          "history_dt": "2020-01-06",
+          "include_now": false,
+          "security": "600000.XSHG",
+          "skip_suspended": false,
+          "trade_date": "2020-01-07"
+        },
+        {
+          "adjust_orig": "2020-01-08",
+          "adjustment_requested": "pre",
+          "bar_count": 1,
+          "field": "close",
+          "frequency": "1d",
+          "history_dt": "2020-01-07",
+          "include_now": false,
+          "security": "600000.XSHG",
+          "skip_suspended": false,
+          "trade_date": "2020-01-08"
+        },
+        {
+          "adjust_orig": "2020-01-09",
+          "adjustment_requested": "pre",
+          "bar_count": 1,
+          "field": "close",
+          "frequency": "1d",
+          "history_dt": "2020-01-08",
+          "include_now": false,
+          "security": "600000.XSHG",
+          "skip_suspended": false,
+          "trade_date": "2020-01-09"
+        },
+        {
+          "adjust_orig": "2020-01-10",
+          "adjustment_requested": "pre",
+          "bar_count": 1,
+          "field": "close",
+          "frequency": "1d",
+          "history_dt": "2020-01-09",
+          "include_now": false,
+          "security": "600000.XSHG",
+          "skip_suspended": false,
+          "trade_date": "2020-01-10"
+        },
+        {
+          "adjust_orig": "2020-01-13",
+          "adjustment_requested": "pre",
+          "bar_count": 1,
+          "field": "close",
+          "frequency": "1d",
+          "history_dt": "2020-01-10",
+          "include_now": false,
+          "security": "600000.XSHG",
+          "skip_suspended": false,
+          "trade_date": "2020-01-13"
+        },
+        {
+          "adjust_orig": "2020-01-14",
+          "adjustment_requested": "pre",
+          "bar_count": 1,
+          "field": "close",
+          "frequency": "1d",
+          "history_dt": "2020-01-13",
+          "include_now": false,
+          "security": "600000.XSHG",
+          "skip_suspended": false,
+          "trade_date": "2020-01-14"
+        },
+        {
+          "adjust_orig": "2020-01-15",
+          "adjustment_requested": "pre",
+          "bar_count": 1,
+          "field": "close",
+          "frequency": "1d",
+          "history_dt": "2020-01-14",
+          "include_now": false,
+          "security": "600000.XSHG",
+          "skip_suspended": false,
+          "trade_date": "2020-01-15"
+        },
+        {
+          "adjust_orig": "2020-01-16",
+          "adjustment_requested": "pre",
+          "bar_count": 1,
+          "field": "close",
+          "frequency": "1d",
+          "history_dt": "2020-01-15",
+          "include_now": false,
+          "security": "600000.XSHG",
+          "skip_suspended": false,
+          "trade_date": "2020-01-16"
+        }
+      ],
+      "calendar_evidence_references": [
+        "b436cc262b51a36bea2d48a5d35a0c92b9dca39791a79aa4aec9c2003df1bacd",
+        "d781ef480a87be2fa3aea890ae454ad43b148540914fbf17d07b97ce64ff461a"
+      ],
+      "calendar_links": [
+        {
+          "current": "2020-01-03",
+          "next_open": "2020-01-06",
+          "previous_open": "2020-01-02"
+        },
+        {
+          "current": "2020-01-06",
+          "next_open": "2020-01-07",
+          "previous_open": "2020-01-03"
+        },
+        {
+          "current": "2020-01-07",
+          "next_open": "2020-01-08",
+          "previous_open": "2020-01-06"
+        },
+        {
+          "current": "2020-01-08",
+          "next_open": "2020-01-09",
+          "previous_open": "2020-01-07"
+        },
+        {
+          "current": "2020-01-09",
+          "next_open": "2020-01-10",
+          "previous_open": "2020-01-08"
+        },
+        {
+          "current": "2020-01-10",
+          "next_open": "2020-01-13",
+          "previous_open": "2020-01-09"
+        },
+        {
+          "current": "2020-01-13",
+          "next_open": "2020-01-14",
+          "previous_open": "2020-01-10"
+        },
+        {
+          "current": "2020-01-14",
+          "next_open": "2020-01-15",
+          "previous_open": "2020-01-13"
+        },
+        {
+          "current": "2020-01-15",
+          "next_open": "2020-01-16",
+          "previous_open": "2020-01-14"
+        },
+        {
+          "current": "2020-01-16",
+          "next_open": "2020-01-17",
+          "previous_open": "2020-01-15"
+        }
+      ],
+      "end": "2020-01-16",
+      "evidence_references": {
+        "expansion_annex_sha256": "71e2121a73bda82261857594a09c7c93904dd70ab30e7be3a4d01dd404b85321",
+        "input_manifest_sha256": "5d2a2ba8690747028325cba9ebab0c0202d508c4a163d5972b728c44e6b4c436",
+        "official_manifest_sha256": "499cc2b4e2985f6597f1d8923fbf1878fcb148f4a0764835607cb3919b040d82"
+      },
+      "execution_days": [
+        "2020-01-03",
+        "2020-01-06",
+        "2020-01-07",
+        "2020-01-08",
+        "2020-01-09",
+        "2020-01-10",
+        "2020-01-13",
+        "2020-01-14",
+        "2020-01-15",
+        "2020-01-16"
+      ],
+      "listing_read_dates": [
+        "2020-01-02",
+        "2020-01-03",
+        "2020-01-06",
+        "2020-01-07",
+        "2020-01-08",
+        "2020-01-09",
+        "2020-01-10",
+        "2020-01-13",
+        "2020-01-14",
+        "2020-01-15",
+        "2020-01-16",
+        "2020-01-17"
+      ],
+      "potential_holding_registration_domain": {
+        "end": "2020-01-17",
+        "start": "2020-01-03"
+      },
+      "price_basis_domain": {
+        "end": "2020-01-16",
+        "start": "2020-01-02"
+      },
+      "raw_valuation_dates": [
+        "2020-01-03",
+        "2020-01-06",
+        "2020-01-07",
+        "2020-01-08",
+        "2020-01-09",
+        "2020-01-10",
+        "2020-01-13",
+        "2020-01-14",
+        "2020-01-15",
+        "2020-01-16"
+      ],
+      "read_roles": [
+        {
+          "current_date": "2020-01-03",
+          "operations": [
+            "listing"
+          ],
+          "phase": "INITIALIZE",
+          "role": "warmup",
+          "target_date": "2020-01-02"
+        },
+        {
+          "current_date": "2020-01-03",
+          "operations": [
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "INITIALIZE",
+          "role": "current",
+          "target_date": "2020-01-03"
+        },
+        {
+          "current_date": "2020-01-03",
+          "operations": [
+            "decision_prev_close",
+            "listing"
+          ],
+          "phase": "DECIDE",
+          "role": "previous",
+          "target_date": "2020-01-02"
+        },
+        {
+          "current_date": "2020-01-03",
+          "operations": [
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "DECIDE",
+          "role": "current",
+          "target_date": "2020-01-03"
+        },
+        {
+          "current_date": "2020-01-03",
+          "operations": [
+            "execution_bar",
+            "trading_state",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SUBMIT_MATCH",
+          "role": "current",
+          "target_date": "2020-01-03"
+        },
+        {
+          "current_date": "2020-01-03",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "AFTER_TRADING",
+          "role": "current",
+          "target_date": "2020-01-03"
+        },
+        {
+          "current_date": "2020-01-03",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "current",
+          "target_date": "2020-01-03"
+        },
+        {
+          "current_date": "2020-01-03",
+          "operations": [
+            "successor",
+            "listing"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "settlement_successor",
+          "target_date": "2020-01-06"
+        },
+        {
+          "current_date": "2020-01-06",
+          "operations": [
+            "decision_prev_close",
+            "listing"
+          ],
+          "phase": "DECIDE",
+          "role": "previous",
+          "target_date": "2020-01-03"
+        },
+        {
+          "current_date": "2020-01-06",
+          "operations": [
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "DECIDE",
+          "role": "current",
+          "target_date": "2020-01-06"
+        },
+        {
+          "current_date": "2020-01-06",
+          "operations": [
+            "execution_bar",
+            "trading_state",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SUBMIT_MATCH",
+          "role": "current",
+          "target_date": "2020-01-06"
+        },
+        {
+          "current_date": "2020-01-06",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "AFTER_TRADING",
+          "role": "current",
+          "target_date": "2020-01-06"
+        },
+        {
+          "current_date": "2020-01-06",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "current",
+          "target_date": "2020-01-06"
+        },
+        {
+          "current_date": "2020-01-06",
+          "operations": [
+            "successor",
+            "listing"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "settlement_successor",
+          "target_date": "2020-01-07"
+        },
+        {
+          "current_date": "2020-01-07",
+          "operations": [
+            "decision_prev_close",
+            "listing"
+          ],
+          "phase": "DECIDE",
+          "role": "previous",
+          "target_date": "2020-01-06"
+        },
+        {
+          "current_date": "2020-01-07",
+          "operations": [
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "DECIDE",
+          "role": "current",
+          "target_date": "2020-01-07"
+        },
+        {
+          "current_date": "2020-01-07",
+          "operations": [
+            "execution_bar",
+            "trading_state",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SUBMIT_MATCH",
+          "role": "current",
+          "target_date": "2020-01-07"
+        },
+        {
+          "current_date": "2020-01-07",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "AFTER_TRADING",
+          "role": "current",
+          "target_date": "2020-01-07"
+        },
+        {
+          "current_date": "2020-01-07",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "current",
+          "target_date": "2020-01-07"
+        },
+        {
+          "current_date": "2020-01-07",
+          "operations": [
+            "successor",
+            "listing"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "settlement_successor",
+          "target_date": "2020-01-08"
+        },
+        {
+          "current_date": "2020-01-08",
+          "operations": [
+            "decision_prev_close",
+            "listing"
+          ],
+          "phase": "DECIDE",
+          "role": "previous",
+          "target_date": "2020-01-07"
+        },
+        {
+          "current_date": "2020-01-08",
+          "operations": [
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "DECIDE",
+          "role": "current",
+          "target_date": "2020-01-08"
+        },
+        {
+          "current_date": "2020-01-08",
+          "operations": [
+            "execution_bar",
+            "trading_state",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SUBMIT_MATCH",
+          "role": "current",
+          "target_date": "2020-01-08"
+        },
+        {
+          "current_date": "2020-01-08",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "AFTER_TRADING",
+          "role": "current",
+          "target_date": "2020-01-08"
+        },
+        {
+          "current_date": "2020-01-08",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "current",
+          "target_date": "2020-01-08"
+        },
+        {
+          "current_date": "2020-01-08",
+          "operations": [
+            "successor",
+            "listing"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "settlement_successor",
+          "target_date": "2020-01-09"
+        },
+        {
+          "current_date": "2020-01-09",
+          "operations": [
+            "decision_prev_close",
+            "listing"
+          ],
+          "phase": "DECIDE",
+          "role": "previous",
+          "target_date": "2020-01-08"
+        },
+        {
+          "current_date": "2020-01-09",
+          "operations": [
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "DECIDE",
+          "role": "current",
+          "target_date": "2020-01-09"
+        },
+        {
+          "current_date": "2020-01-09",
+          "operations": [
+            "execution_bar",
+            "trading_state",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SUBMIT_MATCH",
+          "role": "current",
+          "target_date": "2020-01-09"
+        },
+        {
+          "current_date": "2020-01-09",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "AFTER_TRADING",
+          "role": "current",
+          "target_date": "2020-01-09"
+        },
+        {
+          "current_date": "2020-01-09",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "current",
+          "target_date": "2020-01-09"
+        },
+        {
+          "current_date": "2020-01-09",
+          "operations": [
+            "successor",
+            "listing"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "settlement_successor",
+          "target_date": "2020-01-10"
+        },
+        {
+          "current_date": "2020-01-10",
+          "operations": [
+            "decision_prev_close",
+            "listing"
+          ],
+          "phase": "DECIDE",
+          "role": "previous",
+          "target_date": "2020-01-09"
+        },
+        {
+          "current_date": "2020-01-10",
+          "operations": [
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "DECIDE",
+          "role": "current",
+          "target_date": "2020-01-10"
+        },
+        {
+          "current_date": "2020-01-10",
+          "operations": [
+            "execution_bar",
+            "trading_state",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SUBMIT_MATCH",
+          "role": "current",
+          "target_date": "2020-01-10"
+        },
+        {
+          "current_date": "2020-01-10",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "AFTER_TRADING",
+          "role": "current",
+          "target_date": "2020-01-10"
+        },
+        {
+          "current_date": "2020-01-10",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "current",
+          "target_date": "2020-01-10"
+        },
+        {
+          "current_date": "2020-01-10",
+          "operations": [
+            "successor",
+            "listing"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "settlement_successor",
+          "target_date": "2020-01-13"
+        },
+        {
+          "current_date": "2020-01-13",
+          "operations": [
+            "decision_prev_close",
+            "listing"
+          ],
+          "phase": "DECIDE",
+          "role": "previous",
+          "target_date": "2020-01-10"
+        },
+        {
+          "current_date": "2020-01-13",
+          "operations": [
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "DECIDE",
+          "role": "current",
+          "target_date": "2020-01-13"
+        },
+        {
+          "current_date": "2020-01-13",
+          "operations": [
+            "execution_bar",
+            "trading_state",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SUBMIT_MATCH",
+          "role": "current",
+          "target_date": "2020-01-13"
+        },
+        {
+          "current_date": "2020-01-13",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "AFTER_TRADING",
+          "role": "current",
+          "target_date": "2020-01-13"
+        },
+        {
+          "current_date": "2020-01-13",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "current",
+          "target_date": "2020-01-13"
+        },
+        {
+          "current_date": "2020-01-13",
+          "operations": [
+            "successor",
+            "listing"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "settlement_successor",
+          "target_date": "2020-01-14"
+        },
+        {
+          "current_date": "2020-01-14",
+          "operations": [
+            "decision_prev_close",
+            "listing"
+          ],
+          "phase": "DECIDE",
+          "role": "previous",
+          "target_date": "2020-01-13"
+        },
+        {
+          "current_date": "2020-01-14",
+          "operations": [
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "DECIDE",
+          "role": "current",
+          "target_date": "2020-01-14"
+        },
+        {
+          "current_date": "2020-01-14",
+          "operations": [
+            "execution_bar",
+            "trading_state",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SUBMIT_MATCH",
+          "role": "current",
+          "target_date": "2020-01-14"
+        },
+        {
+          "current_date": "2020-01-14",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "AFTER_TRADING",
+          "role": "current",
+          "target_date": "2020-01-14"
+        },
+        {
+          "current_date": "2020-01-14",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "current",
+          "target_date": "2020-01-14"
+        },
+        {
+          "current_date": "2020-01-14",
+          "operations": [
+            "successor",
+            "listing"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "settlement_successor",
+          "target_date": "2020-01-15"
+        },
+        {
+          "current_date": "2020-01-15",
+          "operations": [
+            "decision_prev_close",
+            "listing"
+          ],
+          "phase": "DECIDE",
+          "role": "previous",
+          "target_date": "2020-01-14"
+        },
+        {
+          "current_date": "2020-01-15",
+          "operations": [
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "DECIDE",
+          "role": "current",
+          "target_date": "2020-01-15"
+        },
+        {
+          "current_date": "2020-01-15",
+          "operations": [
+            "execution_bar",
+            "trading_state",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SUBMIT_MATCH",
+          "role": "current",
+          "target_date": "2020-01-15"
+        },
+        {
+          "current_date": "2020-01-15",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "AFTER_TRADING",
+          "role": "current",
+          "target_date": "2020-01-15"
+        },
+        {
+          "current_date": "2020-01-15",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "current",
+          "target_date": "2020-01-15"
+        },
+        {
+          "current_date": "2020-01-15",
+          "operations": [
+            "successor",
+            "listing"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "settlement_successor",
+          "target_date": "2020-01-16"
+        },
+        {
+          "current_date": "2020-01-16",
+          "operations": [
+            "decision_prev_close",
+            "listing"
+          ],
+          "phase": "DECIDE",
+          "role": "previous",
+          "target_date": "2020-01-15"
+        },
+        {
+          "current_date": "2020-01-16",
+          "operations": [
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "DECIDE",
+          "role": "current",
+          "target_date": "2020-01-16"
+        },
+        {
+          "current_date": "2020-01-16",
+          "operations": [
+            "execution_bar",
+            "trading_state",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SUBMIT_MATCH",
+          "role": "current",
+          "target_date": "2020-01-16"
+        },
+        {
+          "current_date": "2020-01-16",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "AFTER_TRADING",
+          "role": "current",
+          "target_date": "2020-01-16"
+        },
+        {
+          "current_date": "2020-01-16",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "current",
+          "target_date": "2020-01-16"
+        },
+        {
+          "current_date": "2020-01-16",
+          "operations": [
+            "successor",
+            "listing"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "settlement_successor",
+          "target_date": "2020-01-17"
+        }
+      ],
+      "security": "600000.XSHG",
+      "settlement_successor": "2020-01-17",
+      "start": "2020-01-03",
+      "warmup": "2020-01-02",
+      "window_id": "w1"
+    },
+    "w2": {
+      "allowed_ad08_calls": [
+        {
+          "adjust_orig": "2020-01-06",
+          "adjustment_requested": "pre",
+          "bar_count": 1,
+          "field": "close",
+          "frequency": "1d",
+          "history_dt": "2020-01-03",
+          "include_now": false,
+          "security": "600000.XSHG",
+          "skip_suspended": false,
+          "trade_date": "2020-01-06"
+        },
+        {
+          "adjust_orig": "2020-01-07",
+          "adjustment_requested": "pre",
+          "bar_count": 1,
+          "field": "close",
+          "frequency": "1d",
+          "history_dt": "2020-01-06",
+          "include_now": false,
+          "security": "600000.XSHG",
+          "skip_suspended": false,
+          "trade_date": "2020-01-07"
+        },
+        {
+          "adjust_orig": "2020-01-08",
+          "adjustment_requested": "pre",
+          "bar_count": 1,
+          "field": "close",
+          "frequency": "1d",
+          "history_dt": "2020-01-07",
+          "include_now": false,
+          "security": "600000.XSHG",
+          "skip_suspended": false,
+          "trade_date": "2020-01-08"
+        },
+        {
+          "adjust_orig": "2020-01-09",
+          "adjustment_requested": "pre",
+          "bar_count": 1,
+          "field": "close",
+          "frequency": "1d",
+          "history_dt": "2020-01-08",
+          "include_now": false,
+          "security": "600000.XSHG",
+          "skip_suspended": false,
+          "trade_date": "2020-01-09"
+        },
+        {
+          "adjust_orig": "2020-01-10",
+          "adjustment_requested": "pre",
+          "bar_count": 1,
+          "field": "close",
+          "frequency": "1d",
+          "history_dt": "2020-01-09",
+          "include_now": false,
+          "security": "600000.XSHG",
+          "skip_suspended": false,
+          "trade_date": "2020-01-10"
+        },
+        {
+          "adjust_orig": "2020-01-13",
+          "adjustment_requested": "pre",
+          "bar_count": 1,
+          "field": "close",
+          "frequency": "1d",
+          "history_dt": "2020-01-10",
+          "include_now": false,
+          "security": "600000.XSHG",
+          "skip_suspended": false,
+          "trade_date": "2020-01-13"
+        },
+        {
+          "adjust_orig": "2020-01-14",
+          "adjustment_requested": "pre",
+          "bar_count": 1,
+          "field": "close",
+          "frequency": "1d",
+          "history_dt": "2020-01-13",
+          "include_now": false,
+          "security": "600000.XSHG",
+          "skip_suspended": false,
+          "trade_date": "2020-01-14"
+        },
+        {
+          "adjust_orig": "2020-01-15",
+          "adjustment_requested": "pre",
+          "bar_count": 1,
+          "field": "close",
+          "frequency": "1d",
+          "history_dt": "2020-01-14",
+          "include_now": false,
+          "security": "600000.XSHG",
+          "skip_suspended": false,
+          "trade_date": "2020-01-15"
+        },
+        {
+          "adjust_orig": "2020-01-16",
+          "adjustment_requested": "pre",
+          "bar_count": 1,
+          "field": "close",
+          "frequency": "1d",
+          "history_dt": "2020-01-15",
+          "include_now": false,
+          "security": "600000.XSHG",
+          "skip_suspended": false,
+          "trade_date": "2020-01-16"
+        },
+        {
+          "adjust_orig": "2020-01-17",
+          "adjustment_requested": "pre",
+          "bar_count": 1,
+          "field": "close",
+          "frequency": "1d",
+          "history_dt": "2020-01-16",
+          "include_now": false,
+          "security": "600000.XSHG",
+          "skip_suspended": false,
+          "trade_date": "2020-01-17"
+        }
+      ],
+      "calendar_evidence_references": [
+        "b436cc262b51a36bea2d48a5d35a0c92b9dca39791a79aa4aec9c2003df1bacd",
+        "d781ef480a87be2fa3aea890ae454ad43b148540914fbf17d07b97ce64ff461a"
+      ],
+      "calendar_links": [
+        {
+          "current": "2020-01-06",
+          "next_open": "2020-01-07",
+          "previous_open": "2020-01-03"
+        },
+        {
+          "current": "2020-01-07",
+          "next_open": "2020-01-08",
+          "previous_open": "2020-01-06"
+        },
+        {
+          "current": "2020-01-08",
+          "next_open": "2020-01-09",
+          "previous_open": "2020-01-07"
+        },
+        {
+          "current": "2020-01-09",
+          "next_open": "2020-01-10",
+          "previous_open": "2020-01-08"
+        },
+        {
+          "current": "2020-01-10",
+          "next_open": "2020-01-13",
+          "previous_open": "2020-01-09"
+        },
+        {
+          "current": "2020-01-13",
+          "next_open": "2020-01-14",
+          "previous_open": "2020-01-10"
+        },
+        {
+          "current": "2020-01-14",
+          "next_open": "2020-01-15",
+          "previous_open": "2020-01-13"
+        },
+        {
+          "current": "2020-01-15",
+          "next_open": "2020-01-16",
+          "previous_open": "2020-01-14"
+        },
+        {
+          "current": "2020-01-16",
+          "next_open": "2020-01-17",
+          "previous_open": "2020-01-15"
+        },
+        {
+          "current": "2020-01-17",
+          "next_open": "2020-01-20",
+          "previous_open": "2020-01-16"
+        }
+      ],
+      "end": "2020-01-17",
+      "evidence_references": {
+        "expansion_annex_sha256": "71e2121a73bda82261857594a09c7c93904dd70ab30e7be3a4d01dd404b85321",
+        "input_manifest_sha256": "5d2a2ba8690747028325cba9ebab0c0202d508c4a163d5972b728c44e6b4c436",
+        "official_manifest_sha256": "499cc2b4e2985f6597f1d8923fbf1878fcb148f4a0764835607cb3919b040d82"
+      },
+      "execution_days": [
+        "2020-01-06",
+        "2020-01-07",
+        "2020-01-08",
+        "2020-01-09",
+        "2020-01-10",
+        "2020-01-13",
+        "2020-01-14",
+        "2020-01-15",
+        "2020-01-16",
+        "2020-01-17"
+      ],
+      "listing_read_dates": [
+        "2020-01-03",
+        "2020-01-06",
+        "2020-01-07",
+        "2020-01-08",
+        "2020-01-09",
+        "2020-01-10",
+        "2020-01-13",
+        "2020-01-14",
+        "2020-01-15",
+        "2020-01-16",
+        "2020-01-17",
+        "2020-01-20"
+      ],
+      "potential_holding_registration_domain": {
+        "end": "2020-01-20",
+        "start": "2020-01-06"
+      },
+      "price_basis_domain": {
+        "end": "2020-01-17",
+        "start": "2020-01-03"
+      },
+      "raw_valuation_dates": [
+        "2020-01-06",
+        "2020-01-07",
+        "2020-01-08",
+        "2020-01-09",
+        "2020-01-10",
+        "2020-01-13",
+        "2020-01-14",
+        "2020-01-15",
+        "2020-01-16",
+        "2020-01-17"
+      ],
+      "read_roles": [
+        {
+          "current_date": "2020-01-06",
+          "operations": [
+            "listing"
+          ],
+          "phase": "INITIALIZE",
+          "role": "warmup",
+          "target_date": "2020-01-03"
+        },
+        {
+          "current_date": "2020-01-06",
+          "operations": [
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "INITIALIZE",
+          "role": "current",
+          "target_date": "2020-01-06"
+        },
+        {
+          "current_date": "2020-01-06",
+          "operations": [
+            "decision_prev_close",
+            "listing"
+          ],
+          "phase": "DECIDE",
+          "role": "previous",
+          "target_date": "2020-01-03"
+        },
+        {
+          "current_date": "2020-01-06",
+          "operations": [
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "DECIDE",
+          "role": "current",
+          "target_date": "2020-01-06"
+        },
+        {
+          "current_date": "2020-01-06",
+          "operations": [
+            "execution_bar",
+            "trading_state",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SUBMIT_MATCH",
+          "role": "current",
+          "target_date": "2020-01-06"
+        },
+        {
+          "current_date": "2020-01-06",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "AFTER_TRADING",
+          "role": "current",
+          "target_date": "2020-01-06"
+        },
+        {
+          "current_date": "2020-01-06",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "current",
+          "target_date": "2020-01-06"
+        },
+        {
+          "current_date": "2020-01-06",
+          "operations": [
+            "successor",
+            "listing"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "settlement_successor",
+          "target_date": "2020-01-07"
+        },
+        {
+          "current_date": "2020-01-07",
+          "operations": [
+            "decision_prev_close",
+            "listing"
+          ],
+          "phase": "DECIDE",
+          "role": "previous",
+          "target_date": "2020-01-06"
+        },
+        {
+          "current_date": "2020-01-07",
+          "operations": [
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "DECIDE",
+          "role": "current",
+          "target_date": "2020-01-07"
+        },
+        {
+          "current_date": "2020-01-07",
+          "operations": [
+            "execution_bar",
+            "trading_state",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SUBMIT_MATCH",
+          "role": "current",
+          "target_date": "2020-01-07"
+        },
+        {
+          "current_date": "2020-01-07",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "AFTER_TRADING",
+          "role": "current",
+          "target_date": "2020-01-07"
+        },
+        {
+          "current_date": "2020-01-07",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "current",
+          "target_date": "2020-01-07"
+        },
+        {
+          "current_date": "2020-01-07",
+          "operations": [
+            "successor",
+            "listing"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "settlement_successor",
+          "target_date": "2020-01-08"
+        },
+        {
+          "current_date": "2020-01-08",
+          "operations": [
+            "decision_prev_close",
+            "listing"
+          ],
+          "phase": "DECIDE",
+          "role": "previous",
+          "target_date": "2020-01-07"
+        },
+        {
+          "current_date": "2020-01-08",
+          "operations": [
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "DECIDE",
+          "role": "current",
+          "target_date": "2020-01-08"
+        },
+        {
+          "current_date": "2020-01-08",
+          "operations": [
+            "execution_bar",
+            "trading_state",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SUBMIT_MATCH",
+          "role": "current",
+          "target_date": "2020-01-08"
+        },
+        {
+          "current_date": "2020-01-08",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "AFTER_TRADING",
+          "role": "current",
+          "target_date": "2020-01-08"
+        },
+        {
+          "current_date": "2020-01-08",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "current",
+          "target_date": "2020-01-08"
+        },
+        {
+          "current_date": "2020-01-08",
+          "operations": [
+            "successor",
+            "listing"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "settlement_successor",
+          "target_date": "2020-01-09"
+        },
+        {
+          "current_date": "2020-01-09",
+          "operations": [
+            "decision_prev_close",
+            "listing"
+          ],
+          "phase": "DECIDE",
+          "role": "previous",
+          "target_date": "2020-01-08"
+        },
+        {
+          "current_date": "2020-01-09",
+          "operations": [
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "DECIDE",
+          "role": "current",
+          "target_date": "2020-01-09"
+        },
+        {
+          "current_date": "2020-01-09",
+          "operations": [
+            "execution_bar",
+            "trading_state",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SUBMIT_MATCH",
+          "role": "current",
+          "target_date": "2020-01-09"
+        },
+        {
+          "current_date": "2020-01-09",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "AFTER_TRADING",
+          "role": "current",
+          "target_date": "2020-01-09"
+        },
+        {
+          "current_date": "2020-01-09",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "current",
+          "target_date": "2020-01-09"
+        },
+        {
+          "current_date": "2020-01-09",
+          "operations": [
+            "successor",
+            "listing"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "settlement_successor",
+          "target_date": "2020-01-10"
+        },
+        {
+          "current_date": "2020-01-10",
+          "operations": [
+            "decision_prev_close",
+            "listing"
+          ],
+          "phase": "DECIDE",
+          "role": "previous",
+          "target_date": "2020-01-09"
+        },
+        {
+          "current_date": "2020-01-10",
+          "operations": [
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "DECIDE",
+          "role": "current",
+          "target_date": "2020-01-10"
+        },
+        {
+          "current_date": "2020-01-10",
+          "operations": [
+            "execution_bar",
+            "trading_state",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SUBMIT_MATCH",
+          "role": "current",
+          "target_date": "2020-01-10"
+        },
+        {
+          "current_date": "2020-01-10",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "AFTER_TRADING",
+          "role": "current",
+          "target_date": "2020-01-10"
+        },
+        {
+          "current_date": "2020-01-10",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "current",
+          "target_date": "2020-01-10"
+        },
+        {
+          "current_date": "2020-01-10",
+          "operations": [
+            "successor",
+            "listing"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "settlement_successor",
+          "target_date": "2020-01-13"
+        },
+        {
+          "current_date": "2020-01-13",
+          "operations": [
+            "decision_prev_close",
+            "listing"
+          ],
+          "phase": "DECIDE",
+          "role": "previous",
+          "target_date": "2020-01-10"
+        },
+        {
+          "current_date": "2020-01-13",
+          "operations": [
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "DECIDE",
+          "role": "current",
+          "target_date": "2020-01-13"
+        },
+        {
+          "current_date": "2020-01-13",
+          "operations": [
+            "execution_bar",
+            "trading_state",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SUBMIT_MATCH",
+          "role": "current",
+          "target_date": "2020-01-13"
+        },
+        {
+          "current_date": "2020-01-13",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "AFTER_TRADING",
+          "role": "current",
+          "target_date": "2020-01-13"
+        },
+        {
+          "current_date": "2020-01-13",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "current",
+          "target_date": "2020-01-13"
+        },
+        {
+          "current_date": "2020-01-13",
+          "operations": [
+            "successor",
+            "listing"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "settlement_successor",
+          "target_date": "2020-01-14"
+        },
+        {
+          "current_date": "2020-01-14",
+          "operations": [
+            "decision_prev_close",
+            "listing"
+          ],
+          "phase": "DECIDE",
+          "role": "previous",
+          "target_date": "2020-01-13"
+        },
+        {
+          "current_date": "2020-01-14",
+          "operations": [
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "DECIDE",
+          "role": "current",
+          "target_date": "2020-01-14"
+        },
+        {
+          "current_date": "2020-01-14",
+          "operations": [
+            "execution_bar",
+            "trading_state",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SUBMIT_MATCH",
+          "role": "current",
+          "target_date": "2020-01-14"
+        },
+        {
+          "current_date": "2020-01-14",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "AFTER_TRADING",
+          "role": "current",
+          "target_date": "2020-01-14"
+        },
+        {
+          "current_date": "2020-01-14",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "current",
+          "target_date": "2020-01-14"
+        },
+        {
+          "current_date": "2020-01-14",
+          "operations": [
+            "successor",
+            "listing"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "settlement_successor",
+          "target_date": "2020-01-15"
+        },
+        {
+          "current_date": "2020-01-15",
+          "operations": [
+            "decision_prev_close",
+            "listing"
+          ],
+          "phase": "DECIDE",
+          "role": "previous",
+          "target_date": "2020-01-14"
+        },
+        {
+          "current_date": "2020-01-15",
+          "operations": [
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "DECIDE",
+          "role": "current",
+          "target_date": "2020-01-15"
+        },
+        {
+          "current_date": "2020-01-15",
+          "operations": [
+            "execution_bar",
+            "trading_state",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SUBMIT_MATCH",
+          "role": "current",
+          "target_date": "2020-01-15"
+        },
+        {
+          "current_date": "2020-01-15",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "AFTER_TRADING",
+          "role": "current",
+          "target_date": "2020-01-15"
+        },
+        {
+          "current_date": "2020-01-15",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "current",
+          "target_date": "2020-01-15"
+        },
+        {
+          "current_date": "2020-01-15",
+          "operations": [
+            "successor",
+            "listing"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "settlement_successor",
+          "target_date": "2020-01-16"
+        },
+        {
+          "current_date": "2020-01-16",
+          "operations": [
+            "decision_prev_close",
+            "listing"
+          ],
+          "phase": "DECIDE",
+          "role": "previous",
+          "target_date": "2020-01-15"
+        },
+        {
+          "current_date": "2020-01-16",
+          "operations": [
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "DECIDE",
+          "role": "current",
+          "target_date": "2020-01-16"
+        },
+        {
+          "current_date": "2020-01-16",
+          "operations": [
+            "execution_bar",
+            "trading_state",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SUBMIT_MATCH",
+          "role": "current",
+          "target_date": "2020-01-16"
+        },
+        {
+          "current_date": "2020-01-16",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "AFTER_TRADING",
+          "role": "current",
+          "target_date": "2020-01-16"
+        },
+        {
+          "current_date": "2020-01-16",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "current",
+          "target_date": "2020-01-16"
+        },
+        {
+          "current_date": "2020-01-16",
+          "operations": [
+            "successor",
+            "listing"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "settlement_successor",
+          "target_date": "2020-01-17"
+        },
+        {
+          "current_date": "2020-01-17",
+          "operations": [
+            "decision_prev_close",
+            "listing"
+          ],
+          "phase": "DECIDE",
+          "role": "previous",
+          "target_date": "2020-01-16"
+        },
+        {
+          "current_date": "2020-01-17",
+          "operations": [
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "DECIDE",
+          "role": "current",
+          "target_date": "2020-01-17"
+        },
+        {
+          "current_date": "2020-01-17",
+          "operations": [
+            "execution_bar",
+            "trading_state",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SUBMIT_MATCH",
+          "role": "current",
+          "target_date": "2020-01-17"
+        },
+        {
+          "current_date": "2020-01-17",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "AFTER_TRADING",
+          "role": "current",
+          "target_date": "2020-01-17"
+        },
+        {
+          "current_date": "2020-01-17",
+          "operations": [
+            "valuation_bar",
+            "listing",
+            "modeled_actions"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "current",
+          "target_date": "2020-01-17"
+        },
+        {
+          "current_date": "2020-01-17",
+          "operations": [
+            "successor",
+            "listing"
+          ],
+          "phase": "SETTLEMENT",
+          "role": "settlement_successor",
+          "target_date": "2020-01-20"
+        }
+      ],
+      "security": "600000.XSHG",
+      "settlement_successor": "2020-01-20",
+      "start": "2020-01-06",
+      "warmup": "2020-01-03",
+      "window_id": "w2"
+    }
+  }
+}

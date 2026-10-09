@@ -1,3 +1,5 @@
+> **0.7.0.dev1：M2 有限日频条件研究候选。** [公开API/codec](docs/m2-api.md) · [R1–R4裁决](docs/m2-revision-decisions.md) · [A宽字段对接](docs/m2-backend-diff-r2.md)。600000的m2a/w1/w2、完整源日历与新四项ack、P-only策略/engine T日模型隔离、不可变Evidence和当前授权。仅离线数据/codec消费验证；产品待独审，未运行原生M2，后端执行许可恒false。
+
 > **0.6.0.dev3：BR1 有界上市状态。** [新增查询契约](docs/d1-br1-listing.md)：四日条件状态、双日期/用途边界、真实后继校验和缓存复核。绝对退市日 unknown，原事实/数据 ID 不变；须另 pin 新契约与 wheel。执行仍拒绝，原生 adapter 和重跑留待独审。
 
 > **0.6.0.dev2：D1-BR1显式条件研究投影。** [独立公开契约](docs/d1-br1-api.md)。委托方已接受有限A-EQ/A-NORMAL/A-AD08假设用于条件验证；实现与后端绑定仍待独审，执行许可保持false。

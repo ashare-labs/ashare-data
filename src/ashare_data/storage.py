@@ -154,6 +154,26 @@ class Store:
         from .baostock import BaoStockView
         return BaoStockView(self, capture_id)
 
+    def import_m2(self, directory):
+        from .m2_source import import_inputs
+        return import_inputs(self, directory)
+
+    def m2(self, dataset_id, *, profile_sha256, mode):
+        from .m2 import M2View
+        return M2View(self, dataset_id, profile_sha256=profile_sha256, mode=mode)
+
+    def m2_profiles(self, dataset_id):
+        from .m2 import profiles
+        return profiles(self, dataset_id)
+
+    def m2_snapshots(self):
+        from .m2_source import snapshots
+        return snapshots(self)
+
+    def recover_m2(self):
+        from .m2_source import recover
+        return recover(self)
+
     def import_d1_facts(self, directory):
         """Seal the explicitly reviewed, local D1 evidence package."""
         from .d1 import import_facts
