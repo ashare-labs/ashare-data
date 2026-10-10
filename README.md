@@ -6,7 +6,7 @@ A数达是一个用于 A 股行情查询和离线研究的 Python 库，也提�
 
 当前版本为 **0.9.0**。默认行情接口使用新浪公开源；BaoStock 和 zzshare 需要显式选择。价格保持原始价，成交量统一为股，成交额统一为元。查询失败会明确报错，不自动切换数据源或补造记录。
 
-本地开发版本 **0.9.1.dev2** 在该发布基线上增加[固定 JQ 稀疏行情导入与读取](docs/jq-observations.md)，支持有界多日来源和显式前日估值；仅使用用户已有的材料，不随软件分发行情。下方公开安装指南仍固定已发布 v0.9.0。
+本地开发版本 **0.9.1.dev3** 在该发布基线上增加[固定 JQ 稀疏行情导入与读取](docs/jq-observations.md)，支持有界多日来源和显式前日估值；仅使用用户已有的材料，不随软件分发行情。下方公开安装指南仍固定已发布 v0.9.0。
 
 ## 安装指南
 
@@ -58,6 +58,7 @@ PY
 | 查询 BaoStock 数据 | `BaoStockSource` / `Store.baostock(capture_id)` | 有界日线、5/15/30/60m、日状态、源前收和日历 |
 | 检查多证券研究输入 | `Store.preflight_research()` | 显式绑定版本，逐证券、日期和用途列出值与缺口 |
 | 读取已有 JQ 稀疏行情 | `Store.import_jq_observations()` → `Store.jq_observations(dataset_id)` | 本地开发接口；保留来源、可见时钟和独立容量用途 |
+| 读取固定 JQ 查询观测 | `Store.import_jq_queries()` → `Store.jq_queries(dataset_id)` | [请求、快照、元数据与日历契约](docs/jq-query-observations.md)；不连接 JQ |
 | 自有数据的严格快照 | `Store.import_bundle()` → `validate()` → `publish()` | 检查覆盖与质量后发布不可变版本 |
 
 直接查询的完整参数和错误码见 [行情 API](docs/live-api.md)。可运行 `.venv/bin/ashare-data --help` 查看命令，再用子命令的 `--help` 查看参数。

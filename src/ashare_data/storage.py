@@ -162,6 +162,14 @@ class Store:
         from .jq_observations import JQObservationView
         return JQObservationView(self, dataset_id)
 
+    def import_jq_queries(self, sources, *, source_kind):
+        from .jq_queries import import_queries
+        return import_queries(self, sources, source_kind=source_kind)
+
+    def jq_queries(self, dataset_id):
+        from .jq_queries import JQQueryView
+        return JQQueryView(self, dataset_id)
+
     def import_baostock_capture(self, directory):
         from .baostock import import_capture
         return import_capture(self, directory)
