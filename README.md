@@ -1,6 +1,6 @@
-# A数达 0.8.0.dev2：可移植 M2 生产候选
+# A数达 0.8.1.dev1：固定原文量额诊断候选
 
-本候选修复发布前数值和事件身份校验，见[修复契约](docs/portable-m2/validation-fix.md)。独审六项反例原样保留；生产 pin 仍待新候选独立复核。
+新增无网络的[固定原文量额诊断](docs/turnover-diagnostics.md)，保留52300股真实差额。0.8.0.dev2已冻结；本隔离候选不替换其已审pin。本文后续M2能力沿用，当前新增功能仅作离线诊断。
 
 从用户合法取得的市场原文与有来源的事实解释生成不可变数据产品；无需旧机器私有实验包。
 新增公共 `import_m2_sources/import_m2_component/validate_m2/compose_m2/export_m2`，既有 M2 消费接口不变。

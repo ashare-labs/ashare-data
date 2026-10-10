@@ -70,6 +70,12 @@ def parser():
     reconcile = sub.add_parser("reconcile-day", help="单股单日分钟与当前日快照量额诊断")
     reconcile.add_argument("security")
     reconcile.add_argument("--date", required=True)
+    files = sub.add_parser("reconcile-files", help="离线对账固定新浪原文，不采集或修正行情")
+    files.add_argument("security")
+    files.add_argument("--date", required=True)
+    files.add_argument("--one-minute", required=True)
+    files.add_argument("--five-minute", required=True)
+    files.add_argument("--quote", required=True)
     info = sub.add_parser("security", help="查询显式证券的当前名称/代码")
     info.add_argument("security")
     days = sub.add_parser("trade-days", help="查询上交所当前发布年度交易日")
@@ -177,6 +183,20 @@ def parser():
 def main(argv=None):
     args = parser().parse_args(argv)
     try:
+        if args.command == "reconcile-files":
+            from .turnover_diagnostics import MAX_BYTES, reconcile_sina_day
+            def raw_file(name):
+                path = Path(name)
+                require(path.is_file() and path.stat().st_size <= MAX_BYTES,
+                        "BOUNDED_IMPORT", "原文文件须存在且不超过2MiB")
+                with path.open("rb") as stream:
+                    return stream.read(MAX_BYTES + 1)
+            result = reconcile_sina_day(args.security, args.date,
+                                        minute_body=raw_file(args.one_minute),
+                                        five_minute_body=raw_file(args.five_minute),
+                                        quote_body=raw_file(args.quote))
+            print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+            return 2  # Diagnostic completed; market completeness/authenticity is still unverified.
         if args.command == "m2":
             from .m2_cli import dispatch
             from .m2_types import canonical_bytes, json_loads

@@ -2,6 +2,7 @@
 from .model import DataError
 from .contracts import CoverageContract
 from .reconciliation import reconcile_turnover
+from .turnover_diagnostics import reconcile_sina_day
 from .storage import Store
 from .research import ResearchResult, ResearchView
 from .baostock import BaoStockSource, BaoStockView
@@ -15,9 +16,9 @@ from .m2 import M2View, M2UseView
 from .m2_types import M2AD08Call, M2ConsumerBinding, M2ReadContext, M2Read, M2Document
 
 __all__ = ["BaoStockSource", "BaoStockView", "ResearchResult", "ResearchView", "Store", "DataError", "Client", "get_price", "get_security_info", "get_trade_days",
-           "get_all_securities", "capabilities", "CoverageContract", "reconcile_turnover",
+           "get_all_securities", "capabilities", "CoverageContract", "reconcile_turnover", "reconcile_sina_day",
            "D1Facts", "D1View", "D1OwnerReceipt", "D1PrevCloseCall", "BR1View", "BR1Receipt"]
 __all__ += ["BR1ListingContract", "BR1ListingProjection", "BR1ListingView"]
-__version__ = "0.8.0.dev2"
+__version__ = "0.8.1.dev1"
 
 __all__ += ["M2View", "M2UseView", "M2AD08Call", "M2ConsumerBinding", "M2ReadContext", "M2Read", "M2Document"]
