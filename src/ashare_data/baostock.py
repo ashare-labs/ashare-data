@@ -26,6 +26,7 @@ from .research import ResearchResult, _bao, _day, _decimal, _read
 from .storage import identifier, immutable_write
 from . import baostock_minutes as minutes
 from . import daily_status
+from . import preclose
 
 FIELDS = "date,code,open,high,low,close,volume,amount,adjustflag,tradestatus"
 TABLE = """CREATE TABLE IF NOT EXISTS baostock_captures
@@ -60,9 +61,9 @@ def validate_basic(rows, code):
 
 def request(kind, security=None, start_date=None, end_date=None, frequency=None):
     require(
-        kind in {"daily", "daily_status", "minute", "basic", "calendar"},
+        kind in {"daily", "daily_status", "daily_preclose", "minute", "basic", "calendar"},
         "UNSUPPORTED_SOURCE",
-        "仅支持日线、日状态、限定分钟、证券资料、日历",
+        "仅支持日线、日状态、源前收、限定分钟、证券资料、日历",
     )
     if kind == "minute":
         require(
@@ -72,7 +73,8 @@ def request(kind, security=None, start_date=None, end_date=None, frequency=None)
         )
     else:
         require(
-            frequency is None or (kind in {"daily", "daily_status"} and frequency == "daily"),
+            frequency is None
+            or (kind in {"daily", "daily_status", "daily_preclose"} and frequency == "daily"),
             "INVALID_ARGUMENT",
             "周期参数与查询种类不匹配",
         )
@@ -97,13 +99,15 @@ def request(kind, security=None, start_date=None, end_date=None, frequency=None)
         )
         params.update(start_date=start_date, end_date=end_date)
         method = "query_trade_dates"
-        if kind in {"daily", "daily_status", "minute"}:
+        if kind in {"daily", "daily_status", "daily_preclose", "minute"}:
             method = "query_history_k_data_plus"
             params.update(
                 fields=minutes.FIELDS
                 if kind == "minute"
                 else daily_status.FIELDS
                 if kind == "daily_status"
+                else preclose.FIELDS
+                if kind == "daily_preclose"
                 else FIELDS,
                 frequency=minutes.FREQUENCIES[frequency] if kind == "minute" else "d",
                 adjustflag="3",
@@ -137,7 +141,7 @@ class BaoStockSource:
     def capabilities():
         return {
             "source": "baostock",
-            "kinds": ["daily", "daily_status", "minute", "basic", "calendar"],
+            "kinds": ["daily", "daily_status", "daily_preclose", "minute", "basic", "calendar"],
             "frequencies": ["daily", *minutes.FREQUENCIES],
             "max_calendar_days": 31,
             "max_minute_calendar_days": 2,
@@ -156,6 +160,9 @@ class BaoStockSource:
             "basic_validation_policy": METADATA_POLICY,
             "daily_status_policy": daily_status.POLICY,
             "daily_status_fields": ["tradestatus", "isST"],
+            "source_preclose_policy": preclose.POLICY,
+            "source_preclose_fields": ["preclose"],
+            "source_preclose_basis": preclose.BASIS,
         }
 
     def get_price(
@@ -199,6 +206,19 @@ class BaoStockSource:
         result = store.baostock(sid).get_status(require_known=require_known)
         report = dict(result.report, network_used=True, acquisition="explicit_baostock_query")
         return daily_status.DailyStatusResult(sid, result.rows, canonical(report).decode())
+
+    def get_preclose(self, security, *, store, start_date, end_date, require_known=False):
+        require(type(require_known) is bool, "INVALID_ARGUMENT", "require_known必须为bool")
+        sid = self.fetch(
+            store,
+            kind="daily_preclose",
+            security=security,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        result = store.baostock(sid).get_preclose(require_known=require_known)
+        report = dict(result.report, network_used=True, acquisition="explicit_baostock_query")
+        return preclose.SourcePrecloseResult(sid, result.rows, canonical(report).decode())
 
     def get_trade_days(self, *, store, start_date, end_date):
         sid = self.fetch(store, kind="calendar", start_date=start_date, end_date=end_date)
@@ -291,6 +311,12 @@ def _verify_impl(blobs):
         and params.get("fields") == daily_status.FIELDS
     ):
         kind = "daily_status"
+    elif (
+        kind == "daily"
+        and params.get("frequency") == "d"
+        and params.get("fields") == preclose.FIELDS
+    ):
+        kind = "daily_preclose"
     frequency = None
     if kind == "daily" and params.get("frequency") != "d":
         kind = "minute"
@@ -472,6 +498,8 @@ def _verify_impl(blobs):
         return attempt, receipt, storage, [], "source_response_unusable"
     if kind == "daily_status":
         daily_status.page_received_times(receipt)
+    elif kind == "daily_preclose":
+        preclose.received_times(receipt)
     try:
         if kind == "daily" and rows:
             _bao(
@@ -487,6 +515,8 @@ def _verify_impl(blobs):
             )
         elif kind == "daily_status":
             daily_status.validate(rows, params)
+        elif kind == "daily_preclose":
+            preclose.validate(rows, params)
         elif kind == "minute":
             minutes.validate(rows, params)
         elif kind == "calendar" and rows:
@@ -521,6 +551,8 @@ def _publish(store, blobs):
         if attempt["request"]["params"].get("frequency") in minutes.FREQUENCIES.values()
         else daily_status.VERSION
         if attempt["request"]["params"].get("fields") == daily_status.FIELDS
+        else preclose.VERSION
+        if attempt["request"]["params"].get("fields") == preclose.FIELDS
         else VERSION,
         "artifacts": [
             {"name": n, "sha256": bh(b), "bytes": len(b)} for n, b in sorted(blobs.items())
@@ -554,7 +586,7 @@ def _load(store, body, sid):
     require(bh(body) == sid, "INTEGRITY", "清单 hash 不匹配")
     m = json.loads(body)
     require(
-        m["version"] in {VERSION, minutes.VERSION, daily_status.VERSION}
+        m["version"] in {VERSION, minutes.VERSION, daily_status.VERSION, preclose.VERSION}
         and 0 < len(m["artifacts"]) <= 20,
         "INTEGRITY",
         "证据版本或文件数无效",
@@ -577,6 +609,8 @@ def _load(store, body, sid):
         if verified[0]["request"]["params"].get("frequency") in minutes.FREQUENCIES.values()
         else daily_status.VERSION
         if verified[0]["request"]["params"].get("fields") == daily_status.FIELDS
+        else preclose.VERSION
+        if verified[0]["request"]["params"].get("fields") == preclose.FIELDS
         else VERSION
     )
     require(m["version"] == expected_version, "INTEGRITY", "证据版本与周期契约不符")
@@ -742,7 +776,9 @@ class BaoStockView:
             if self._attempt["request"]["method"] == "query_history_k_data_plus"
             else "not_applicable",
             "units": {"price": "CNY/share", "volume": "share", "amount": "CNY"},
-            "price_basis": "raw_unadjusted",
+            "price_basis": preclose.BASIS
+            if self._manifest["version"] == preclose.VERSION
+            else "raw_unadjusted",
             "bar_start": None,
             "bar_end": None,
             "timezone": "Asia/Shanghai",
@@ -891,11 +927,14 @@ class BaoStockView:
 
     def get_price(self, *, end=None, end_inclusive=True):
         require(
-            self._manifest["version"] != daily_status.VERSION,
+            self._manifest["version"] not in {daily_status.VERSION, preclose.VERSION},
             "QUERY_KIND_MISMATCH",
-            "日状态证据不含OHLCV；请使用get_status",
+            "该字段证据不含OHLCV；请使用get_status/get_preclose",
         )
         return self._with_end(end, end_inclusive)._result("query_history_k_data_plus")
+
+    def get_preclose(self, *, require_known=False):
+        return preclose.project(self, require_known=require_known)
 
     def get_status(self, *, require_known=False):
         return daily_status.project(self, require_known=require_known)

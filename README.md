@@ -1,24 +1,26 @@
-# A数达 0.8.3.dev2：历史日线交易状态与ST
+# A数达 0.8.4.dev1：源 preclose 有界增量
 
-[日状态公共契约](docs/daily-status.md)新增通用BaoStock `daily_status` 显式采集及固定capture离线读取。每次一证券、至多31自然日；不按三只股票特判。三股2026-09-28至30真实九行均返回tradestatus="1"、isST="0"，仅为来源日线状态声明，不授予PIT或执行许可。
+提供通用 `daily_preclose` 显式采集、原始回执导入及固定capture离线查询，保留旧daily/daily_status/minute profile。三股2026-09-28至30共九个真实源值已取得，定义和回执先于实现保存。没有把前日close替代preclose。
+
+[完整公共契约](docs/preclose.md) · [离线示例](examples/preclose.py) · [已有日状态契约](docs/daily-status.md)
 
 ```python
-from ashare_data import Store, DailyStatusResult
+from ashare_data import Store, SourcePrecloseResult
 
-store = Store.init("/新的私有目录/store")
-capture_id = store.import_baostock_capture("/已采集的worker证据目录")
-result = store.baostock(capture_id).get_status()
-assert isinstance(result, DailyStatusResult)
+store = Store.init("/新的本地目录/store")
+sid = store.import_baostock_capture("/已取得的worker回执目录")
+result = store.baostock(sid).get_preclose(require_known=True)
+assert isinstance(result, SourcePrecloseResult)
 for row in result.rows:
-    print(row.security, row.trade_date, row.suspended.value, row.is_st.value)
-    print(row.suspended.state, row.is_st.state, row.response_received_at)
+    print(row.security, row.trade_date, row.preclose.raw_value, row.preclose.value)
+    print(row.preclose.state, row.price_basis, row.response_received_at)
 ```
 
-缺行、字段未请求、源空值、未知枚举分开报告；`get_status(require_known=True)`遇未知即拒绝。旧日线capture可读取已有tradestatus，未请求的isST仍未知。只读查询不联网，显式采集使用 `BaoStockSource.get_status(...)` 或CLI `baostock-fetch daily_status`。
+查询不联网；主动采集为 `BaoStockSource.get_preclose(...)` / CLI `baostock-fetch daily_preclose`，固定读取为 `baostock-query preclose --capture ID [--require-known]`。单位人民币每股，Decimal保留源精度；自然日缺行、未请求、空串、非法数值和零分开报告。
 
-[离线示例](examples/daily_status.py) · [BaoStock原接口](docs/baostock-api.md) · [既有上市事实](docs/listing-fact.md)
+price_basis=`source_reference_adjustflag_3`：源请求采用adjustflag=3，但除权除息时源preclose可以不同于前日实际收盘。它不是已认证的限价参考价，不能用已知值或require_known成功推无事件、历史资格/PIT或执行许可。末字节接收记录与已验证完成、历史发布时点分开；96帧完整性限制沿用。
 
-本候选继承并保留0.8.2.dev2上市事实实现，但本轮没有重跑其1812项验收作为新增进度。当前代码身份、状态样本、受影响测试和独审结论由外置本轮交接记录绑定；下文和PUBLIC_RELEASE.json/PUBLIC_CONTENT.sha256包含旧发布预览历史信息，不代表本候选已公开发布或继承整体准入。没有修改上层或启动F2/交易。
+当前代码/wheel身份、三份真实样本及测试/独审状态由外置preclose-r1-evidence交付记录绑定。只验证对应影响面，不把上一版本1812项或本轮定向测试称全量。没有新依赖、上层/F2/交易、限价计算或事件覆盖实现；旧候选冻结。下文和PUBLIC_RELEASE.json/PUBLIC_CONTENT.sha256保留历史发布预览，不代表当前候选整体准入或公开发布。
 
 以下为已有公共生产能力说明。
 

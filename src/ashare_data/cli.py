@@ -127,7 +127,7 @@ def parser():
             for flag in ("complete", "fresh", "final", "tradable"):
                 rp.add_argument("--require-" + flag, action="store_true")
     bf = sub.add_parser("baostock-fetch", help="显式查询匿名免费源并封存请求证据")
-    bf.add_argument("kind", choices=["daily", "daily_status", "minute", "basic", "calendar"])
+    bf.add_argument("kind", choices=["daily", "daily_status", "daily_preclose", "minute", "basic", "calendar"])
     bf.add_argument("--frequency", choices=["daily", "5m", "15m", "30m", "60m"])
     bf.add_argument("--security")
     bf.add_argument("--start")
@@ -135,7 +135,7 @@ def parser():
     bf.add_argument("--sdk-path", help="已有官方0.9.4 SDK根目录；不自动安装")
     bf.add_argument("--timeout", type=float, default=15)
     bq = sub.add_parser("baostock-query", help="离线查询固定BaoStock证据版本")
-    bq.add_argument("dataset", choices=["price", "statuses", "security", "trade-days", "descriptor", "quality", "coverage", "lineage"])
+    bq.add_argument("dataset", choices=["price", "statuses", "preclose", "security", "trade-days", "descriptor", "quality", "coverage", "lineage"])
     bq.add_argument("--capture", required=True)
     bq.add_argument("--as-of")
     bq.add_argument("--visibility", choices=["received", "verified", "source_label"], default="received")
@@ -327,8 +327,8 @@ def main(argv=None):
                 require(result["status"] in {"research_rows", "empty_unknown"},
                         "SOURCE_REQUEST_FAILED", "源响应未达到研究读取条件；失败证据已封存", result)
             elif args.command == "baostock-query":
-                require(not args.require_known or args.dataset == "statuses",
-                        "INVALID_ARGUMENT", "require-known仅适用于statuses")
+                require(not args.require_known or args.dataset in {"statuses", "preclose"},
+                        "INVALID_ARGUMENT", "require-known仅适用于statuses/preclose")
                 require(args.as_of is not None or args.visibility == "received",
                         "INVALID_ARGUMENT", "visibility须与as-of同传")
                 require(not args.end_exclusive or args.end is not None,
@@ -338,8 +338,8 @@ def main(argv=None):
                     view = view.at(args.end, visibility="source_label", inclusive=not args.end_exclusive)
                 if args.as_of is not None:
                     view = view.at(args.as_of, visibility=args.visibility)
-                method = {"price": "get_price", "statuses": "get_status", "security": "get_security_info", "trade-days": "get_trade_days"}.get(args.dataset, args.dataset)
-                value = (view.get_status(require_known=args.require_known) if args.dataset == "statuses"
+                method = {"price": "get_price", "statuses": "get_status", "preclose": "get_preclose", "security": "get_security_info", "trade-days": "get_trade_days"}.get(args.dataset, args.dataset)
+                value = (getattr(view, method)(require_known=args.require_known) if args.dataset in {"statuses", "preclose"}
                          else getattr(view, method)())
                 result = value.to_dict() if hasattr(value, "to_dict") else value
             elif args.command == "baostock-snapshots":
