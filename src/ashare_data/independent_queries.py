@@ -6,8 +6,10 @@ Decimal strings preserve the source's precision; unsupported is never NaN.
 from __future__ import annotations
 
 from copy import deepcopy
+import csv
 from decimal import Decimal, InvalidOperation, localcontext
 import hashlib
+import io
 import json
 from pathlib import Path
 import re
@@ -168,6 +170,64 @@ class IndependentQueryView:
                             missing_row_policy="omit; absence reason unknown, never filled",
                             full_session_coverage_certified=False,
                             units={"price": "CNY/share", "volume": "share", "money": "CNY"})
+
+    def read_index_members(self, product_id, security, *, as_of_date, source, role,
+                           allow_uncertified=False):
+        """Read an explicit historical candidate, never certify an official/PIT set."""
+        b, p = self._open(product_id, security, role, "index_members")
+        require(allow_uncertified is True, "INDEPENDENT_UNCERTIFIED",
+                "Historical candidates require allow_uncertified=True")
+        label = day(as_of_date)
+        require(label in p["dates"] and source in p["sources"],
+                "INDEPENDENT_SCOPE", "Unbound index date or source")
+        s = b["sources"][source]
+        require(s.get("official_chain_verified") is False,
+                "INDEPENDENT_SCHEMA", "Index reader only supports uncertified archives")
+        try:
+            reader = csv.DictReader(io.StringIO(self._checked(s).decode("utf-8-sig")))
+            rows = list(reader)
+        except (UnicodeError, csv.Error) as exc:
+            raise DataError("INDEPENDENT_SCHEMA", "Invalid index CSV") from exc
+        require(0 < len(rows) <= 20000, "INDEPENDENT_SCHEMA", "Unexpected index rows")
+        members = []
+        for row in rows:
+            require(None not in row and all(type(v) is str for v in row.values()),
+                    "INDEPENDENT_SCHEMA", "Malformed index row")
+            if s["kind"] == "index_membership_intervals":
+                require(set(row) == {"symbol", "name", "opt-in", "opt-out"},
+                        "INDEPENDENT_SCHEMA", "Unexpected interval fields")
+                code = row["symbol"]
+                require(re.fullmatch(r"(?:SH|SZ)\d{6}", code) is not None,
+                        "INDEPENDENT_SCHEMA", "Invalid source index member")
+                start = day(row["opt-in"])
+                end = day(row["opt-out"]) if row["opt-out"] else None
+                require(end is None or start < end, "INDEPENDENT_SCHEMA", "Invalid membership interval")
+                if not (start <= label and (end is None or label < end)):
+                    continue
+                item = {"security": code[2:] + (".XSHG" if code[:2] == "SH" else ".XSHE"),
+                        "source_symbol": code, "source_name": row["name"],
+                        "source_opt_in": start, "source_opt_out": end}
+            elif s["kind"] == "index_dated_snapshot":
+                require(set(row) == {"Symbol", "Name"} and label == s["snapshot_date"],
+                        "INDEPENDENT_SCOPE", "Snapshot date or fields do not match")
+                code = row["Symbol"]
+                require(re.fullmatch(r"\d{6}\.(?:SS|SZ)", code) is not None,
+                        "INDEPENDENT_SCHEMA", "Invalid snapshot index member")
+                item = {"security": code[:6] + (".XSHG" if code[-2:] == "SS" else ".XSHE"),
+                        "source_symbol": code, "source_name": row["Name"]}
+            else:
+                raise DataError("INDEPENDENT_SCHEMA", "Unsupported index source")
+            members.append(item)
+        expected = p.get("expected_members")
+        require(type(expected) is int and 0 < expected <= 10000 and len(members) == expected
+                and len({r["security"] for r in members}) == expected,
+                "INDEPENDENT_COVERAGE", "Missing, duplicate or unexpected index members")
+        members.sort(key=lambda r: r["security"])
+        return self._result(product_id, p, s, members, as_of_date=label,
+                            official_chain_verified=False, complete_membership_certified=False,
+                            historical_name_verified=False, source_quality="independent archival candidate",
+                            interval_semantics="opt-in inclusive; opt-out exclusive",
+                            warning="Counts and archive agreement do not certify official historical membership")
 
     def read_paused(self, product_id, security, *, skip_paused, fill_paused, role):
         b, p = self._open(product_id, security, role, "paused_daily")

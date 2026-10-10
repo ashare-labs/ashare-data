@@ -171,3 +171,64 @@ def test_opening_snapshot_is_not_an_order_matching_proof(delivery):
     b["sources"]["sina"].update(r)
     with pytest.raises(DataError, match="one actual opening"):
         view(delivery).read_opening("daily", "000001.XSHE", role=ROLE)
+
+
+@pytest.fixture
+def index_delivery(delivery):
+    root, b = delivery
+    ref = write(root, "index.csv", b"symbol,name,opt-in,opt-out\nSZ000001,A,2020-01-01,2024-03-01\nSZ000002,B,2024-03-01,\nSH600000,C,2019-01-01,\n")
+    b["sources"]["index"] = {**ref, "kind": "index_membership_intervals",
+        "security": "000300.XSHG", "adjustment": "none", "official_chain_verified": False,
+        "captured_start": "2026-10-10T01:00:00+00:00", "captured_end": "2026-10-10T01:00:01+00:00"}
+    b["products"]["index"] = {"kind": "index_members", "security": "000300.XSHG",
+        "sources": ["index"], "dates": ["2020-03-02", "2024-03-01"], "expected_members": 2}
+    return delivery
+
+
+def index_read(v, **kw):
+    return v.read_index_members("index", "000300.XSHG", as_of_date=kw.pop("as_of_date", "2024-03-01"),
+                               source="index", role=ROLE, **kw)
+
+
+def test_index_interval_boundaries_and_uncertified_labels(index_delivery):
+    v = view(index_delivery)
+    before = index_read(v, as_of_date="2020-03-02", allow_uncertified=True)
+    after = index_read(v, allow_uncertified=True)
+    assert [r["security"] for r in before["rows"]] == ["000001.XSHE", "600000.XSHG"]
+    assert [r["security"] for r in after["rows"]] == ["000002.XSHE", "600000.XSHG"]
+    assert not after["official_chain_verified"] and not after["complete_membership_certified"]
+    assert not after["historical_name_verified"] and not after["strategy_visible"]
+
+
+@pytest.mark.parametrize("flag", [False, 1, "true", None])
+def test_index_requires_explicit_candidate_acceptance(index_delivery, flag):
+    with pytest.raises(DataError, match="allow_uncertified"):
+        index_read(view(index_delivery), allow_uncertified=flag)
+
+
+def test_index_date_scope_and_source_integrity(index_delivery):
+    v = view(index_delivery)
+    with pytest.raises(DataError, match="Unbound"):
+        index_read(v, as_of_date="2024-03-02", allow_uncertified=True)
+    (index_delivery[0] / "index.csv").write_text("changed")
+    with pytest.raises(DataError, match="digest mismatch"):
+        index_read(v, allow_uncertified=True)
+
+
+@pytest.mark.parametrize("suffix", ["SZ000002,D,2023-01-01,\n", "SH600001,D,2023-01-01,\n"])
+def test_index_duplicate_or_extra_member_refused(index_delivery, suffix):
+    root, b = index_delivery
+    raw = (root / "index.csv").read_bytes() + suffix.encode()
+    b["sources"]["index"].update(write(root, "index.csv", raw))
+    with pytest.raises(DataError, match="unexpected index members"):
+        index_read(view(index_delivery), allow_uncertified=True)
+
+
+def test_index_snapshot_retains_original_code_and_rejects_wrong_day(index_delivery):
+    root, b = index_delivery
+    ref = write(root, "snapshot.csv", b"Symbol,Name\n000001.SZ,A\n600000.SS,C\n")
+    b["sources"]["index"].update(ref, kind="index_dated_snapshot", snapshot_date="2024-03-01")
+    result = index_read(view(index_delivery), allow_uncertified=True)
+    assert result["rows"][1]["source_symbol"] == "600000.SS"
+    with pytest.raises(DataError, match="Snapshot date"):
+        index_read(view(index_delivery), as_of_date="2020-03-02", allow_uncertified=True)
