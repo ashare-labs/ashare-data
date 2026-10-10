@@ -22,7 +22,7 @@ from .m2_types import (
 )
 from .model import DataError, require
 
-VERSION = "0.8.2.dev1"
+VERSION = "0.8.2.dev2"
 MODE = "conditional_research"
 TZ = ZoneInfo("Asia/Shanghai")
 

@@ -1,4 +1,4 @@
-"""One reviewed issuer fact, year precision, immutable and offline.
+"""Reviewed issuer listing facts, immutable and offline.
 
 This is not a generic document parser or a historical eligibility service.
 The owner pins original documents, receipts, extraction and review together.
@@ -11,12 +11,18 @@ from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
 
-from .d1_types import Projection
+from .d1_types import Evidence, FactRecord, Projection
 from .model import DataError, canonical, digest, require
 from .storage import identifier, immutable_write, now
 
 PACKAGE_SHA256 = "08eb0578e608ed92d2ae8df9c2b7f72092016bdd63d13eaab26162da53d9f9e5"
+# Retain the original package's identity and public output when read by newer code.
 OWNER_VERSION = "0.8.2.dev1"
+DATE_PACKAGE_SHA256 = "f046562fc6db577ce0c201872655c0e91c7984bbb981c27bf75d4ece17685099"
+POLICIES = {
+    PACKAGE_SHA256: ("reviewed_listing_year", OWNER_VERSION),
+    DATE_PACKAGE_SHA256: ("reviewed_instrument_fact", "0.8.2.dev2"),
+}
 MAX_BYTES = 8 * 1024 * 1024
 TABLE = """CREATE TABLE IF NOT EXISTS listing_facts
 (id TEXT PRIMARY KEY, body TEXT NOT NULL, status TEXT NOT NULL
@@ -69,7 +75,7 @@ class ListingYearFact(Projection):
     visibility: str
     knowledge_at: datetime | None
     evidence: tuple[ListingFactEvidence, ...]
-    actual_initial_listing_date: None = None
+    actual_initial_listing_date: date | None = None
     historical_eligible: None = None
     historical_available_at: None = None
     execution_permission: bool = False
@@ -101,7 +107,7 @@ def _read(path, limit=MAX_BYTES):
 
 
 def _package(blob):
-    require(_sha(blob) == PACKAGE_SHA256, "LISTING_UNREVIEWED_PACKAGE",
+    require(_sha(blob) in POLICIES, "LISTING_UNREVIEWED_PACKAGE",
             "仅接纳固定审阅包；自行改值并重算hash不构成事实采纳")
     return json.loads(blob)
 
@@ -114,8 +120,10 @@ def _decode_manifest(data):
 
 
 def _body(package):
-    return {"kind": "reviewed_listing_year", "owner_version": OWNER_VERSION,
-            "package_sha256": PACKAGE_SHA256, "files": package['files']}
+    package_sha = digest(package)
+    kind, version = POLICIES[package_sha]
+    return {"kind": kind, "owner_version": version,
+            "package_sha256": package_sha, "files": package['files']}
 
 
 def _exists(db):
@@ -132,7 +140,9 @@ def snapshots(store):
 
 def _validate(store, body):
     require(type(body) is dict, "LISTING_INTEGRITY", "清单必须是对象")
-    blob = _read(_safe(store.root, "listing-objects/" + PACKAGE_SHA256), 1024 * 1024)
+    sha = body.get('package_sha256')
+    require(type(sha) is str and sha in POLICIES, "LISTING_INTEGRITY", "未审阅的证据包身份")
+    blob = _read(_safe(store.root, "listing-objects/" + sha), 1024 * 1024)
     package = _package(blob)
     require(canonical(body) == canonical(_body(package)), "LISTING_INTEGRITY", "清单不符固定契约")
     for entry in package['files']:
@@ -162,7 +172,7 @@ def import_evidence(store, directory):
         raise DataError("LISTING_INPUT_INVALID", "须提供本地证据目录") from exc
     blob = _read(_safe(root, 'package.json'), 1024 * 1024)
     package = _package(blob)
-    objects = {PACKAGE_SHA256: blob}
+    objects = {_sha(blob): blob}
     for entry in package['files']:
         value = _read(_safe(root, entry['path']))
         require(len(value) == entry['bytes'] and _sha(value) == entry['sha256'],
@@ -244,6 +254,35 @@ def _evidence(package):
         _day(e['source_index_disclosure_date']), _clock(e['received_at'])) for e in package['evidence'])
 
 
+def _fields(package):
+    return (package['field'], *package.get('derived_fields', ()))
+
+
+def _date_record(package, snapshot_id, security, on_date, visibility, clock):
+    """Use the existing generic fact/evidence model, without a security-specific type."""
+    source_fields = {
+        'snapshot_id': snapshot_id, 'package_sha256': digest(package),
+        'security': security, 'on_date': on_date.isoformat(), 'field': package['field'],
+        'event_date': package['event_date'], 'valid_date': package['valid_date'],
+        'precision': package['precision'],
+        'document_published_date': package['document_published_date'],
+        'document_published_datetime_label': package['document_published_datetime_label'],
+        'document_published_timezone': package['document_published_timezone'],
+        'publication_metadata_record': package['publication_metadata_record'],
+        'evidence_received_at': package['evidence_received_at'],
+        'visibility': visibility, 'knowledge_at': clock.isoformat() if clock else None,
+        'historical_available_at': None, 'historical_eligible': None,
+        'execution_permission': False,
+    }
+    evidence = tuple(Evidence(
+        e['raw_path'], e['source_sha256'], e['url'],
+        'PDF pages ' + ','.join(map(str, e['pdf_pages'])) if e['pdf_pages'] else 'publication metadata infoId=' + package['publication_metadata_record']['infoId'],
+        _clock(e['received_at']), None, canonical(e).decode()) for e in package['evidence'])
+    return FactRecord(digest({'snapshot_id': snapshot_id, 'field': package['field'], 'security': security}),
+                      canonical(package['value']).decode(), package['evidence_status'], evidence,
+                      canonical(source_fields).decode())
+
+
 class ListingFactView:
     def __init__(self, store, snapshot_id):
         self._store, self._id = store, snapshot_id
@@ -251,8 +290,9 @@ class ListingFactView:
 
     def descriptor(self):
         p = _load(self._store, self._id)
-        return ListingFactDescriptor(self._id, PACKAGE_SHA256, OWNER_VERSION, p['security'],
-                                     (p['field'],), tuple(_day(x) for x in p['query_dates']),
+        sha = digest(p)
+        return ListingFactDescriptor(self._id, sha, POLICIES[sha][1], p['security'],
+                                     _fields(p), tuple(_day(x) for x in p['query_dates']),
                                      _clock(p['evidence_received_at']), p['price_context_dataset_id'],
                                      tuple(p['unsupported']), tuple(e['path'] for e in p['files']))
 
@@ -267,18 +307,19 @@ class ListingFactView:
 
     def validate(self):
         d = self.descriptor()
-        return {"status": "VALID_YEAR_FACT_ONLY", "descriptor": d.to_dict(),
+        status = "VALID_LISTING_DATE_FACT_ONLY" if 'initial_listing_date' in d.supported_fields else "VALID_YEAR_FACT_ONLY"
+        return {"status": status, "descriptor": d.to_dict(),
                 "complete_instrument_history": False, "execution_permission": False}
 
     def get(self, security, on_date, *, field='initial_listing_year',
             visibility='posthoc', knowledge_at=None):
         p = _load(self._store, self._id)
         require(type(security) is str and security == p['security'],
-                "LISTING_SECURITY_SCOPE", "本组件仅300750.XSHE")
+                "LISTING_SECURITY_SCOPE", "证券不在固定审阅组件范围内")
         d = _day(on_date)
         require(d.isoformat() in p['query_dates'], "LISTING_DATE_SCOPE", "仅共同窗口2026-09-28至30")
-        require(field == p['field'], "LISTING_FACT_UNAVAILABLE",
-                "仅支持首次上市年份；具体实际日期及其他资格事实未证明", {"field": field})
+        require(field in _fields(p), "LISTING_FACT_UNAVAILABLE",
+                "该字段未在固定证据包中证明或支持派生", {"field": field})
         require(visibility in ('posthoc', 'received', 'verified'),
                 "LISTING_VISIBILITY", "未知可见性模式")
         require(visibility != 'verified', "PIT_UNAVAILABLE", "没有历史首次可见/修订证明")
@@ -289,10 +330,15 @@ class ListingFactView:
         else:
             clock = _clock(knowledge_at)
             require(clock >= received, "VISIBILITY_UNKNOWN", "知识时钟早于本批证据接收完成")
-        return ListingYearFact(self._id, PACKAGE_SHA256, security, d, p['field'], p['value'],
-                               p['precision'], p['evidence_status'], received, visibility, clock,
-                               _evidence(p))
+        if field == 'initial_listing_date':
+            return _date_record(p, self._id, security, d, visibility, clock)
+        actual_date = _day(p['value']) if p['field'] == 'initial_listing_date' else None
+        return ListingYearFact(self._id, digest(p), security, d, field,
+                               actual_date.year if actual_date else p['value'], 'year',
+                               'derived_from_initial_listing_date' if actual_date else p['evidence_status'],
+                               received, visibility, clock, _evidence(p),
+                               actual_initial_listing_date=actual_date)
 
     def require_eligible(self, security, on_date):
         self.get(security, on_date)
-        raise DataError("LISTING_ELIGIBILITY_UNKNOWN", "首次上市年份不能证明窗口内持续上市或可交易")
+        raise DataError("LISTING_ELIGIBILITY_UNKNOWN", "首次上市日期/年份不能证明窗口内持续上市或可交易")

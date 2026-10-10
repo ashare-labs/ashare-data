@@ -22,6 +22,15 @@ def demonstrate(store, evidence_directory):
         "historical_pit": lambda: view.get("300750.XSHE", "2026-09-30", visibility="verified",
                                             knowledge_at="2026-09-30T15:00:00+08:00"),
     }
+    date_rows = []
+    if "initial_listing_date" in view.descriptor().supported_fields:
+        del calls["exact_actual_date"]
+        for day in (28, 29, 30):
+            fact = view.get("300750.XSHE", f"2026-09-{day}", field="initial_listing_date")
+            assert fact.value == "2018-06-11"
+            assert fact.source_fields["document_published_date"] == "2018-08-24"
+            assert fact.source_fields["document_published_timezone"] is None
+            date_rows.append(fact.to_dict())
     for label, call in calls.items():
         try:
             call()
@@ -32,8 +41,11 @@ def demonstrate(store, evidence_directory):
     for source in view.lineage():
         import hashlib
         assert hashlib.sha256(view.evidence(source.path)).hexdigest() == source.source_sha256
-    return {"descriptor": view.descriptor().to_dict(), "rows": rows, "refusals": refusals,
+    result = {"descriptor": view.descriptor().to_dict(), "rows": rows, "refusals": refusals,
             "validation": view.validate(), "execution_permission": False}
+    if date_rows:
+        result["date_rows"] = date_rows
+    return result
 
 
 def main():

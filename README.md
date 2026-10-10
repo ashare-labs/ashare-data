@@ -1,19 +1,25 @@
-# A数达 0.8.2.dev1：单证券上市年份事实候选
+# A数达 0.8.2.dev2：首次实际上市日期的有界增量
 
-新增[单字段公开契约](docs/listing-fact.md)：`300750.XSHE` 在 2026-09-28/29/30 的查询可读取 `initial_listing_year=2018`。依据已封存的发行人2018年度报告摘要，精度仅为年。原计划的精确实际上市日仍未证实；上市公告所述2018-06-11仅为当时安排，不升级为实际发生日期。
+复用[现有事实入口与模型](docs/listing-fact.md)，新证据包支持 `initial_listing_date=2018-06-11`；证券/查询范围仍为300750.XSHE、2026-09-28/29/30。依据发行人官网2018半年度报告的事后陈述及官网原文发布元数据，不升级历史交易资格或严格PIT。
 
 ```python
-from ashare_data import Store
+from ashare_data import Store, FactRecord
 store = Store.init("/新的私有目录/store")
-snapshot_id = store.import_listing_evidence("/已交接固定证据包目录")
-fact = store.listing_fact(snapshot_id).get("300750.XSHE", "2026-09-30")
-assert (fact.value, fact.precision) == (2018, "year")
-assert fact.historical_eligible is None and not fact.execution_permission
+snapshot_id = store.import_listing_evidence("/已交接精确日期证据包目录")
+view = store.listing_fact(snapshot_id)
+fact = view.get("300750.XSHE", "2026-09-30", field="initial_listing_date")
+assert isinstance(fact, FactRecord) and fact.value == "2018-06-11"
+assert fact.source_fields["event_date"] == "2018-06-11"
+assert fact.source_fields["document_published_date"] == "2018-08-24"
+assert fact.source_fields["document_published_timezone"] is None
+assert view.get("300750.XSHE", "2026-09-30").value == 2018  # 从实际日期派生
 ```
 
-[离线端到端示例](examples/listing_fact.py)展示三日读取、原文追溯及精确日期/资格/PIT拒绝。原文PDF不随源码或wheel分发，缺固定证据包时拒绝导入；相关真实样本测试通过环境变量 `ASHARE_LISTING_EVIDENCE` 显式定位，未提供时明确skip。
+原年精度0.8.2.dev1证据包可继续导入/读取，保持旧snapshot_id与输出，不因软件升级自动获得新事实。原年精度仓库和冻结0.8.0.dev2不修改。新包默认事后读取；以2018上市日、2018文档发布日期或2026原文采集前为知识时钟均拒绝received读取，verified始终拒绝。来源未注明发布时间时区，不能补成UTC或上海时间。
 
-本候选独审待进行，不改冻结0.8.0.dev2或已审TD-01的0.8.1.dev2。量额诊断及旧M2接口保留，新增组件不组合执行产品、不扩大事实到其他股票或日期、不放宽任何执行门禁。以下为已有公共生产能力说明。
+[离线示例](examples/listing_fact.py)复用原入口，可接收旧年精度包或新日期包。真实原文、关键页、采集回执为外置证据，不进入源码/wheel；新样本回归通过 `ASHARE_LISTING_DATE_EVIDENCE` 指定，旧包通过 `ASHARE_LISTING_EVIDENCE` 指定。独立复核结果随外置固定身份交接报告交付，不能继承旧版本PASS。本次不增加采集或放宽执行门禁。
+
+以下为已有公共生产能力说明。
 
 从用户合法取得的市场原文与有来源的事实解释生成不可变数据产品；无需旧机器私有实验包。
 新增公共 `import_m2_sources/import_m2_component/validate_m2/compose_m2/export_m2`，既有 M2 消费接口不变。

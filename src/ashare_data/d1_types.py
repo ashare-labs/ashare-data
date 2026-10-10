@@ -51,6 +51,11 @@ class FactRecord(SourceRecord):
     evidence: tuple[Evidence, ...]
     raw_json: str
 
+    @property
+    def value(self):
+        """Detached JSON value, shared by existing and new fact consumers."""
+        return json.loads(self.value_json)
+
 
 @dataclass(frozen=True)
 class D1Descriptor(Projection):

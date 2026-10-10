@@ -8,7 +8,7 @@ from .storage import Store
 from .research import ResearchResult, ResearchView
 from .baostock import BaoStockSource, BaoStockView
 from .d1 import D1Facts, D1View
-from .d1_types import D1OwnerReceipt, D1PrevCloseCall
+from .d1_types import D1OwnerReceipt, D1PrevCloseCall, Evidence, FactRecord
 from .br1 import BR1View, BR1Receipt
 from .br1_listing import BR1ListingContract, BR1ListingProjection, BR1ListingView
 from .live import Client, capabilities, get_all_securities, get_price, get_security_info, get_trade_days
@@ -20,9 +20,11 @@ __all__ = ["BaoStockSource", "BaoStockView", "ResearchResult", "ResearchView", "
            "get_all_securities", "capabilities", "CoverageContract", "reconcile_turnover", "reconcile_sina_day",
            "D1Facts", "D1View", "D1OwnerReceipt", "D1PrevCloseCall", "BR1View", "BR1Receipt"]
 __all__ += ["BR1ListingContract", "BR1ListingProjection", "BR1ListingView"]
-__version__ = "0.8.2.dev1"
+__version__ = "0.8.2.dev2"
 
 __all__ += ["M2View", "M2UseView", "M2AD08Call", "M2ConsumerBinding", "M2ReadContext", "M2Read", "M2Document"]
 
 
 __all__ += ["ListingFactView", "ListingFactDescriptor", "ListingFactEvidence", "ListingYearFact"]
+
+__all__ += ["Evidence", "FactRecord"]
