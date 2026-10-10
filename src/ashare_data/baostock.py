@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import fcntl
 import importlib.util
+from itertools import islice
 import json
 import os
 from pathlib import Path
@@ -24,6 +25,7 @@ from .model import DataError, canonical, require, timestamp
 from .research import ResearchResult, _bao, _day, _decimal, _read
 from .storage import identifier, immutable_write
 from . import baostock_minutes as minutes
+from . import daily_status
 
 FIELDS = "date,code,open,high,low,close,volume,amount,adjustflag,tradestatus"
 TABLE = """CREATE TABLE IF NOT EXISTS baostock_captures
@@ -58,9 +60,9 @@ def validate_basic(rows, code):
 
 def request(kind, security=None, start_date=None, end_date=None, frequency=None):
     require(
-        kind in {"daily", "minute", "basic", "calendar"},
+        kind in {"daily", "daily_status", "minute", "basic", "calendar"},
         "UNSUPPORTED_SOURCE",
-        "仅支持日线、限定分钟、证券资料、日历",
+        "仅支持日线、日状态、限定分钟、证券资料、日历",
     )
     if kind == "minute":
         require(
@@ -70,7 +72,7 @@ def request(kind, security=None, start_date=None, end_date=None, frequency=None)
         )
     else:
         require(
-            frequency is None or (kind == "daily" and frequency == "daily"),
+            frequency is None or (kind in {"daily", "daily_status"} and frequency == "daily"),
             "INVALID_ARGUMENT",
             "周期参数与查询种类不匹配",
         )
@@ -95,10 +97,14 @@ def request(kind, security=None, start_date=None, end_date=None, frequency=None)
         )
         params.update(start_date=start_date, end_date=end_date)
         method = "query_trade_dates"
-        if kind in {"daily", "minute"}:
+        if kind in {"daily", "daily_status", "minute"}:
             method = "query_history_k_data_plus"
             params.update(
-                fields=minutes.FIELDS if kind == "minute" else FIELDS,
+                fields=minutes.FIELDS
+                if kind == "minute"
+                else daily_status.FIELDS
+                if kind == "daily_status"
+                else FIELDS,
                 frequency=minutes.FREQUENCIES[frequency] if kind == "minute" else "d",
                 adjustflag="3",
             )
@@ -131,7 +137,7 @@ class BaoStockSource:
     def capabilities():
         return {
             "source": "baostock",
-            "kinds": ["daily", "minute", "basic", "calendar"],
+            "kinds": ["daily", "daily_status", "minute", "basic", "calendar"],
             "frequencies": ["daily", *minutes.FREQUENCIES],
             "max_calendar_days": 31,
             "max_minute_calendar_days": 2,
@@ -148,6 +154,8 @@ class BaoStockSource:
             "one_minute": "unsupported",
             "minute_label_cutoff": "aware end, inclusive or exclusive; not closure/PIT",
             "basic_validation_policy": METADATA_POLICY,
+            "daily_status_policy": daily_status.POLICY,
+            "daily_status_fields": ["tradestatus", "isST"],
         }
 
     def get_price(
@@ -181,6 +189,16 @@ class BaoStockSource:
         return self._acquired(
             store.baostock(self.fetch(store, kind="basic", security=security)).get_security_info()
         )
+
+    def get_status(self, security, *, store, start_date, end_date, require_known=False):
+        require(type(require_known) is bool, "INVALID_ARGUMENT", "require_known必须为bool")
+        sid = self.fetch(
+            store, kind="daily_status", security=security, start_date=start_date, end_date=end_date
+        )
+        # Frozen result reports its explicit acquisition without mutating the offline view.
+        result = store.baostock(sid).get_status(require_known=require_known)
+        report = dict(result.report, network_used=True, acquisition="explicit_baostock_query")
+        return daily_status.DailyStatusResult(sid, result.rows, canonical(report).decode())
 
     def get_trade_days(self, *, store, start_date, end_date):
         sid = self.fetch(store, kind="calendar", start_date=start_date, end_date=end_date)
@@ -267,6 +285,12 @@ def _verify_impl(blobs):
     }
     kind = methods[req["method"]]
     params = req["params"]
+    if (
+        kind == "daily"
+        and params.get("frequency") == "d"
+        and params.get("fields") == daily_status.FIELDS
+    ):
+        kind = "daily_status"
     frequency = None
     if kind == "daily" and params.get("frequency") != "d":
         kind = "minute"
@@ -459,6 +483,8 @@ def _verify_impl(blobs):
                     }
                 )
             )
+        elif kind == "daily_status":
+            daily_status.validate(rows, params)
         elif kind == "minute":
             minutes.validate(rows, params)
         elif kind == "calendar" and rows:
@@ -491,6 +517,8 @@ def _publish(store, blobs):
     manifest = {
         "version": minutes.VERSION
         if attempt["request"]["params"].get("frequency") in minutes.FREQUENCIES.values()
+        else daily_status.VERSION
+        if attempt["request"]["params"].get("fields") == daily_status.FIELDS
         else VERSION,
         "artifacts": [
             {"name": n, "sha256": bh(b), "bytes": len(b)} for n, b in sorted(blobs.items())
@@ -524,7 +552,8 @@ def _load(store, body, sid):
     require(bh(body) == sid, "INTEGRITY", "清单 hash 不匹配")
     m = json.loads(body)
     require(
-        m["version"] in {VERSION, minutes.VERSION} and 0 < len(m["artifacts"]) <= 20,
+        m["version"] in {VERSION, minutes.VERSION, daily_status.VERSION}
+        and 0 < len(m["artifacts"]) <= 20,
         "INTEGRITY",
         "证据版本或文件数无效",
     )
@@ -544,10 +573,37 @@ def _load(store, body, sid):
     expected_version = (
         minutes.VERSION
         if verified[0]["request"]["params"].get("frequency") in minutes.FREQUENCIES.values()
+        else daily_status.VERSION
+        if verified[0]["request"]["params"].get("fields") == daily_status.FIELDS
         else VERSION
     )
     require(m["version"] == expected_version, "INTEGRITY", "证据版本与周期契约不符")
     return m, verified
+
+
+def import_capture(store, directory):
+    """Explicit offline import of worker receipts; stored paths never drive external reads."""
+    root = Path(directory)
+    require(root.is_dir() and not root.is_symlink(), "BOUNDED_IMPORT", "需真实证据目录")
+    paths = list(islice(root.rglob("*"), 22))
+    require(len(paths) <= 21, "BOUNDED_IMPORT", "证据目录项超限")
+    require(not any(p.is_symlink() for p in paths), "BOUNDED_IMPORT", "证据不得包含符号链接")
+    files = [p for p in paths if p.is_file()]
+    require(0 < len(files) <= 20, "BOUNDED_IMPORT", "证据文件数超限")
+    require(
+        sum(p.stat().st_size for p in files) <= 20 * 1024 * 1024, "BOUNDED_IMPORT", "证据总量超限"
+    )
+    blobs = {}
+    for p in files:
+        name = p.relative_to(root).as_posix()
+        require(
+            re.fullmatch(r"(?:capture/)?[a-z0-9.-]+", name) is not None,
+            "BOUNDED_IMPORT",
+            "证据路径无效",
+        )
+        blobs[name] = _read(p, 8 * 1024 * 1024)
+    require(sum(map(len, blobs.values())) <= 20 * 1024 * 1024, "BOUNDED_IMPORT", "证据总量超限")
+    return _publish(store, blobs)
 
 
 def snapshots(store):
@@ -832,7 +888,15 @@ class BaoStockView:
         )
 
     def get_price(self, *, end=None, end_inclusive=True):
+        require(
+            self._manifest["version"] != daily_status.VERSION,
+            "QUERY_KIND_MISMATCH",
+            "日状态证据不含OHLCV；请使用get_status",
+        )
         return self._with_end(end, end_inclusive)._result("query_history_k_data_plus")
+
+    def get_status(self, *, require_known=False):
+        return daily_status.project(self, require_known=require_known)
 
     def get_security_info(self):
         return self._result("query_stock_basic")

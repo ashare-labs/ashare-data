@@ -154,6 +154,10 @@ class Store:
         from .baostock import BaoStockView
         return BaoStockView(self, capture_id)
 
+    def import_baostock_capture(self, directory):
+        from .baostock import import_capture
+        return import_capture(self, directory)
+
     def import_m2_sources(self, *, kind, documents, classification, claims=None):
         from .m2_components import import_sources
         return import_sources(self, kind=kind, documents=documents,

@@ -1,23 +1,24 @@
-# A数达 0.8.2.dev2：首次实际上市日期的有界增量
+# A数达 0.8.3.dev1：历史日线交易状态与ST
 
-复用[现有事实入口与模型](docs/listing-fact.md)，新证据包支持 `initial_listing_date=2018-06-11`；证券/查询范围仍为300750.XSHE、2026-09-28/29/30。依据发行人官网2018半年度报告的事后陈述及官网原文发布元数据，不升级历史交易资格或严格PIT。
+[日状态公共契约](docs/daily-status.md)新增通用BaoStock `daily_status` 显式采集及固定capture离线读取。每次一证券、至多31自然日；不按三只股票特判。三股2026-09-28至30真实九行均返回tradestatus="1"、isST="0"，仅为来源日线状态声明，不授予PIT或执行许可。
 
 ```python
-from ashare_data import Store, FactRecord
+from ashare_data import Store, DailyStatusResult
+
 store = Store.init("/新的私有目录/store")
-snapshot_id = store.import_listing_evidence("/已交接精确日期证据包目录")
-view = store.listing_fact(snapshot_id)
-fact = view.get("300750.XSHE", "2026-09-30", field="initial_listing_date")
-assert isinstance(fact, FactRecord) and fact.value == "2018-06-11"
-assert fact.source_fields["event_date"] == "2018-06-11"
-assert fact.source_fields["document_published_date"] == "2018-08-24"
-assert fact.source_fields["document_published_timezone"] is None
-assert view.get("300750.XSHE", "2026-09-30").value == 2018  # 从实际日期派生
+capture_id = store.import_baostock_capture("/已采集的worker证据目录")
+result = store.baostock(capture_id).get_status()
+assert isinstance(result, DailyStatusResult)
+for row in result.rows:
+    print(row.security, row.trade_date, row.suspended.value, row.is_st.value)
+    print(row.suspended.state, row.is_st.state, row.response_received_at)
 ```
 
-原年精度0.8.2.dev1证据包可继续导入/读取，保持旧snapshot_id与输出，不因软件升级自动获得新事实。原年精度仓库和冻结0.8.0.dev2不修改。新包默认事后读取；以2018上市日、2018文档发布日期或2026原文采集前为知识时钟均拒绝received读取，verified始终拒绝。来源未注明发布时间时区，不能补成UTC或上海时间。
+缺行、字段未请求、源空值、未知枚举分开报告；`get_status(require_known=True)`遇未知即拒绝。旧日线capture可读取已有tradestatus，未请求的isST仍未知。只读查询不联网，显式采集使用 `BaoStockSource.get_status(...)` 或CLI `baostock-fetch daily_status`。
 
-[离线示例](examples/listing_fact.py)复用原入口，可接收旧年精度包或新日期包。真实原文、关键页、采集回执为外置证据，不进入源码/wheel；新样本回归通过 `ASHARE_LISTING_DATE_EVIDENCE` 指定，旧包通过 `ASHARE_LISTING_EVIDENCE` 指定。独立复核结果随外置固定身份交接报告交付，不能继承旧版本PASS。本次不增加采集或放宽执行门禁。
+[离线示例](examples/daily_status.py) · [BaoStock原接口](docs/baostock-api.md) · [既有上市事实](docs/listing-fact.md)
+
+本候选继承并保留0.8.2.dev2上市事实实现，但本轮没有重跑其1812项验收作为新增进度。当前代码身份、状态样本、受影响测试和独审结论由外置本轮交接记录绑定；下文和PUBLIC_RELEASE.json/PUBLIC_CONTENT.sha256包含旧发布预览历史信息，不代表本候选已公开发布或继承整体准入。没有修改上层或启动F2/交易。
 
 以下为已有公共生产能力说明。
 
