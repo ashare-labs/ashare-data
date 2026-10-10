@@ -1,5 +1,26 @@
 # 独立历史查询产品
 
+## 发行人事实与归档版本（dev10）
+
+`read_action_evidence(product, security, role=role)` 读取经过原文核对的固定行动事实。
+返回原始 PDF 哈希、引用页、文档日期标签与真实采集时钟。已解决的安排日期和只确认年度
+事项的 `partial_history` 分开；未知除权日保留 `null`。这是局部事实补证，不能据此认证
+完整公司行动链、替换提供商台账或自动构建因子。
+
+`read_archive_daily(product, security, source=..., role=role)` 与
+`read_archive_calendar(product, security, source=..., role=role)` 读取公开 Dolt 档案的
+固定提交响应。前者范围最多12行，后者最多20行，均需要准确的请求日期清单与不可变
+32位提交；每次调用核验响应的仓库、完整 SQL `AS OF`、行身份、覆盖及提交日志。
+日线保留 `native_fields` 原始数值字符串，并以 Decimal 将手乘100转股、千元乘1000转元。
+日历只属于其声明的交易所，ASCII十六进制30/31分别表示关市/开市，不推断其他交易所。
+
+`archive_version.commit` 是数据库版本。其 `commit_time_raw` 保持原日志文本，未给时区
+便不推测；`original_source_capture_time/source_publication_time/source_revision_id`
+均未知。数据库提交不同不代表所查行情值发生修订。当前 HTTP 取证时间保留于 source，
+不会作为历史源采集时间。历史 PIT、策略可见、撮合、官方日历及全日覆盖认证均不开放。
+
+## 既有独立读取
+
 `IndependentQueryView` 读取 AD 固定 binding 内的独立真实来源。它不联网，也不读取 JQ
 答案。使用角色必须为 `independent_retrospective_query_research`；策略、撮合、初始化角色
 均拒绝。每次读取重新校验 binding 和依赖证据 SHA256，路径限制在 binding 所在目录内。

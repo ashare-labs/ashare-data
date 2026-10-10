@@ -291,6 +291,143 @@ class IndependentQueryView:
         return self._result(product_id, p, s, rows, source_publication_time=None,
                             policy="Explicit event records; no price fills and no inference from missing daily bars")
 
+    def read_action_evidence(self, product_id, security, *, role):
+        """Read reviewed issuer facts with pinned documents, without rebuilding factors."""
+        b, p = self._open(product_id, security, role, "action_evidence")
+        s = b["sources"][p["sources"][0]]
+        fact = _json(self._checked(s))
+        require(s["kind"] == "reviewed_issuer_actions"
+                and fact.get("schema") == "ad.issuer-action-evidence.v1"
+                and fact.get("security") == security,
+                "INDEPENDENT_SCHEMA", "Invalid issuer action evidence")
+        documents, rows = fact.get("documents"), fact.get("rows")
+        require(type(documents) is dict and 1 <= len(documents) <= 12
+                and type(rows) is list and 1 <= len(rows) <= 100,
+                "INDEPENDENT_SCHEMA", "Invalid issuer evidence coverage")
+        for document in documents.values():
+            self._checked(document)
+            day(document["document_date"])
+            require(timestamp(document["captured_start"]) <= timestamp(document["captured_end"])
+                    and document.get("source_publication_time") is None,
+                    "INDEPENDENT_SCHEMA", "Document dates must not impersonate publication clocks")
+        result = []
+        for row in rows:
+            require(type(row) is dict and row.get("event_id") in p["event_ids"]
+                    and row.get("resolution") in {"resolved_schedule", "partial_history"}
+                    and re.fullmatch(r"\d{4}(?:-\d{2})?", row.get("period", "")) is not None
+                    and type(row.get("facts")) is dict and row["facts"]
+                    and type(row.get("citations")) is list and row["citations"],
+                    "INDEPENDENT_SCHEMA", "Invalid reviewed event")
+            for citation in row["citations"]:
+                require(citation.get("document") in documents
+                        and type(citation.get("pages")) is list and citation["pages"]
+                        and all(type(n) is int and 1 <= n <= 1000 for n in citation["pages"]),
+                        "INDEPENDENT_SCHEMA", "Missing document/page citation")
+            label = row.get("ex_date")
+            if label is not None:
+                require(day(p["start_date"]) <= day(label) <= day(p["end_date"]),
+                        "INDEPENDENT_SCOPE", "Action date outside bound window")
+            require(row["resolution"] != "resolved_schedule" or label is not None,
+                    "INDEPENDENT_SCHEMA", "Resolved schedule requires an ex-date")
+            result.append(deepcopy(row))
+        require(sorted(r["event_id"] for r in result) == sorted(p["event_ids"])
+                and len({r["event_id"] for r in result}) == len(result),
+                "INDEPENDENT_COVERAGE", "Missing or duplicate reviewed event")
+        return self._result(product_id, p, s, result, documents=deepcopy(documents),
+                            historical_action_chain_complete=False, adjustment_factor_certified=False,
+                            source_publication_time=None,
+                            policy="Reviewed issuer facts only; no source-ledger replacement or factor synthesis")
+
+    def _archive_rows(self, p, s, security, *, calendar):
+        require(s.get("kind") == "dolt_sql_snapshot", "INDEPENDENT_SCHEMA", "Unsupported archive")
+        commit = s.get("archive_commit", "")
+        require(type(commit) is str and re.fullmatch(r"[0-9a-v]{32}", commit) is not None,
+                "INDEPENDENT_SCHEMA", "Archive must use an immutable Dolt commit")
+        start, end = day(p["start_date"]), day(p["end_date"])
+        require(start <= end, "INDEPENDENT_SCOPE", "Reversed archive window")
+        if calendar:
+            exchange = p.get("exchange")
+            require(exchange in {"SSE", "SZSE", "BSE"}, "INDEPENDENT_SCHEMA", "Invalid calendar exchange")
+            query = ("SELECT exchange,date,HEX(is_open) AS is_open_hex FROM ts_trade_day_calendar "
+                     f"AS OF '{commit}' WHERE exchange='{exchange}' AND date BETWEEN '{start}' "
+                     f"AND '{end}' ORDER BY date LIMIT 20;")
+        else:
+            code = security[:6] + (".SZ" if security.endswith("XSHE") else ".SH")
+            query = ("SELECT tradedate,symbol,open,high,low,close,volume,amount FROM ts_a_stock_eod_price "
+                     f"AS OF '{commit}' WHERE symbol='{code}' AND tradedate BETWEEN '{start}' "
+                     f"AND '{end}' ORDER BY tradedate LIMIT 12;")
+        payload = _json(self._checked(s))
+        require(payload.get("query_execution_status") == "Success"
+                and payload.get("repository_owner") == s["repository_owner"]
+                and payload.get("repository_name") == s["repository_name"]
+                and payload.get("sql_query") == query and type(payload.get("rows")) is list,
+                "INDEPENDENT_SCHEMA", "Archive response does not match the pinned query")
+        expected = p.get("expected_dates")
+        require(type(expected) is list and 0 < len(expected) <= (20 if calendar else 12)
+                and expected == sorted(set(day(d) for d in expected))
+                and all(start <= d <= end for d in expected),
+                "INDEPENDENT_SCHEMA", "Invalid archive date coverage")
+        rows = payload["rows"]
+        require(all(type(r) is dict for r in rows)
+                and [r.get("date" if calendar else "tradedate") for r in rows] == expected,
+                "INDEPENDENT_COVERAGE", "Missing, duplicate or extra archive rows")
+        log = _json(self._checked(s["commit_log"]))
+        require(log.get("query_execution_status") == "Success" and type(log.get("rows")) is list,
+                "INDEPENDENT_SCHEMA", "Invalid archive commit log")
+        entries = [r for r in log["rows"] if r.get("commit_hash") == commit]
+        require(len(entries) == 1 and type(entries[0].get("date")) is str,
+                "INDEPENDENT_SCHEMA", "Archive commit absent from pinned log")
+        version = {"commit": commit, "commit_time_raw": entries[0]["date"],
+                   "commit_time_timezone": None, "original_source_capture_time": None,
+                   "source_publication_time": None, "source_revision_id": None,
+                   "semantics": "Database archive version; not an original provider capture or value revision"}
+        return rows, version
+
+    def read_archive_daily(self, product_id, security, *, source, role):
+        """Read a bounded immutable archive, preserving native precision and clocks."""
+        b, p = self._open(product_id, security, role, "archive_daily")
+        require(source in p["sources"], "INDEPENDENT_SCOPE", "Unbound archive source")
+        s = b["sources"][source]
+        raw, version = self._archive_rows(p, s, security, calendar=False)
+        require(s.get("unit_policy") == "tushare_daily_lots_100_and_amount_1000.v1"
+                and s.get("evidence"), "INDEPENDENT_SCHEMA", "Missing archive unit evidence")
+        code = security[:6] + (".SZ" if security.endswith("XSHE") else ".SH")
+        rows = []
+        for item in raw:
+            require(set(item) == {"tradedate", "symbol", "open", "high", "low", "close", "volume", "amount"}
+                    and item["symbol"] == code and item["amount"] is not None,
+                    "INDEPENDENT_SCHEMA", "Incomplete or wrong-security daily archive")
+            r = {k: _decimal(item[k]) for k in ("open", "high", "low", "close", "volume")}
+            r["volume"] *= 100
+            r["money"] = _decimal(item["amount"]) * 1000
+            validate_ohlc(*(r[k] for k in ("open", "high", "low", "close")), code="INDEPENDENT_VALUE")
+            fields = _fields(r)
+            for name in ("volume", "money"):
+                fields[name]["origin"] = "documented_source_unit_conversion"
+            rows.append({"date": item["tradedate"], "fields": fields, "native_fields": deepcopy(item)})
+        return self._result(product_id, p, s, rows, archive_version=version,
+                            units={"price": "CNY/share", "volume": "share", "money": "CNY"},
+                            native_units={"volume": "100 shares", "amount": "1000 CNY"},
+                            full_session_coverage_certified=False,
+                            policy="Separate immutable archive snapshots; no fills or inferred value revisions")
+
+    def read_archive_calendar(self, product_id, security, *, source, role):
+        """Read the archive's stated exchange calendar, without cross-exchange inference."""
+        b, p = self._open(product_id, security, role, "archive_calendar")
+        require(source in p["sources"], "INDEPENDENT_SCOPE", "Unbound archive source")
+        s = b["sources"][source]
+        raw, version = self._archive_rows(p, s, security, calendar=True)
+        rows = []
+        for item in raw:
+            require(set(item) == {"exchange", "date", "is_open_hex"}
+                    and item["exchange"] == p["exchange"] and item["is_open_hex"] in {"30", "31"},
+                    "INDEPENDENT_SCHEMA", "Invalid archive calendar encoding or exchange")
+            rows.append({"date": item["date"], "exchange": item["exchange"],
+                         "is_open": item["is_open_hex"] == "31", "native_fields": deepcopy(item)})
+        return self._result(product_id, p, s, rows, archive_version=version,
+                            calendar_exchange=p["exchange"], official_calendar_certified=False,
+                            policy="Observed exchange calendar only; not an original publication/receipt history")
+
     def read_index_members(self, product_id, security, *, as_of_date, source, role,
                            allow_uncertified=False):
         """Read an explicit historical candidate, never certify an official/PIT set."""
