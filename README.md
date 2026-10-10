@@ -1,4 +1,15 @@
-# A数达 0.8.5.dev2：可选 zzshare 本地研究适配器
+# A数达 0.8.6.dev1：固定源日历与开市邻日
+
+新增 `Store.baostock(capture_id).get_calendar()` 和 `get_calendar_links(trading_dates=[...])`。
+逐日保留源开闭声明、原字段、摘要及接收时间；在同一个capture内给出有据的前一/当前/后一开市日。缺行、未知、关闭锚点或捕获边界不足明确拒绝，不按工作日补数据。
+
+[公共类型、CLI与错误契约](docs/source-calendar.md) · [离线示例](examples/source_calendar.py)
+
+旧get_trade_days和capture格式保持兼容。这是来源日历研究接口，不改变M2固定窗口、历史资格/PIT或执行门禁；本轮新窗口采集会话失败，仅复用已有真实三日日历验证，长假控制为合成。固定身份及实际测试/独审以包外calendar-r1-evidence为准。
+
+以下保留已冻结0.8.5.dev2及更早阶段的功能说明和发布记录，不代表当前候选继承其准入。
+
+## 0.8.5.dev2：可选 zzshare 本地研究适配器
 
 新增默认关闭的 zzshare 日线研究源：显式匿名采集、原文回执离线导入、固定 capture 重开和精确数值公共查询。需 `enable_research=True` 或 CLI `--enable-research`；现有默认源路由保持原样。限价是 `source_claimed`，规则推算结果不填充；不授予官方限价、PIT、完整覆盖或执行许可。
 

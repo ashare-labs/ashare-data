@@ -27,6 +27,7 @@ from .storage import identifier, immutable_write
 from . import baostock_minutes as minutes
 from . import daily_status
 from . import preclose
+from . import source_calendar
 
 FIELDS = "date,code,open,high,low,close,volume,amount,adjustflag,tradestatus"
 TABLE = """CREATE TABLE IF NOT EXISTS baostock_captures
@@ -163,6 +164,8 @@ class BaoStockSource:
             "source_preclose_policy": preclose.POLICY,
             "source_preclose_fields": ["preclose"],
             "source_preclose_basis": preclose.BASIS,
+            "source_calendar_policy": source_calendar.POLICY,
+            "source_calendar_links": "same_capture_known_open_anchors_only",
         }
 
     def get_price(
@@ -947,3 +950,9 @@ class BaoStockView:
         if not result.data.empty:
             result.data = result.data.loc[result.data["is_trading_day"] == "1"].copy()
         return result
+
+    def get_calendar(self, *, require_known=False):
+        return source_calendar.project(self, require_known=require_known)
+
+    def get_calendar_links(self, *, trading_dates):
+        return source_calendar.links(self, trading_dates=trading_dates)

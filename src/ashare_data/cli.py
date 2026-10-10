@@ -137,13 +137,14 @@ def parser():
     bf.add_argument("--sdk-path", help="已有官方0.9.4 SDK根目录；不自动安装")
     bf.add_argument("--timeout", type=float, default=15)
     bq = sub.add_parser("baostock-query", help="离线查询固定BaoStock证据版本")
-    bq.add_argument("dataset", choices=["price", "statuses", "preclose", "security", "trade-days", "descriptor", "quality", "coverage", "lineage"])
+    bq.add_argument("dataset", choices=["price", "statuses", "preclose", "calendar", "calendar-links", "security", "trade-days", "descriptor", "quality", "coverage", "lineage"])
     bq.add_argument("--capture", required=True)
     bq.add_argument("--as-of")
     bq.add_argument("--visibility", choices=["received", "verified", "source_label"], default="received")
     bq.add_argument("--end", help="分钟源标签上限，含秒和时区；非发布/闭合时间")
     bq.add_argument("--end-exclusive", action="store_true", help="排除--end恰好相等的标签")
-    bq.add_argument("--require-known", action="store_true", help="仅日状态或源preclose：任一未知字段即拒绝；不授予交易许可")
+    bq.add_argument("--require-known", action="store_true", help="仅日状态、源preclose或源日历：任一未知字段即拒绝；不授予交易许可")
+    bq.add_argument("--dates", nargs="+", help="仅calendar-links：固定capture内的开市锚点日期")
     bi = sub.add_parser("baostock-import", help="显式离线导入已捕获的原始BaoStock回执")
     bi.add_argument("directory")
     sub.add_parser("baostock-snapshots")
@@ -334,8 +335,10 @@ def main(argv=None):
                 require(result["status"] in {"research_rows", "empty_unknown"},
                         "SOURCE_REQUEST_FAILED", "源响应未达到研究读取条件；失败证据已封存", result)
             elif args.command == "baostock-query":
-                require(not args.require_known or args.dataset in {"statuses", "preclose"},
-                        "INVALID_ARGUMENT", "require-known仅适用于statuses/preclose")
+                require(not args.require_known or args.dataset in {"statuses", "preclose", "calendar"},
+                        "INVALID_ARGUMENT", "require-known仅适用于statuses/preclose/calendar")
+                require((args.dates is not None) == (args.dataset == "calendar-links"),
+                        "INVALID_ARGUMENT", "calendar-links必需dates；其他查询不接受dates")
                 require(args.as_of is not None or args.visibility == "received",
                         "INVALID_ARGUMENT", "visibility须与as-of同传")
                 require(not args.end_exclusive or args.end is not None,
@@ -345,9 +348,13 @@ def main(argv=None):
                     view = view.at(args.end, visibility="source_label", inclusive=not args.end_exclusive)
                 if args.as_of is not None:
                     view = view.at(args.as_of, visibility=args.visibility)
-                method = {"price": "get_price", "statuses": "get_status", "preclose": "get_preclose", "security": "get_security_info", "trade-days": "get_trade_days"}.get(args.dataset, args.dataset)
-                value = (getattr(view, method)(require_known=args.require_known) if args.dataset in {"statuses", "preclose"}
-                         else getattr(view, method)())
+                method = {"price": "get_price", "statuses": "get_status", "preclose": "get_preclose", "calendar": "get_calendar", "calendar-links": "get_calendar_links", "security": "get_security_info", "trade-days": "get_trade_days"}.get(args.dataset, args.dataset)
+                if args.dataset == "calendar-links":
+                    value = view.get_calendar_links(trading_dates=args.dates)
+                elif args.dataset in {"statuses", "preclose", "calendar"}:
+                    value = getattr(view, method)(require_known=args.require_known)
+                else:
+                    value = getattr(view, method)()
                 result = value.to_dict() if hasattr(value, "to_dict") else value
             elif args.command == "baostock-snapshots":
                 result = store.baostock_snapshots()

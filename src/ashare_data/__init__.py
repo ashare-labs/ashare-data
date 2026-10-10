@@ -2,6 +2,8 @@
 from .model import DataError
 from .preclose import SourcePrecloseValue, SourcePrecloseRow, SourcePrecloseResult
 from .daily_status import DailyStatusFlag, DailyStatusRow, DailyStatusResult
+from .source_calendar import (SourceCalendarFlag, SourceCalendarRow, SourceCalendarResult,
+                              SourceCalendarLink, SourceCalendarLinksResult)
 from .listing_fact import ListingFactView, ListingFactDescriptor, ListingFactEvidence, ListingYearFact
 from .contracts import CoverageContract
 from .reconciliation import reconcile_turnover
@@ -24,7 +26,7 @@ __all__ = ["BaoStockSource", "BaoStockView", "ResearchResult", "ResearchView", "
            "get_all_securities", "capabilities", "CoverageContract", "reconcile_turnover", "reconcile_sina_day",
            "D1Facts", "D1View", "D1OwnerReceipt", "D1PrevCloseCall", "BR1View", "BR1Receipt"]
 __all__ += ["BR1ListingContract", "BR1ListingProjection", "BR1ListingView"]
-__version__ = "0.8.5.dev2"
+__version__ = "0.8.6.dev1"
 
 __all__ += ["M2View", "M2UseView", "M2AD08Call", "M2ConsumerBinding", "M2ReadContext", "M2Read", "M2Document"]
 
@@ -32,6 +34,8 @@ __all__ += ["M2View", "M2UseView", "M2AD08Call", "M2ConsumerBinding", "M2ReadCon
 __all__ += ["ListingFactView", "ListingFactDescriptor", "ListingFactEvidence", "ListingYearFact"]
 
 __all__ += ["Evidence", "FactRecord"]
+__all__ += ["SourceCalendarFlag", "SourceCalendarRow", "SourceCalendarResult",
+            "SourceCalendarLink", "SourceCalendarLinksResult"]
 
 
 __all__ += ["DailyStatusFlag", "DailyStatusRow", "DailyStatusResult"]
