@@ -1,6 +1,19 @@
-# A数达 0.8.1.dev2：固定原文量额诊断候选
+# A数达 0.8.2.dev1：单证券上市年份事实候选
 
-无网络的[固定原文量额诊断](docs/turnover-diagnostics.md)，保留52300股真实差额。本次仅修复TD-01：额外JSON字段指数溢出时，API/CLI一致返回SOURCE_SCHEMA_ERROR。0.8.0.dev2已冻结；本隔离候选不替换其已审pin。本文后续M2能力沿用，当前功能仅作离线诊断。
+新增[单字段公开契约](docs/listing-fact.md)：`300750.XSHE` 在 2026-09-28/29/30 的查询可读取 `initial_listing_year=2018`。依据已封存的发行人2018年度报告摘要，精度仅为年。原计划的精确实际上市日仍未证实；上市公告所述2018-06-11仅为当时安排，不升级为实际发生日期。
+
+```python
+from ashare_data import Store
+store = Store.init("/新的私有目录/store")
+snapshot_id = store.import_listing_evidence("/已交接固定证据包目录")
+fact = store.listing_fact(snapshot_id).get("300750.XSHE", "2026-09-30")
+assert (fact.value, fact.precision) == (2018, "year")
+assert fact.historical_eligible is None and not fact.execution_permission
+```
+
+[离线端到端示例](examples/listing_fact.py)展示三日读取、原文追溯及精确日期/资格/PIT拒绝。原文PDF不随源码或wheel分发，缺固定证据包时拒绝导入；相关真实样本测试通过环境变量 `ASHARE_LISTING_EVIDENCE` 显式定位，未提供时明确skip。
+
+本候选独审待进行，不改冻结0.8.0.dev2或已审TD-01的0.8.1.dev2。量额诊断及旧M2接口保留，新增组件不组合执行产品、不扩大事实到其他股票或日期、不放宽任何执行门禁。以下为已有公共生产能力说明。
 
 从用户合法取得的市场原文与有来源的事实解释生成不可变数据产品；无需旧机器私有实验包。
 新增公共 `import_m2_sources/import_m2_component/validate_m2/compose_m2/export_m2`，既有 M2 消费接口不变。

@@ -177,6 +177,18 @@ def parser():
     m2 = sub.add_parser("m2", help="固定有限M2公开契约；离线，不授执行许可")
     m2.add_argument("action", choices=["import", "profiles", "query", "canonical", "snapshots", "recover", "import-sources", "import-component", "component", "validate", "compose", "report", "export"])
     m2.add_argument("--request", required=True, help="严格JSON请求文件；schema见m2-api.md")
+    li = sub.add_parser("listing-import", help="离线封存固定审阅的上市年份证据包")
+    li.add_argument("directory")
+    lq = sub.add_parser("listing-query", help="仅固定单字段事实，不授予历史资格或执行许可")
+    lq.add_argument("operation", choices=["value", "descriptor", "lineage", "validate"])
+    lq.add_argument("--snapshot", required=True)
+    lq.add_argument("--security")
+    lq.add_argument("--date")
+    lq.add_argument("--field")
+    lq.add_argument("--visibility")
+    lq.add_argument("--knowledge-at")
+    sub.add_parser("listing-snapshots")
+    sub.add_parser("listing-recover")
     return p
 
 
@@ -241,6 +253,28 @@ def main(argv=None):
             store = Store(args.store)
             if args.command in {"capabilities", "snapshots", "recover"}:
                 result = getattr(store, args.command)()
+            elif args.command == "listing-import":
+                result = {"snapshot_id": store.import_listing_evidence(args.directory)}
+            elif args.command == "listing-snapshots":
+                result = store.listing_fact_snapshots()
+            elif args.command == "listing-recover":
+                result = store.recover_listing_facts()
+            elif args.command == "listing-query":
+                if args.operation == "value":
+                    require(args.security is not None and args.date is not None,
+                            "LISTING_QUERY_ARGUMENT", "value须提供security和date")
+                    result = store.listing_fact(args.snapshot).get(
+                        args.security, args.date,
+                        field=args.field if args.field is not None else "initial_listing_year",
+                        visibility=args.visibility if args.visibility is not None else "posthoc",
+                        knowledge_at=args.knowledge_at).to_dict()
+                else:
+                    require(all(x is None for x in (args.security, args.date, args.field,
+                                                   args.visibility, args.knowledge_at)),
+                            "LISTING_QUERY_ARGUMENT", "非value操作不接受字段查询参数")
+                    value = getattr(store.listing_fact(args.snapshot), args.operation)()
+                    result = ([x.to_dict() for x in value] if isinstance(value, tuple)
+                              else value.to_dict() if hasattr(value, "to_dict") else value)
             elif args.command == "d1-import-facts":
                 result = {"facts_component_id": store.import_d1_facts(args.directory)}
             elif args.command == "br1-compose":

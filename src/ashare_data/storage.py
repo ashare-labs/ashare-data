@@ -211,6 +211,23 @@ class Store:
         from .m2_source import recover
         return recover(self)
 
+    def import_listing_evidence(self, directory):
+        """Seal the bounded, reviewed issuer listing-year evidence, offline."""
+        from .listing_fact import import_evidence
+        return import_evidence(self, directory)
+
+    def listing_fact(self, snapshot_id):
+        from .listing_fact import ListingFactView
+        return ListingFactView(self, snapshot_id)
+
+    def listing_fact_snapshots(self):
+        from .listing_fact import snapshots
+        return snapshots(self)
+
+    def recover_listing_facts(self):
+        from .listing_fact import recover
+        return recover(self)
+
     def import_d1_facts(self, directory):
         """Seal the explicitly reviewed, local D1 evidence package."""
         from .d1 import import_facts
