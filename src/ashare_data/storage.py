@@ -170,6 +170,14 @@ class Store:
         from .jq_queries import JQQueryView
         return JQQueryView(self, dataset_id)
 
+    def import_tdx_points(self, source, *, source_kind):
+        from .tdx_points import import_points
+        return import_points(self, source, source_kind=source_kind)
+
+    def tdx_points(self, dataset_id):
+        from .tdx_points import TDXPointView
+        return TDXPointView(self, dataset_id)
+
     def import_baostock_capture(self, directory):
         from .baostock import import_capture
         return import_capture(self, directory)
