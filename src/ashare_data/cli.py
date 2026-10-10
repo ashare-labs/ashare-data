@@ -141,7 +141,7 @@ def parser():
     bq.add_argument("--visibility", choices=["received", "verified", "source_label"], default="received")
     bq.add_argument("--end", help="分钟源标签上限，含秒和时区；非发布/闭合时间")
     bq.add_argument("--end-exclusive", action="store_true", help="排除--end恰好相等的标签")
-    bq.add_argument("--require-known", action="store_true", help="仅日状态：任一未知字段即拒绝；不授予交易许可")
+    bq.add_argument("--require-known", action="store_true", help="仅日状态或源preclose：任一未知字段即拒绝；不授予交易许可")
     bi = sub.add_parser("baostock-import", help="显式离线导入已捕获的原始BaoStock回执")
     bi.add_argument("directory")
     sub.add_parser("baostock-snapshots")

@@ -1,4 +1,4 @@
-# 源 preclose 公共契约（0.8.4.dev1）
+# 源 preclose 公共契约（0.8.4.dev2）
 
 本增量只提供来源前收字段，不计算限价、复权因子或完整事件覆盖。三股九行真实回执先取得，再实现通用查询；不按证券特判。每次显式一证券、至多31自然日，固定请求 `date,code,preclose,adjustflag`、日线频率和adjustflag=3。旧daily、daily_status、minute请求字段和capture版本不改。
 

@@ -1,4 +1,6 @@
-# A数达 0.8.4.dev1：源 preclose 有界增量
+# A数达 0.8.4.dev2：源 preclose 有界增量
+
+dev2 修正 `baostock-query --require-known` 帮助文案，明确同时适用于日状态和源 preclose；数据契约、查询逻辑和快照格式沿用已冻结 dev1。
 
 提供通用 `daily_preclose` 显式采集、原始回执导入及固定capture离线查询，保留旧daily/daily_status/minute profile。三股2026-09-28至30共九个真实源值已取得，定义和回执先于实现保存。没有把前日close替代preclose。
 
