@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -27,6 +28,12 @@ def _raw(body):
 
 def _constant(value):
     raise DataError("SOURCE_SCHEMA_ERROR", "JSON包含非有限常量: " + value)
+
+
+def _float(value):
+    parsed = float(value)
+    require(math.isfinite(parsed), "SOURCE_SCHEMA_ERROR", "JSON数值超出有限浮点范围")
+    return parsed
 
 
 def _pairs(items):
@@ -60,7 +67,9 @@ def _value(value):
 
 def _rows(body, trade_date, frequency):
     try:
-        rows = json.loads(body, object_pairs_hook=_pairs, parse_constant=_constant)
+        rows = json.loads(
+            body, object_pairs_hook=_pairs, parse_constant=_constant, parse_float=_float
+        )
         require(rows is not None and rows != [], "SOURCE_NO_DATA", "原文没有K线数组记录")
         require(type(rows) is list, "SOURCE_SCHEMA_ERROR", "原文不是K线数组，错误对象不等于空行情")
         require(len(rows) <= MAX_ROWS, "BOUNDED_IMPORT", "每份K线原文最多1023行")

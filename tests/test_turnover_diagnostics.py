@@ -227,3 +227,47 @@ def test_nonfinite_unknown_json_fields_are_not_silently_hashed():
     with pytest.raises(DataError) as exc:
         reconcile_sina_day(SEC, DAY, **raw)
     assert exc.value.code == "SOURCE_SCHEMA_ERROR"
+
+
+@pytest.mark.parametrize("field", ["minute_body", "five_minute_body"])
+@pytest.mark.parametrize("token", [b"1e999", b"-1e999"])
+@pytest.mark.parametrize("placement", ["extra", "nested_extra", "unselected_date"])
+def test_numeric_overflow_anywhere_has_same_api_cli_error(
+    field, token, placement, tmp_path, capsys
+):
+    raw = inputs()
+    payload = b'{"nested": [' + token + b"]}" if placement == "nested_extra" else token
+    extra = b'"extra": ' + payload + b', "open": "10"'
+    raw[field] = raw[field].replace(b'"open": "10"', extra, 1)
+    if placement == "unselected_date":
+        # The entire original response must be valid, even outside the requested day.
+        raw[field] = raw[field].replace(b"2026-10-08", b"2026-10-07", 1)
+    with pytest.raises(DataError) as caught:
+        reconcile_sina_day(SEC, DAY, **raw)
+    assert caught.value.code == "SOURCE_SCHEMA_ERROR"
+    args = ["reconcile-files", SEC, "--date", DAY]
+    for key, flag in (
+        ("minute_body", "--one-minute"),
+        ("five_minute_body", "--five-minute"),
+        ("quote_body", "--quote"),
+    ):
+        path = tmp_path / key
+        path.write_bytes(raw[key])
+        args.extend([flag, str(path)])
+    assert main(args) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert json.loads(captured.err)["error"]["code"] == "SOURCE_SCHEMA_ERROR"
+
+
+@pytest.mark.parametrize("token", [b"1.25", b"1e308"])
+def test_finite_extra_numbers_keep_original_row_hash_contract(token):
+    raw = inputs()
+    raw["minute_body"] = raw["minute_body"].replace(
+        b'"open": "10"', b'"extra": {"nested": [' + token + b']}, "open": "10"', 1
+    )
+    result = reconcile_sina_day(SEC, DAY, **raw)
+    assert result["inputs"]["1m"]["selected_row_sha256"] == [
+        digest(row) for row in json.loads(raw["minute_body"])
+    ]
+    assert result["accepted"] is False

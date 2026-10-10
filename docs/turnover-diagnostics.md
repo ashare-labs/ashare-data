@@ -1,4 +1,4 @@
-# 固定原文离线量额诊断（0.8.1.dev1）
+# 固定原文离线量额诊断（0.8.1.dev2）
 
 本候选新增 `reconcile_sina_day` 和 `reconcile-files`，解决已封存旧日的量额证据只能由外置脚本重算、现有 `Client.reconcile_day` 依赖当前quote的限制。`Client.reconcile_day` 行为不变。0.8.0.dev2 / 0c984cde 已冻结，本候选不继承其独审准入或既有M2 pin。
 
@@ -41,3 +41,12 @@ print(report["comparisons"]["1m"]["reference_minus_bars_volume"])
 公开方法和字段参考：[AKShare股票文档](https://akshare.akfamily.xyz/data/stock/stock.html)、[东财适配开源实现](https://github.com/akfamily/akshare/blob/main/akshare/stock_feature/stock_hist_em.py)。其文档已说明近期1m历史open可能为0；AKShare只是读取工具，不增加源底层独立性或数据权利。未安装或执行该库，未新增运行依赖。
 
 当前可用：显式源限定的离线研究、原文追溯、数量/金额差分。当前不通过：52300股根因解释、完整成交量额、精确1m替代、14:55已闭合/PIT、目标2026-04-09至09-30完整1m历史。免费来源提供了新对照，尚无可安全修正新浪bar的交易明细证据。F2因子未实施。
+
+
+## TD-01：指数溢出的错误边界
+
+额外字段包含JSON数值`1e999`或`-1e999`时，旧候选在选中行哈希阶段泄漏ValueError，CLI误报INPUT_OR_IO_ERROR。
+0.8.1.dev2在JSON解码时检查浮点有限性；API抛出DataError(code="SOURCE_SCHEMA_ERROR")，CLI输出同码JSON到stderr、退出2、stdout为空。
+此检查覆盖1m/5m、嵌套未知字段和未选中日期；有限额外数值仍按原有解析/行hash契约保留。行情必要数值字段仍要求十进制文本，未放宽。
+
+新增14项回归，另将独审原两例逐字节保留在外部证据包，并对源码和隔离wheel重跑。不修正52300股/507179.1011元源差额，不改变accepted=false与全部市场准入门槛。新包身份不能替换已冻结dev2 M2 pins。
