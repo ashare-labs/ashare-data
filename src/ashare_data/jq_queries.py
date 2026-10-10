@@ -416,3 +416,37 @@ class JQQueryView:
         found = [r for r in found if r["observed_at"] == newest]
         require(len({digest(r["result"]) for r in found}) == 1, "JQ_CONFLICT", "conflicting query observations")
         return self.read(sorted(found, key=lambda r: r["query_id"])[0]["query_id"], as_of=clock)
+
+    def read_initialization(self, query_id, security, *, valuation_date, as_of):
+        """Only the explicitly selected prior raw daily close, never today's quote."""
+        security, label_date = symbol(security), day(valuation_date)
+        clock = timestamp(as_of)
+        require(1 <= (clock.date() - date.fromisoformat(label_date)).days <= 31,
+                "JQ_INITIALIZATION_SCOPE", "initialization requires an explicit prior date within 31 days")
+        result = self.read(query_id, as_of=clock).to_dict()
+        out = {"dataset_id": self.dataset_id, "query_id": query_id, "security": security,
+               "valuation_date": label_date, "as_of": clock.isoformat(), "role": "initialization",
+               "status": "unavailable", "reason": result.get("reason"), "rows": [],
+               "historical_pit": False, "strategy_visible": False, "matching_eligible": False,
+               "current_quote": False, "source_preclose": False, "network_used": False,
+               "adjacent_session_certified": False}
+        if result["status"] != "available":
+            return JQObservationRead(canonical(out).decode())
+        params = result.get("parameters", {})
+        require(result.get("api") == "get_price" and params.get("security") == security
+                and params.get("frequency") == "daily" and params.get("fq") is None
+                and "close" in params.get("fields", []),
+                "JQ_INITIALIZATION_SOURCE", "requires a matching raw daily close query")
+        matches = [r for r in result["rows"] if r.get("index") == label_date + " 00:00:00"]
+        require(len(matches) <= 1, "JQ_CONFLICT", "duplicate daily valuation label")
+        if not matches or type(matches[0].get("close")) is not str:
+            out["reason"] = "NO_FINITE_SOURCE_CLOSE"
+        else:
+            close = Decimal(matches[0]["close"])
+            require(close.is_finite() and close > 0, "JQ_INITIALIZATION_SOURCE", "invalid close")
+            out.update(status="available", reason=None, observed_at=result["observed_at"],
+                       available_at=result["available_at"], source_refs=result["source_refs"],
+                       physical_capture_interval=result.get("physical_capture_interval"),
+                       rows=[{"security": security, "source_label_at": label_date + "T00:00:00+08:00",
+                              "values": {"close": matches[0]["close"]}}])
+        return JQObservationRead(canonical(out).decode())

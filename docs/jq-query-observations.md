@@ -36,3 +36,15 @@ C01 的完整性只指固定查询返回的 5108 行均齐全，不是对全市�
 日历只提供源明确列出的 dates 和 `source_previous_date/previous_date_anchor`，没有列出的日期不自动判为休市。bootstrap 的交易日历/公司行动未知项不由此暗中改成已验证或无事件。
 
 `describe()` 和 `source_evidence()` 属于 owner 管理/审核通道，包含整个固定产品的快照描述和源错误。AQ 应将它们与策略可见查询分开。市场值的公开接口不意味着把私有行情发布到互联网。
+
+## 显式前日估值初始化
+
+`view.read_initialization(query_id, security, valuation_date="2024-06-13", as_of="2024-06-14T09:00:00+08:00")`
+仅从指定的 `get_price` 原始日线（`fq=None`）查询中选取精确午夜日期标签的 `close`。
+必须在源观察时钟之后读取，日期必须早于 as_of 日期且相隔不超过 31 个自然日；
+未观察、空响应或明确非有限值返回 unavailable，不改写为零。证券不一致、复权查询或分钟查询拒绝。
+
+返回 `role=initialization`、`strategy_visible=false`、`matching_eligible=false`，
+只含 close 并保留源标签、源证据及观察／实际采集时钟。接口不返回当日日线的其他字段，
+不把前日 close 称为当日 pre_close 或当前报价，也不认证两个日期是相邻交易日。
+日历事实仍须独立提供；这不改变源数据 `historical_pit=false` 的限制。

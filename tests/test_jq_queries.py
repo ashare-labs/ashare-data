@@ -66,6 +66,40 @@ def test_query_visibility_empty_nonfinite_precision_and_evidence(store, tmp_path
     assert exc.value.code == "JQ_CONFLICT"
 
 
+def test_explicit_initialization_keeps_source_clock_and_only_prior_raw_close(store, tmp_path):
+    view = publish(store, source(tmp_path, pair()))
+    qid = view.describe()["queries"][0]["query_id"]
+    def mark(clock):
+        return view.read_initialization(qid, "000001.XSHE", valuation_date="2024-03-01", as_of=clock)
+    assert mark("2024-03-04T09:00:00+08:00").rows == ()
+    result = mark("2024-03-05T09:00:00+08:00").to_dict()
+    assert result["rows"][0]["values"] == {"close": "12.34"}
+    assert result["observed_at"] == "2024-03-04T15:30:00+08:00"
+    assert result["role"] == "initialization" and result["strategy_visible"] is False
+    assert not result["current_quote"] and not result["adjacent_session_certified"]
+    for clock in ["2024-03-01T09:00:00+08:00", "2024-05-01T09:00:00+08:00"]:
+        with pytest.raises(DataError):
+            mark(clock)
+    with pytest.raises(DataError):
+        view.read_initialization(qid, "600000.XSHG", valuation_date="2024-03-01", as_of="2024-03-05T09:00:00+08:00")
+
+
+@pytest.mark.parametrize("variant", ["nan", "empty", "adjusted", "minute"])
+def test_initialization_does_not_promote_missing_adjusted_or_intraday_close(store, tmp_path, variant):
+    specs = pair(value={"nonfinite": "nan"}) if variant == "nan" else pair(rows=[]) if variant == "empty" else pair()
+    if variant == "adjusted":
+        specs[0]["parameters"]["fq"] = "pre"
+    if variant == "minute":
+        specs[0]["parameters"]["frequency"] = "1m"
+    view = publish(store, source(tmp_path, specs))
+    qid = view.describe()["queries"][0]["query_id"]
+    if variant in {"adjusted", "minute"}:
+        with pytest.raises(DataError):
+            view.read_initialization(qid, "000001.XSHE", valuation_date="2024-03-01", as_of="2024-03-05T09:00:00+08:00")
+    else:
+        assert view.read_initialization(qid, "000001.XSHE", valuation_date="2024-03-01", as_of="2024-03-05T09:00:00+08:00").rows == ()
+
+
 def test_own_future_and_field_guards_and_recovery(store, tmp_path):
     specs = pair()
     view = publish(store, source(tmp_path, specs))
