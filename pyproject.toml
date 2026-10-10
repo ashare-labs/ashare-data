@@ -33,3 +33,7 @@ select = ["E4", "E7", "E9", "F"]
 
 [tool.ruff.format]
 exclude = ["tests/test_regression_gates.py"]
+
+# Source archives contain distributable project files only, including in Git worktrees.
+[tool.hatch.build.targets.sdist]
+include = ["/src", "/tests", "/examples", "/scripts", "/docs", "/README.md", "/CHANGELOG.md", "/pyproject.toml", "/uv.lock", "/.gitignore"]
