@@ -6,6 +6,8 @@ A数达是一个用于 A 股行情查询和离线研究的 Python 库，也提�
 
 当前版本为 **0.9.0**。默认行情接口使用新浪公开源；BaoStock 和 zzshare 需要显式选择。价格保持原始价，成交量统一为股，成交额统一为元。查询失败会明确报错，不自动切换数据源或补造记录。
 
+本地开发版本 **0.9.1.dev1** 在该发布基线上增加[固定 JQ 稀疏行情导入与读取](docs/jq-observations.md)，仅使用用户已有的来源材料，不随软件分发行情；下方公开安装指南仍固定已发布 v0.9.0。
+
 ## 安装指南
 
 需要 Python 3.11～3.13 和 [uv](https://docs.astral.sh/uv/getting-started/installation/)。以下命令使用 Python 3.12，在新目录安装固定版本：
@@ -55,6 +57,7 @@ PY
 | 保存可重复读取的研究数据 | `Store.fetch_price()` → `Store.research(dataset_id)` | 显式采集，固定版本离线读取 |
 | 查询 BaoStock 数据 | `BaoStockSource` / `Store.baostock(capture_id)` | 有界日线、5/15/30/60m、日状态、源前收和日历 |
 | 检查多证券研究输入 | `Store.preflight_research()` | 显式绑定版本，逐证券、日期和用途列出值与缺口 |
+| 读取已有 JQ 稀疏行情 | `Store.import_jq_observations()` → `Store.jq_observations(dataset_id)` | 本地开发接口；保留来源、可见时钟和独立容量用途 |
 | 自有数据的严格快照 | `Store.import_bundle()` → `validate()` → `publish()` | 检查覆盖与质量后发布不可变版本 |
 
 直接查询的完整参数和错误码见 [行情 API](docs/live-api.md)。可运行 `.venv/bin/ashare-data --help` 查看命令，再用子命令的 `--help` 查看参数。
