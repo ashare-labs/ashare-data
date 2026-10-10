@@ -158,6 +158,22 @@ class Store:
         from .baostock import import_capture
         return import_capture(self, directory)
 
+    def zzshare(self, capture_id, *, enable_research=False):
+        from .zzshare import ZzshareView
+        return ZzshareView(self, capture_id, enable_research=enable_research)
+
+    def import_zzshare_capture(self, directory, *, enable_research=False):
+        from .zzshare import import_capture
+        return import_capture(self, directory, enable_research=enable_research)
+
+    def zzshare_snapshots(self, *, enable_research=False):
+        from .zzshare import snapshots
+        return snapshots(self, enable_research=enable_research)
+
+    def recover_zzshare(self, *, enable_research=False):
+        from .zzshare import recover
+        return recover(self, enable_research=enable_research)
+
     def import_m2_sources(self, *, kind, documents, classification, claims=None):
         from .m2_components import import_sources
         return import_sources(self, kind=kind, documents=documents,

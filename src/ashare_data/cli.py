@@ -33,6 +33,8 @@ def parser():
     p = argparse.ArgumentParser(prog="ashare-data", description="A数达：直接查询公开 A 股行情，支持可选缓存与高级离线快照")
     p.add_argument("--store", help="高级离线快照目录；直接行情查询无需此参数")
     sub = p.add_subparsers(dest="command", required=True)
+    from .zzshare_cli import add_parsers as add_zzshare_parsers
+    add_zzshare_parsers(sub)
     for name in ("init", "capabilities", "snapshots", "recover"):
         sub.add_parser(name)
     price = sub.add_parser("price", help="直接从公开源获取行情，无需初始化")
@@ -212,6 +214,11 @@ def main(argv=None):
                                         quote_body=raw_file(args.quote))
             print(json.dumps(result, ensure_ascii=False, sort_keys=True))
             return 2  # Diagnostic completed; market completeness/authenticity is still unverified.
+        if args.command.startswith("zzshare-"):
+            from .zzshare_cli import dispatch as dispatch_zzshare
+            result = dispatch_zzshare(args)
+            print(json.dumps(result, ensure_ascii=False, sort_keys=True, default=json_value))
+            return 0
         if args.command == "m2":
             from .m2_cli import dispatch
             from .m2_types import canonical_bytes, json_loads

@@ -1,4 +1,10 @@
-# A数达 0.8.4.dev2：源 preclose 有界增量
+# A数达 0.8.5.dev1：可选 zzshare 本地研究适配器
+
+新增默认关闭的 zzshare 日线研究源：显式匿名采集、原文回执离线导入、固定 capture 重开和精确数值公共查询。需 `enable_research=True` 或 CLI `--enable-research`；现有默认源路由保持原样。限价是 `source_claimed`，规则推算结果不填充；不授予官方限价、PIT、完整覆盖或执行许可。
+
+[zzshare 公共契约与错误边界](docs/zzshare.md) · [离线重开示例](examples/zzshare.py)
+
+以下保留冻结基线的既有 preclose 功能说明；旧数据版本及独立发布记录不因本增量重新获得准入。
 
 dev2 修正 `baostock-query --require-known` 帮助文案，明确同时适用于日状态和源 preclose；数据契约、查询逻辑和快照格式沿用已冻结 dev1。
 
