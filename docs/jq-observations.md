@@ -1,4 +1,4 @@
-# 本地 JQ 稀疏行情观察：0.9.1.dev1 本地研究能力
+# 本地 JQ 稀疏行情观察：0.9.1.dev2 本地研究能力
 
 仅供有界本地研究。此版本以已发布 v0.9.0 为基线，迁入原 0.8.8.dev1 的六题数据接口；既有 M2、研究 preflight 与发布标签保持不变，不继承其执行准入。本轮没有联网采集、JQ 重跑、上传、推送或发版。公开 API 是可调用的软件接口；真实行情仍是用户本地私有文件，不在仓库或 wheel 中。
 
@@ -23,7 +23,9 @@ result = view.read("000001.XSHE", kind="current",
 print(result.to_dict())
 ```
 
-输入绑定 1–10 份本地事件文件，每份至多 8 MiB / 1000 事件；单次事件最多 32 行。只支持单证券单日分钟回测及前 7 日以内已出现的历史标签，绝不补全历史。JSON 禁止重复键与非有限数，数字最多 12 位小数，不做舍入。价格和金额为精确十进制字符串，暂停/ST 为布尔；用 `Decimal(row["values"]["close"])` 消费价格。`money` 仅重命名为 `amount`，单位元；volume 为股，价格元/股。单位依据是源 API 字段惯例与固定源码请求，不是独立市场单位认证。
+输入绑定 1–10 份本地事件文件，每份至多 8 MiB / 1000 事件；单次事件最多 32 行。支持单证券、最多 31 个自然日的有界分钟回测及前 7 日以内已出现的历史标签，绝不补全历史。JSON 禁止重复键与非有限数，数字最多 12 位小数，不做舍入。价格和金额为精确十进制字符串，暂停/ST 为布尔；用 `Decimal(row["values"]["close"])` 消费价格。`money` 仅重命名为 `amount`，单位元；volume 为股，价格元/股。单位依据是源 API 字段惯例与固定源码请求，不是独立市场单位认证。
+
+单日输入省略 `session_end_date`，仍产生完全兼容的 v1 产品身份。多日输入显式填写末日，例如 `session_end_date="2024-03-05"`，必须与固定源 identity 的 end_date 一致，产生 `ad.jq-sparse-observations.v2`。日期范围只绑定源运行边界，不证明范围内每天开市，也不补充无观察的日线。
 
 原文件和脚本分别核对完整摘要，identity 只用来校验证券、日期和 raw/minute 设置。只导入 `current_data`、`market_bars`、`daily_market`、`call_auction_data` 白名单；每种行情结构严格校验，嵌入订单、成交等额外字段会被拒绝。订单/账户/决策事件仅检查顶层序号与运行身份，不投影、存储或用作数据值。`reference.json`、平台日志和成交标准答案不被导入器读取，脚本不执行。
 
@@ -39,8 +41,11 @@ print(result.to_dict())
 | `opening_observation` | current/auction | 开盘报价/竞价观察；不是独立竞价撮合证明 |
 | `final_valuation` | daily | 只在日线被观察后给出日终 OHLCV |
 | `engine_capacity` | daily | 显式事后单笔容量模型，只给原始全日 volume；不含 OHLC/金额，不计算可成交数量 |
+| `initialization` | daily | 仅 v2；显式指定一个早于 as_of 日期的 daily 午夜标签，只返回已经观察的 close 供前日估值 |
 
-所有 as_of/start/end 必须含 UTC offset，转换到 Asia/Shanghai；as_of 必须属于数据已绑定的证券/单日会话。`start/end` 是可选的源标签过滤，不代表连续区间覆盖。`current` 只匹配精确观察时点，绝不延续到下个未观察分钟；其他种类只返回实际存在的稀疏行。空结果为 `status=unavailable`，原因是 `NO_SOURCE_OBSERVATION` 或 `NOT_OBSERVED_AS_OF`，不是行情零值。
+所有 as_of/start/end 必须含 UTC offset，转换到 Asia/Shanghai；as_of 必须属于数据已绑定的证券/源运行日期范围。`start/end` 是可选的源标签过滤，不代表连续区间覆盖。`current` 只匹配精确观察时点，绝不延续到下个未观察分钟；其他种类只返回实际存在的稀疏行。空结果为 `status=unavailable`，原因是 `NO_SOURCE_OBSERVATION` 或 `NOT_OBSERVED_AS_OF`，不是行情零值。
+
+例如读取次日盘前持仓估值：`view.read("000001.XSHE", kind="daily", role="initialization", as_of="2024-03-05T09:00:00+08:00", start="2024-03-04T00:00:00+08:00", end="2024-03-04T00:00:00+08:00")`。返回只含 close，保留原日线标签和真实观察时钟，标记 `matching_eligible=false`、`strategy_visible=false`。这不是当日 pre_close 字段，不证明两个日期相邻开市，更不授权成交。
 
 `source_label_at` 原样保留源标签；`observed_at/available_at` 是最早取得该条行情的 **JQ 历史回测模拟时钟**，不是 2016/2024 年真实发布或收包时间。`historical_pit=false` 始终保留，实际墙钟采集时刻未知。普通查询还过滤晚于 as_of 的证据指针。
 

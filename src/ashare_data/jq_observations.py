@@ -7,7 +7,7 @@ Numbers in the public JSON contract are exact decimal strings.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal, DecimalException
 import hashlib
 import json
@@ -18,6 +18,7 @@ from .model import DataError, TZ, canonical, day, digest, require, symbol, times
 from .storage import identifier, immutable_write
 
 SCHEMA = "ad.jq-sparse-observations.v1"
+RANGE_SCHEMA = "ad.jq-sparse-observations.v2"
 MAX_BYTES = 8 * 1024 * 1024
 MARKET_KINDS = {
     "current_data": "current", "market_bars": "minute",
@@ -30,6 +31,7 @@ ROLES = {
     "opening_observation": {"current", "auction"},
     "final_valuation": {"daily"},
     "engine_capacity": {"daily"},
+    "initialization": {"daily"},
 }
 OHLC = {"open", "high", "low", "close"}
 BAR_FIELDS = OHLC | {"volume", "money"}
@@ -46,6 +48,7 @@ class JQObservationInput:
     events_sha256: str
     script_path: str
     script_sha256: str
+    session_end_date: str | None = None
 
 
 @dataclass(frozen=True)
@@ -158,7 +161,8 @@ def _market_rows(e, src, paused):
     }[kind]
     require(set(e) == BASE_FIELDS | extras, "JQ_SCHEMA", "unexpected market event fields")
     observed = _source_time(e["time"])
-    require(observed[:10] == src.session_date, "JQ_SCOPE", "observation outside bound session")
+    require(src.session_date <= observed[:10] <= (src.session_end_date or src.session_date),
+            "JQ_SCOPE", "observation outside bound source run")
     if kind in {"current", "minute"}:
         require(e["symbol"] == src.security and type(e["label"]) is str,
                 "JQ_SCOPE", "market event security mismatch")
@@ -166,7 +170,7 @@ def _market_rows(e, src, paused):
         require(e["fq"] is None and e["frequency"] == ("1m" if kind == "minute" else "daily"),
                 "JQ_SCHEMA", "only source raw 1m/daily observations supported")
     if kind == "daily":
-        require(observed >= src.session_date + "T15:00:00+08:00", "JQ_VISIBILITY",
+        require(observed >= observed[:10] + "T15:00:00+08:00", "JQ_VISIBILITY",
                 "intraday daily observations cannot stand in for whole-day/final data")
     if kind == "auction":
         require(e["source"] == "get_call_auction", "JQ_SCHEMA", "unsupported auction source")
@@ -195,9 +199,9 @@ def _market_rows(e, src, paused):
         require(0 <= (datetime.fromisoformat(observed) - datetime.fromisoformat(label)).days <= 7,
                 "JQ_SCOPE", "market row outside bounded historical context")
         if kind in {"daily", "auction"}:
-            require(label[:10] == src.session_date, "JQ_SCOPE", "row outside bound session")
+            require(label[:10] == observed[:10], "JQ_SCOPE", "row outside observed session")
         paused_at_observation = values.get("paused")
-        if kind in {"minute", "auction"} and label[:10] == src.session_date:
+        if kind in {"minute", "auction"} and label[:10] == observed[:10]:
             paused_at_observation = paused
         zero_volume = "volume" in values and Decimal(values["volume"]) == 0
         filled = kind in {"minute", "daily"} and paused_at_observation is True and zero_volume
@@ -217,6 +221,9 @@ def _extract(src):
             "JQ_INPUT", "invalid case identifier")
     symbol(src.security)
     day(src.session_date)
+    end_date = day(src.session_end_date) if src.session_end_date is not None else src.session_date
+    require(0 <= (date.fromisoformat(end_date) - date.fromisoformat(src.session_date)).days <= 30,
+            "JQ_SCOPE", "source run must span at most 31 calendar dates")
     raw = _read_file(src.events_path, src.events_sha256)
     _read_file(src.script_path, src.script_sha256)
     lines = raw.splitlines()
@@ -230,7 +237,8 @@ def _extract(src):
             require(e.get("kind") == "identity", "JQ_SCHEMA", "first event must identify the run")
             settings = e.get("settings", {})
             require(type(settings) is dict and settings.get("symbol") == src.security
-                    and settings.get("start_date") == settings.get("end_date") == src.session_date
+                    and settings.get("start_date") == src.session_date
+                    and settings.get("end_date") == end_date
                     and settings.get("use_real_price") is True
                     and settings.get("frequency") == "minute", "JQ_SCOPE", "source run scope mismatch")
             run_tag = e.get("run_tag")
@@ -259,6 +267,8 @@ def _extract(src):
     source = {"case_id": src.case_id, "security": src.security, "session_date": src.session_date,
               "events_sha256": src.events_sha256, "script_sha256": src.script_sha256,
               "run_tag": run_tag, "source_event_count": len(lines), "market_event_count": len(events)}
+    if src.session_end_date is not None:
+        source["session_end_date"] = end_date
     return source, records, evidence
 
 
@@ -305,8 +315,9 @@ def import_observations(store, sources, *, source_kind):
     records = _merge([r for _, rows, _ in extracted for r in rows])
     evidence = sorted([e for _, _, events in extracted for e in events],
                       key=lambda e: (e["case_id"], e["seq"]))
+    multi_day = any(s.get("session_end_date") for s in metadata)
     body = {
-        "schema": SCHEMA, "source_kind": source_kind, "sources": metadata,
+        "schema": RANGE_SCHEMA if multi_day else SCHEMA, "source_kind": source_kind, "sources": metadata,
         "records": records, "market_evidence": evidence, "coverage": _coverage(records),
         "timezone": "Asia/Shanghai", "price_basis": "source_raw_fq_none_use_real_price",
         "units": {"prices": "CNY/share", "volume": "shares", "amount": "CNY"},
@@ -315,7 +326,7 @@ def import_observations(store, sources, *, source_kind):
         "source_clock_domain": "JQ_backtest_context_current_dt", "physical_capture_at": None,
         "historical_pit": False, "network_used": False, "full_session_coverage": False,
         "live_execution_permission": False, "local_research_use": "conditional_sparse_native_execution",
-        "read_roles": {k: sorted(v) for k, v in ROLES.items()},
+        "read_roles": {k: sorted(v) for k, v in ROLES.items() if multi_day or k != "initialization"},
         "limitations": [
             "Only explicitly observed labels; no forward/back filling or session expansion.",
             "Current-data and auction observations are not minute bars or order-book evidence.",
@@ -336,6 +347,11 @@ def import_observations(store, sources, *, source_kind):
     return dataset_id
 
 
+def _source_scope(source, security, clock_date):
+    return (source["security"] == security
+            and source["session_date"] <= clock_date <= source.get("session_end_date", source["session_date"]))
+
+
 class JQObservationView:
     """Fixed data identity. All reads are local, verified and detached."""
 
@@ -348,7 +364,7 @@ class JQObservationView:
         raw = _read_file(self._root / "jq_observations" / (self.dataset_id + ".json"))
         require(_sha(raw) == self.dataset_id, "JQ_INTEGRITY", "sealed product hash mismatch")
         body = _json(raw)
-        require(body.get("schema") == SCHEMA, "JQ_SCHEMA", "unsupported product version")
+        require(body.get("schema") in {SCHEMA, RANGE_SCHEMA}, "JQ_SCHEMA", "unsupported product version")
         return body
 
     def describe(self):
@@ -366,7 +382,7 @@ class JQObservationView:
         symbol(security)
         day(session_date)
         body = self._load()
-        sources = [s for s in body["sources"] if s["security"] == security and s["session_date"] == session_date]
+        sources = [s for s in body["sources"] if _source_scope(s, security, session_date)]
         require(sources, "JQ_SCOPE", "security/session not bound by this product")
         clocks = sorted({r["observed_at"] for r in body["records"]
                          if r["security"] == security and r["observed_at"][:10] == session_date})
@@ -397,14 +413,18 @@ class JQObservationView:
         upper = timestamp(end).isoformat() if end is not None else None
         require(lower is None or upper is None or lower <= upper, "JQ_RANGE", "inverted label range")
         body = self._load()
-        require(any(s["security"] == security and s["session_date"] == clock[:10] for s in body["sources"]),
+        require(any(_source_scope(s, security, clock[:10]) for s in body["sources"]),
                 "JQ_SCOPE", "read clock outside source-bound security/session")
+        if role == "initialization":
+            require(body["schema"] == RANGE_SCHEMA and lower is not None and lower == upper
+                    and lower[:10] < clock[:10], "JQ_ROLE",
+                    "initialization requires an explicit prior-day daily label in a multi-day product")
         candidates = [r for r in body["records"] if r["security"] == security and r["kind"] == kind
                       and (lower is None or r["source_label_at"] >= lower)
                       and (upper is None or r["source_label_at"] <= upper)]
         if kind == "current":
             candidates = [r for r in candidates if r["source_label_at"] == clock]
-        if kind in {"daily", "auction"}:
+        if kind in {"daily", "auction"} and role != "initialization":
             candidates = [r for r in candidates if r["source_label_at"][:10] == clock[:10]]
         retrospective = role == "engine_capacity"
         rows = [r for r in candidates if retrospective or r["available_at"] <= clock]
@@ -416,10 +436,15 @@ class JQObservationView:
             else:
                 row["source_refs"] = [ref for ref in row["source_refs"] if ref["observed_at"] <= clock]
                 row["strategy_visible"] = True
+            if role == "initialization":
+                row["values"] = {"close": row["values"]["close"]}
+                row["strategy_visible"] = False
+                row["use_restriction"] = "previous observed daily close valuation; not a current quote or source preclose"
+                row["matching_eligible"] = False
             row["historical_pit"] = False
         reason = None if rows else ("NOT_OBSERVED_AS_OF" if candidates else "NO_SOURCE_OBSERVATION")
         result = {
-            "dataset_id": self.dataset_id, "schema": SCHEMA, "security": security, "kind": kind,
+            "dataset_id": self.dataset_id, "schema": body["schema"], "security": security, "kind": kind,
             "role": role, "as_of": clock, "status": "available" if rows else "unavailable",
             "reason": reason, "rows": rows, "retrospective": retrospective,
             "coverage": "sparse_observations_only", "complete_minute_session": False,

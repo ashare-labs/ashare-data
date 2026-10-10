@@ -178,3 +178,82 @@ def test_source_hash_scope_and_role_fail_closed(store, tmp_path):
     assert caught.value.code == "JQ_SCOPE"
     with pytest.raises(DataError):
         view.read("000001.XSHE", kind="current", as_of="2024-03-04 10:00:00")
+
+
+def range_source(tmp_path, *, end_date="2024-03-05"):
+    source = fixture_source(tmp_path)
+
+    def extend(events):
+        events[0]["settings"]["end_date"] = end_date
+        second = json.loads(json.dumps(events[2:7]).replace("2024-03-04", end_date))
+        for event in second:
+            event["seq"] = len(events) + 1
+            if event["kind"] == "current_data":
+                event["data"]["paused"] = True
+            else:
+                event["rows"][0].update(volume=0, money=0)
+                if event["kind"] == "daily_market":
+                    event["rows"][0]["paused"] = 1
+            events.append(event)
+    return replace(rewrite(source, extend), session_end_date=end_date)
+
+
+def test_bounded_multi_day_visibility_and_prior_close(store, tmp_path):
+    view = publish(store, range_source(tmp_path))
+    assert view.describe()["schema"] == "ad.jq-sparse-observations.v2"
+    prior = "2024-03-04T00:00:00+08:00"
+    clock = "2024-03-05T09:00:00+08:00"
+    value = view.read("000001.XSHE", kind="daily", role="initialization", as_of=clock,
+                      start=prior, end=prior)
+    assert len(value.rows) == 1
+    assert value.rows[0]["values"] == {"close": "12.5"}
+    assert value.rows[0]["available_at"] == "2024-03-04T15:30:00+08:00"
+    assert value.rows[0]["matching_eligible"] is False
+    assert value.rows[0]["strategy_visible"] is False
+    assert view.read("000001.XSHE", kind="current", as_of=clock).rows == ()
+    assert view.read("000001.XSHE", kind="daily", as_of=clock).rows == ()
+    capacity = view.read("000001.XSHE", kind="daily", role="engine_capacity", as_of=clock)
+    assert capacity.rows[0]["values"] == {"volume": "0"}
+    assert capacity.rows[0]["source_label_at"].startswith("2024-03-05")
+    second = view.read("000001.XSHE", kind="minute", as_of="2024-03-05T10:00:00+08:00",
+                       start="2024-03-05T00:00:00+08:00")
+    assert second.rows[0]["quality"] == "source_filled_suspended"
+    assert read(view, kind="minute").rows[0]["quality"] == "source_observed"
+    assert view.bootstrap("000001.XSHE", "2024-03-05")["unknown"]["previous_session"] is None
+
+
+@pytest.mark.parametrize("bounds", [{}, {"start": "2024-03-04T00:00:00+08:00"},
+                                  {"start": "2024-03-05T00:00:00+08:00",
+                                   "end": "2024-03-05T00:00:00+08:00"}])
+def test_initialization_requires_exact_prior_label(store, tmp_path, bounds):
+    view = publish(store, range_source(tmp_path))
+    with pytest.raises(DataError) as caught:
+        view.read("000001.XSHE", kind="daily", role="initialization",
+                  as_of="2024-03-05T09:00:00+08:00", **bounds)
+    assert caught.value.code == "JQ_ROLE"
+
+
+def test_range_does_not_invent_session_observations(store, tmp_path):
+    view = publish(store, range_source(tmp_path, end_date="2024-03-06"))
+    bootstrap = view.bootstrap("000001.XSHE", "2024-03-05")
+    assert bootstrap["source_observation_clocks"] == []
+    assert bootstrap["unknown"]["exchange_calendar"] is None
+    assert view.read("000001.XSHE", kind="current", as_of="2024-03-05T10:00:00+08:00").rows == ()
+
+
+@pytest.mark.parametrize("end_date", [None, "2024-03-03", "2024-04-04"])
+def test_range_bound_must_match_source_and_be_small(store, tmp_path, end_date):
+    source = range_source(tmp_path)
+    with pytest.raises(DataError) as caught:
+        publish(store, replace(source, session_end_date=end_date))
+    assert caught.value.code == "JQ_SCOPE"
+
+
+def test_single_day_product_still_uses_v1_contract(store, tmp_path):
+    view = publish(store, fixture_source(tmp_path))
+    assert view.describe()["schema"] == "ad.jq-sparse-observations.v1"
+    assert "initialization" not in view.describe()["read_roles"]
+    with pytest.raises(DataError) as caught:
+        read(view, kind="daily", role="initialization",
+             start="2024-03-01T00:00:00+08:00", end="2024-03-01T00:00:00+08:00")
+    assert caught.value.code == "JQ_ROLE"
