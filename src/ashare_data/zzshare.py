@@ -11,7 +11,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import date, timedelta
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, localcontext
 from pathlib import Path
 
 from .model import DataError, canonical, day, require, symbol, timestamp
@@ -19,6 +19,8 @@ from .storage import identifier, immutable_write, now
 from .zzshare_types import SourceClaimedLimits, ZzshareDailyResult, ZzshareDailyRow, ZzshareValue
 
 VERSION = "zzshare-research-1"
+PROJECTION_VERSION = "zzshare-projection-2"
+MAX_JSON_DEPTH = 64
 MAX_BYTES = 2 * 1024 * 1024
 MAX_DAYS = 31
 ENDPOINT = "https://api.zizizaizai.com/v3/market/kline/day/"
@@ -54,13 +56,27 @@ def _invalid_constant(value):
 
 def _json(raw, *, numbers=False):
     try:
-        return json.loads(
+        result = json.loads(
             raw,
             object_pairs_hook=_pairs,
             parse_constant=_invalid_constant,
             **({"parse_float": _Number, "parse_int": _Number} if numbers else {}),
         )
-    except (ValueError, UnicodeError, RecursionError) as exc:
+        # Bound every value, including unknown fields, before recursive projection.
+        pending = [(result, 0)]
+        with localcontext() as context:
+            context.traps[InvalidOperation] = True
+            while pending:
+                value, depth = pending.pop()
+                require(depth <= MAX_JSON_DEPTH, "ZZSHARE_SCHEMA", "JSON嵌套深度超过64")
+                if isinstance(value, dict):
+                    pending.extend((child, depth + 1) for child in value.values())
+                elif isinstance(value, list):
+                    pending.extend((child, depth + 1) for child in value)
+                elif isinstance(value, _Number):
+                    require(Decimal(value).is_finite(), "ZZSHARE_SCHEMA", "源数字超出Decimal范围")
+        return result
+    except (ValueError, UnicodeError, RecursionError, InvalidOperation) as exc:
         raise DataError("ZZSHARE_SCHEMA", "不是有界有效JSON") from exc
 
 
@@ -205,8 +221,31 @@ def _rows(receipt, scope, raw):
     require(status == 200, "ZZSHARE_HTTP", "源HTTP请求失败", details)
     require(not receipt["body_truncated"], "ZZSHARE_TRUNCATED", "源响应超过有界大小")
     headers = receipt.get("response_headers", {})
-    require(isinstance(headers, dict), "ZZSHARE_RECEIPT", "响应头记录无效")
-    lengths = [value for key, value in headers.items() if key.lower() == "content-length"]
+    require(
+        isinstance(headers, dict)
+        and all(type(k) is str and k and type(v) is str for k, v in headers.items()),
+        "ZZSHARE_RECEIPT",
+        "响应头记录无效",
+    )
+    pairs = receipt.get("response_header_pairs")
+    if "response_header_pairs" in receipt:
+        require(
+            isinstance(pairs, list)
+            and all(
+                isinstance(pair, list)
+                and len(pair) == 2
+                and all(type(item) is str for item in pair)
+                and pair[0]
+                for pair in pairs
+            ),
+            "ZZSHARE_RECEIPT",
+            "有序响应头记录无效",
+        )
+        require(dict(pairs) == headers, "ZZSHARE_RECEIPT", "响应头两种投影不一致")
+    else:
+        # Legacy captures cannot recover duplicate headers from their mapping.
+        pairs = list(headers.items())
+    lengths = [value for key, value in pairs if key.lower() == "content-length"]
     if lengths:
         require(
             len(lengths) == 1
@@ -214,7 +253,7 @@ def _rows(receipt, scope, raw):
             and re.fullmatch(r"[0-9]{1,20}", lengths[0])
             and int(lengths[0]) == len(raw),
             "ZZSHARE_LENGTH_MISMATCH",
-            "HTTP声明长度与实际捕获不符；不视为完整响应",
+            "HTTP声明长度重复或与实际捕获不符；不视为完整响应",
         )
     data = _json(raw, numbers=True)
     try:
@@ -465,12 +504,18 @@ class ZzshareView:
             "execution_permission": False,
             "price_basis": "source_claimed_mode0",
             "receipt_authenticity": "locally_recorded_unattested",
+            "response_header_evidence": (
+                "ordered_pairs_recorded_unattested"
+                if "response_header_pairs" in self._receipt
+                else "legacy_mapping_duplicate_visibility_unknown"
+            ),
         }
 
     def descriptor(self):
         return {
             "capture_id": self._id,
             "version": VERSION,
+            "projection_version": PROJECTION_VERSION,
             "provider": "zzshare",
             "request": dict(self._scope),
             "network_used": False,
@@ -485,6 +530,7 @@ class ZzshareView:
             "provider": "zzshare",
             "service": "api.zizizaizai.com",
             "upstream_provider": "UNKNOWN",
+            "projection_version": PROJECTION_VERSION,
             "receipt": _json(self._data["business.receipt.json"]),
             "raw_response_sha256": _sha(self._data["business.raw"]),
             "raw_response_bytes": len(self._data["business.raw"]),
@@ -508,8 +554,10 @@ class ZzshareView:
             )
             o, h, low, close = (v.value for v in values[:4])
             require(
-                any(x is None for x in (o, h, low, close))
-                or low <= min(o, close) <= max(o, close) <= h,
+                all(
+                    left is None or right is None or left <= right
+                    for left, right in ((low, h), (low, o), (o, h), (low, close), (close, h))
+                ),
                 "ZZSHARE_PRICE_INVALID",
                 "源OHLC关系无效",
                 {"capture_id": self._id},
@@ -533,6 +581,7 @@ class ZzshareView:
         coverage = self.coverage()
         report = {
             "capture_id": self._id,
+            "projection_version": PROJECTION_VERSION,
             "provider": "zzshare",
             "network_used": False,
             "coverage": coverage,
@@ -578,6 +627,8 @@ class ZzshareSource:
             "mode": [0],
             "max_securities": 1,
             "max_natural_days": MAX_DAYS,
+            "max_json_depth": MAX_JSON_DEPTH,
+            "projection_version": PROJECTION_VERSION,
             "automatic_retries": 0,
             "automatic_source_fallback": False,
             "redirects": False,
@@ -634,13 +685,15 @@ class ZzshareSource:
             except urllib.error.HTTPError as exc:
                 response = exc
             with response:
+                pairs = [
+                    [k, v]
+                    for k, v in response.headers.items()
+                    if k.lower() not in {"set-cookie", "cookie", "authorization"}
+                ]
                 receipt.update(
                     http_status=response.code,
-                    response_headers={
-                        k: v
-                        for k, v in response.headers.items()
-                        if k.lower() not in {"set-cookie", "cookie", "authorization"}
-                    },
+                    response_headers=dict(pairs),
+                    response_header_pairs=pairs,
                     retry_after=response.headers.get("Retry-After"),
                 )
                 raw = response.read(MAX_BYTES + 1)

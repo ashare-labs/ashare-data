@@ -5,9 +5,10 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation, localcontext
 
 from .d1_types import Projection
+from .model import DataError
 
 
 @dataclass(frozen=True)
@@ -64,7 +65,16 @@ class ZzshareDailyRow(Projection):
 
     @property
     def source_fields(self):
-        return json.loads(self.raw_json, parse_float=Decimal, parse_int=Decimal)
+        try:
+            with localcontext() as context:
+                context.traps[InvalidOperation] = True
+                return json.loads(self.raw_json, parse_float=Decimal, parse_int=Decimal)
+        except (ValueError, RecursionError, InvalidOperation) as exc:
+            raise DataError(
+                "ZZSHARE_SCHEMA",
+                "源字段无法投影为有界JSON/Decimal",
+                {"capture_id": self.capture_id},
+            ) from exc
 
 
 @dataclass(frozen=True)

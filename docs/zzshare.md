@@ -1,4 +1,4 @@
-# zzshare 可选研究适配器（0.8.5.dev1）
+# zzshare 可选研究适配器（0.8.5.dev2）
 
 默认关闭，所有导入、读取、采集和恢复操作都要显式启用。该源没有加入现有 Client/get_price 默认路由，不静默切换或覆盖 BaoStock/Sina。用途限于明确标注来源的本地研究；没有官方限价、PIT、完整覆盖或执行许可。
 
@@ -53,3 +53,9 @@ ashare-data --store ./research-store zzshare-query daily --capture 完整ID --en
 ```
 
 采集必须显式调用fetch或zzshare-fetch；没有安装或运行zzshare SDK，不加载token、cookies或环境代理凭据。普通匿名入口依据已核查公开说明。MIT是软件许可，本实现不授予行情商用/公开再分发权；未发现禁止本轮本地个人研究的条款，也未取得独立数据授权。真实样本与证据保持包外，不随wheel或源码分发行情。导入的本地回执是可追踪但未经外部认证的记录，完整性校验不等于来源真实性认证。
+
+修复版投影为 `zzshare-projection-2`，清单仍为 `zzshare-research-1`：相同原文/回执保持相同 capture_id；结果同时标注投影版本，复现时还需固定 wheel。dev1 已冻结，不改旧文件。每个已知 OHLC 比较对独立检查，不因其他字段缺失而放行矛盾。
+
+新 HTTP 捕获保留有序 `response_header_pairs`（敏感头不保存），`response_headers` 为兼容字典且必须与前者一致。任何重复 Content-Length（即使值相同）、非法长度或实际长度不符均拒绝。历史仅字典回执仍可离线导入；其重复头可见性标记 `legacy_mapping_duplicate_visibility_unknown`，不伪造丢失的头部证据。
+
+包括未知字段在内，JSON 从根节点深度0起最大深度64，所有数字须可表示为有限 Decimal；超限查询报 `ZZSHARE_SCHEMA` 并保留 capture_id 和封存原文，strict=False 也不放行。合法高精度数值仍按原 token 保留。

@@ -1,7 +1,7 @@
 """Synthetic controls and optional external fixed evidence; never live network."""
 
 from dataclasses import FrozenInstanceError
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation, localcontext
 from email.message import Message
 import hashlib
 import http.client
@@ -430,3 +430,154 @@ def test_bound_before_network(store, security, start, end, monkeypatch):
     )
     with pytest.raises(DataError):
         ZzshareSource(enabled=True).fetch(store, security=security, start_date=start, end_date=end)
+
+
+@pytest.mark.parametrize("strict", [True, False])
+@pytest.mark.parametrize(
+    "missing,changes",
+    [
+        ("open", {"high": 8, "low": 9, "close": 10.5}),
+        ("close", {"high": 11, "low": 11.1}),
+        ("high", {"low": 11.22}),
+        ("low", {"high": 11.2}),
+        ("open", {"low": 11.26}),
+        ("low", {"high": 11.22}),
+    ],
+)
+def test_partial_ohlc_known_contradictions_rejected(store, tmp_path, strict, missing, changes):
+    row = source_row()
+    row.update(changes)
+    del row[missing]
+    view = load(store, capture(tmp_path, rows=[row]))
+    with fail_code("ZZSHARE_PRICE_INVALID") as error:
+        view.get_daily(strict=strict)
+    assert error.value.details["capture_id"] == view.descriptor()["capture_id"]
+
+
+@pytest.mark.parametrize("missing", ["open", "high", "low", "close"])
+def test_consistent_partial_ohlc_retains_unknown(store, tmp_path, missing):
+    row = source_row()
+    del row[missing]
+    view = load(store, capture(tmp_path, rows=[row]))
+    result = view.get_daily(strict=False)
+    assert result.report["unknown_fields"] == [
+        {"date": "20260928", "field": missing, "state": "field_missing"}
+    ]
+    with fail_code("ZZSHARE_FIELDS_UNKNOWN"):
+        view.get_daily()
+
+
+@pytest.mark.parametrize("variant", ["single", "conflict_first", "conflict_last", "same", "case"])
+def test_wire_response_preserves_lengths_before_validation(store, monkeypatch, variant):
+    raw = body()
+    size = str(len(raw))
+    lengths = {
+        "single": [("Content-Length", size)],
+        "conflict_first": [("Content-Length", "99999"), ("Content-Length", size)],
+        "conflict_last": [("Content-Length", size), ("Content-Length", "99999")],
+        "same": [("Content-Length", size), ("Content-Length", size)],
+        "case": [("Content-Length", "99999"), ("content-length", size)],
+    }[variant]
+    wire = (
+        "HTTP/1.1 200 OK\r\n"
+        + "".join(f"{key}: {value}\r\n" for key, value in lengths)
+        + "Content-Type: application/json\r\nSet-Cookie: omitted\r\nConnection: close\r\n\r\n"
+    ).encode() + raw
+
+    class WireSocket:
+        def makefile(self, *args, **kwargs):
+            return io.BytesIO(wire)
+
+    calls = []
+
+    class Opener:
+        def open(self, request, timeout):
+            calls.append(request)
+            response = http.client.HTTPResponse(WireSocket())
+            response.begin()
+            return response
+
+    monkeypatch.setattr(api.urllib.request, "build_opener", lambda *args: Opener())
+
+    def fetch():
+        return ZzshareSource(enabled=True).fetch(
+            store, security="600000.XSHG", start_date="2026-09-28", end_date="2026-09-28"
+        )
+
+    if variant == "single":
+        sid = fetch()
+    else:
+        with fail_code("ZZSHARE_LENGTH_MISMATCH") as error:
+            fetch()
+        sid = error.value.details["capture_id"]
+    view = Store(store.root).zzshare(sid, enable_research=True)
+    receipt = view.lineage()["receipt"]
+    assert receipt["response_header_pairs"][: len(lengths)] == [list(pair) for pair in lengths]
+    assert receipt["response_headers"] == dict(receipt["response_header_pairs"])
+    assert all(pair[0].lower() != "set-cookie" for pair in receipt["response_header_pairs"])
+    assert view.quality()["response_header_evidence"] == "ordered_pairs_recorded_unattested"
+    assert len(calls) == 1
+    if variant != "single":
+        with fail_code("ZZSHARE_LENGTH_MISMATCH"):
+            view.get_daily(strict=False)
+
+
+def test_legacy_headers_visibility_is_unknown(store, tmp_path):
+    view = load(store, capture(tmp_path))
+    assert (
+        view.quality()["response_header_evidence"] == "legacy_mapping_duplicate_visibility_unknown"
+    )
+    assert view.get_daily().report["projection_version"] == "zzshare-projection-2"
+    assert "response_header_pairs" not in view.lineage()["receipt"]
+
+
+@pytest.mark.parametrize(
+    "pairs", [None, {"Content-Length": "10"}, [["Content-Length"]], [[1, "10"]], [["x", "y"]]]
+)
+def test_invalid_ordered_header_record_rejected(store, tmp_path, pairs):
+    view = load(store, capture(tmp_path, changes={"response_header_pairs": pairs}))
+    with fail_code("ZZSHARE_RECEIPT"):
+        view.get_daily(strict=False)
+
+
+@pytest.mark.parametrize("bad", ["nested", "numeric"])
+@pytest.mark.parametrize("strict", [True, False])
+def test_unknown_source_field_boundaries_are_structured(store, tmp_path, capsys, bad, strict):
+    token = b"[" * 700 + b"0" + b"]" * 700 if bad == "nested" else b"1e9999999999999999999"
+    raw = body().replace(b'"factor":1.01', b'"factor":' + token)
+    view = load(store, capture(tmp_path, raw=raw))
+    sid = view.descriptor()["capture_id"]
+    with localcontext() as context:
+        context.traps[InvalidOperation] = False
+        with fail_code("ZZSHARE_SCHEMA") as error:
+            view.get_daily(strict=strict)
+    assert error.value.details["capture_id"] == sid
+    assert view.coverage()["failure"]["code"] == "ZZSHARE_SCHEMA"
+    assert view.lineage()["raw_response_sha256"] == hashlib.sha256(raw).hexdigest()
+    assert (
+        main(
+            [
+                "--store",
+                str(store.root),
+                "zzshare-query",
+                "daily",
+                "--capture",
+                sid,
+                "--enable-research",
+                "--allow-partial",
+            ]
+        )
+        == 2
+    )
+    assert json.loads(capsys.readouterr().err)["error"]["code"] == "ZZSHARE_SCHEMA"
+
+
+def test_bounded_unknown_source_fields_keep_precision(store, tmp_path):
+    token = b"[" * 50 + b"1.000000000000000000000000000000001" + b"]" * 50
+    raw = body().replace(b'"factor":1.01', b'"factor":' + token)
+    row = load(store, capture(tmp_path, raw=raw)).get_daily().rows[0]
+    assert token.decode() in row.raw_json
+    value = row.source_fields["factor"]
+    for _ in range(50):
+        value = value[0]
+    assert value == Decimal("1.000000000000000000000000000000001")
