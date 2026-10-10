@@ -1,4 +1,4 @@
-# 上市事实：精确日期增量与旧年份兼容（0.8.2.dev2）
+# 上市事实：精确日期增量与旧年份兼容
 
 本次复用 `Store.import_listing_evidence` / `Store.listing_fact(snapshot_id)` / `view.get`，精确日期返回已有通用 `FactRecord` 与 `Evidence`，没有新增证券专属方法或类型。仍仅接纳两个固定审阅包，更新证据需要新的审阅策略；不是通用公告自动解析器。
 
@@ -53,5 +53,3 @@ python examples/listing_fact.py --store /新的私有目录/store --evidence /�
 ```
 
 CLI仍用 `listing-import/query/snapshots/recover`。日期查询输出已有FactRecord的 `to_dict()` 结构：`value_json`为序列化日期，`raw_json`为公开来源/时间元数据；Python消费者可直接读 `fact.value` 和 `fact.source_fields`，无须读私有事实文件。非value查询拒绝多余字段参数，输入缺失/越界/不支持错误JSON退出2。成功读取/完整性校验退出0仅代表该事实可读，不代表执行准入。
-
-仅新增12项小范围真实证据回归，保留旧76项年份回归及全部既有测试。独审用原始证据外置交接，软件包不再分发原始PDF；缺外置样本时明确skip，不用合成事实代替。没有增加采集、标的、其他事实字段、回测引擎或交易功能。

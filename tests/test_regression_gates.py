@@ -1,4 +1,4 @@
-"""Portable producer acceptance gates: currently 6 failures on e72f713.
+"""Portable producer regression gates from the six failures originally found on e72f713.
 Run against a fresh installed wheel, with ASHARE_M2_COMPONENTS pointing to a private
 read-only market/facts component directory; all mutations remain under pytest tmp_path.
 A future fix may reject malformed components at import, or block product validation.
@@ -8,6 +8,11 @@ from pathlib import Path
 import copy,json,os
 import pytest
 from ashare_data import Store,DataError
+
+@pytest.fixture(autouse=True)
+def require_private_components():
+    if not os.environ.get('ASHARE_M2_COMPONENTS'):
+        pytest.skip('private M2 components absent; set ASHARE_M2_COMPONENTS to run')
 
 @pytest.mark.parametrize('fault',['preclose_exponent','preclose_whitespace','preclose_nonnumeric','volume_overlong','event_unknown_security','event_missing_fields'])
 def test_reject_before_product_publication(tmp_path,fault):

@@ -24,6 +24,6 @@ basis_date、adjustment_kind、factor_value、formula_version、included_event_i
 必须声明乘法方向、价格/股数/成交额如何处理、参考日以及所纳入事件的可见截止。
 原始价永不覆盖；前复权/后复权的派生结果应引用原价 snapshot 与因子 snapshot。
 
-拟定查询形态（本轮不实现）：按 symbols、明确有效时间范围、as_of、snapshot 查询事件；
+拟定查询形态（尚未实现）：按 symbols、明确有效时间范围、as_of、snapshot 查询事件；
 派生价格必须另外传 adjustment_kind 与 basis_date。有效时间与可见时间独立过滤，修订选择有版本证据。
 迟发公告、更正和除权除息当天盘中边界要独立验收，不能通过简单累乘就承诺聚宽 fq 等价。

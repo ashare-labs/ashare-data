@@ -1,5 +1,5 @@
 # 直接行情接口
-> 0.3.0.dev4增量：独立策略时钟、保证检查、固定观测、覆盖与对账契约见 [data-admission.md](data-admission.md)。以下原接口的end_date和strict语义保持。
+独立策略时钟、保证检查、固定观测和覆盖检查见 [数据准入契约](data-admission.md)。
 
 
 这是 A数达原生 API，借鉴 jqdatasdk 的参数与表结构。它直接访问固定公开源；`Store` 的离线契约单独保留。

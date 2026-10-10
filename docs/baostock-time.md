@@ -1,6 +1,4 @@
-# BaoStock 截止筛选与证券资料校验（0.5.0.dev3）
-
-本轮基于冻结 `71c6b4a1656c49908feea28c2c7b083c51b32d54`，仅修复独审 M-CUTOFF 与 B-META。既有 capture、分钟清单 v2、日线清单 v1 及原始行不重写；reader 校验政策变化由包版本和 `baostock-basic-validation-1` 标识。没有新增采集或依赖。
+# BaoStock 分钟时间边界与证券资料校验
 
 ## 公开接口
 
@@ -19,9 +17,7 @@
 
 筛选后的 quality/coverage 中 `selection` 单独记录模式、上海上限和端点；`closed_bar_verified/historical_pit_verified/actual_visibility_verified` 均为 false。`bar_start/bar_end/available_at` 仍未知。coverage 的分钟网格诊断只检查上限以内；原 query_complete 仍指原始采集回执，不表示筛选后覆盖已认证。筛选后的 lineage 只返回选中原行和 hash，不附含窗口外原行的完整 receipt；完整证据须另开未筛选 view 审计。
 
-在已存600000 2026-09-30样本上，14:55包含端点时，5/15/30/60m应分别返回47/15/7/3行，末标签14:55/14:45/14:30/14:00。14:55.001晚于14:55，不得因舍掉毫秒被纳入。结束标签网格只是推断；这些结果不证明对应bar已闭合、源当时已发布或聚宽口径一致。
-
-这不是恶意策略沙箱：持有原始Store和capture_id的调用者仍能显式另开完整版本。策略端须仅获得所批准的带上限接口；本轮没有开发A宽访问控制。
+这不是恶意策略沙箱：持有原始Store和capture_id的调用者仍能显式另开完整版本。策略端须仅获得所批准的带上限接口。
 
 ## 证券资料
 
@@ -45,4 +41,4 @@ ashare-data --store ./bao-store baostock-query price --capture CAPTURE_ID \
 
 `--visibility`非默认值须同时给`--as-of`；`--end-exclusive`须同时给`--end`。两个时间参数同传时取交集。对日线、资料、日历附加分钟标签上限报 `UNSUPPORTED_FREQUENCY`；错误模式不静默忽略。示例 `examples/baostock_cutoff.py` 只重开已有store，不采集。
 
-兼容边界：旧压缩合成夹具在71c6b4a已更早报非法帧，其原断言差异继续保留；本轮仅修正协议模块过时注释，不改字节解析。压缩外层校验、PIT、最终性、1m、完整历史、交易准入仍未解决；600000分钟额与日线差−0.38元保持。全套旧独审不是本轮新独立验收。
+压缩外层校验、历史PIT、最终性、BaoStock 1m和完整历史仍不受支持，筛选结果不授予交易执行资格。

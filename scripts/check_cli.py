@@ -18,7 +18,7 @@ def run(root):
         parsed = json.loads(result.stdout if result.stdout else result.stderr)
         calls.append({"args": list(args), "exit": result.returncode})
         return parsed
-    fixtures = Path(__file__).parent / "fixtures"
+    fixtures = Path(__file__).resolve().parents[1] / "examples" / "fixtures"
     call("init")
     bid = call("import", str(fixtures / "golden.json"))["batch_id"]
     report = call("validate", "--batch", bid, "--requirements", str(fixtures / "requirements.json"), "--policy", "synthetic")

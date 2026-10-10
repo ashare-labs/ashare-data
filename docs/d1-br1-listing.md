@@ -1,7 +1,7 @@
 # BR1 有界上市状态：0.6.0.dev3
 
 新增可固定身份的公共条件查询。**绝对退市日期保持 None/unknown；严格 D1 四项 unknown 和
-执行许可 false 不变。** 本轮没有修改 RQ/A宽 adapter，没有重跑两订单场景或恢复失败账户。
+执行许可 false 不变。**
 
 ## 证据与版本
 
@@ -76,7 +76,7 @@ CALENDAR、SUCCESSOR、CONFLICT、CACHE_MISMATCH、REVIEW_REQUIRED（全部带 B
 RQ 末端 next(Jan-07)=Jan-07，本接口因 next_open=null/非严格后继拒绝；next(Jan-08)=Jan-07，
 因当前日越界拒绝。不能只检查返回日落在四日范围内。n 仅接受精确 int 1，True/1.0/其他值拒绝。
 
-## 后端适配责任（本轮未实现）
+## 消费者责任
 
 context_sha256 是**调用方声明的摘要，不是 owner 验证的运行许可**。固定算法应至少纳入新 owner
 契约/wheel、adapter/RQ/config/run 身份、实际 phase、完整模型时刻、event cursor 和恢复 generation。
@@ -96,9 +96,4 @@ all_instruments、benchmark、因子过滤或外部 API 输出它。不改 RQ �
 取消订阅规避、不构造伪装 datetime 的通用对象。listed_at/active_at/de_listed_at 共用有界投影，
 不能遗留默认无界 listed_at。
 
-后端固定新 owner/adapter/RQ/config/checkpoint 身份，独审后才另行运行批准的实验。本轮测试
-不替代首日结算、T+1、卖单、实际 AD08、费用/账本、恢复去重验证。
-
-CLI：br1-listing contract --dataset ID --mode conditional_research；status 或 successor
-另加 --contract SHA --call request.json；全局 --store DIR。成功 exit 0，拒绝 exit 2；
-查询成功仍 execution_permission=false。示例 examples/br1_listing_demo.py。
+消费者必须固定库版本、数据版本与使用声明；该投影不负责交易执行、恢复账户或认证原生调用。

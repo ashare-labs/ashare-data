@@ -1,28 +1,58 @@
-# BaoStock 日线/资料/日历子契约（冻结0.5.0.dev1）
+# BaoStock API
 
-0.5.0.dev2的分钟扩展见[分钟接口契约](baostock-minutes.md)；本页保留日线首轮边界。
+BaoStock 是显式选择的独立数据通道。默认 `get_price()` 仍使用新浪，两者不会自动回退或拼接。需要官方 `baostock==0.9.4` SDK；安装命令见 [README](../README.md#可选数据源与研究检查)。本库校验 SDK 的固定源码指纹，不捆绑 SDK，也不读取账号或密钥。
 
-本轮在 `7533b1f3` 之上增加独立来源通道，不改变旧研究版本或严格快照。
-采集只由显式 `fetch` 触发；固定版本的所有读取离线并重新核验磁盘内容。
+## 采集与固定读取
 
-| 接口 | 契约 |
-|---|---|
-| `BaoStockSource(sdk_path=..., timeout=15)` | 使用现有官方 0.9.4 SDK；逐文件校验固定官方 wheel 的源码指纹。不安装、不读密钥。独立进程、匿名免费公共入口、单连接、无自动重试/换源。 |
-| `source.get_price(security, store=..., start_date=..., end_date=...)` | 显式有界采集，封存后返回 ResearchResult；report 含 capture_id。失败抛 DataError，details 保留失败版本ID。 |
-| `source.get_security_info(security, store=...)` / `source.get_trade_days(store=..., start_date=..., end_date=...)` | 显式采集并返回对应 ResearchResult。 |
-| `source.fetch(store, kind="daily", security="600000.XSHG", start_date=..., end_date=...)` | 日线原价 flag3，显式一个证券及不超过31个自然日；返回不可变 `capture_id`。 |
-| `source.fetch(store, kind="basic", security=...)` | 只查一个显式证券的当前源资料，不形成历史股票池。 |
-| `source.fetch(store, kind="calendar", start_date=..., end_date=...)` | 查不超过31个自然日的源日历；不自行生成交易日。 |
-| `store.baostock(capture_id)` | 重开固定证据版本；哈希、身份、行语义复核失败则拒绝。 |
-| `view.get_price()` / `get_security_info()` / `get_trade_days()` | 返回 `ResearchResult(data, report)`；保留源字段、来源行哈希、质量及单位说明。类型不匹配报错。 |
-| `view.descriptor()` / `lineage()` / `quality()` / `coverage()` | 显示真实请求、传输/分页/时钟状态及来源限制；收到有限响应不等于历史覆盖。 |
-| `view.at(as_of, visibility="received")` | 只接纳完整且时间证据有效的本地已接收版本。`verified` 历史 PIT 未支持。默认无历史时钟的研究读取仍可用。 |
-| `baostock-fetch` / `baostock-query` / `baostock-snapshots` / `baostock-recover` | 显式采集/离线查询/列举版本/发布恢复。失败也封存证据，查询报清晰源错误。 |
+```python
+from pathlib import Path
+from ashare_data import BaoStockSource, Store
 
-固定边界：每次一个业务查询，最多2页、128行、单页4MiB；总进程期限和 socket 期限。
-日线 volume=股、amount=元，价格=元/股；保留原始字符串、不复权、不把日标签换成已验证闭合时刻。
-证券资料是本次取得的资料；日历是源声明，不证明证券状态或历史可见性。
-不支持1m；5/15/30/60分钟留待单独验证。
+path = Path('.data/bao')
+store = Store(path) if path.exists() else Store.init(path)
+result = BaoStockSource().get_price(
+    '600000.XSHG', store=store,
+    start_date='2026-09-28', end_date='2026-09-30',
+)
+print(result.data)
+capture_id = result.report['capture_id']
+print(Store(path).baostock(capture_id).get_price().data)  # 离线重开
+```
 
-Receipt v4 的 R1/R2 逻辑沿用；压缩96帧需保持外层完整性未知，除非真实证据及协议检验共同证实。
-可解码、请求身份一致且 SDK 行相同的有限日线可以作为明确标注的研究资料；其 `query_complete`、`received` 和严格覆盖不会因此获准。
+日期只作调用示例，不承诺该范围一定可得。采集为独立子进程、匿名单连接，每次一证券/一类业务，无自动重试或换端点。应关闭其他并发 BaoStock 采集任务；本机锁不能约束其他软件的独立连接。
+
+| 接口 | 返回与范围 |
+| --- | --- |
+| `BaoStockSource(*, sdk_path=None, timeout=15)` | 默认在当前环境寻找 SDK，也可指定已有官方源码目录 |
+| `source.get_price(security, store=..., start_date=..., end_date=..., frequency='daily')` | 显式采集后返回 `ResearchResult`；report 含 capture_id |
+| `source.get_security_info(security, store=...)` | 证券资料来源声明，不作为历史资格证明 |
+| `source.get_trade_days(store=..., start_date=..., end_date=...)` | 显式来源日历查询 |
+| `source.fetch(store, kind=..., ...)` | 保存原始请求、响应和回执，返回 capture_id；kind 由对应业务文档定义 |
+| `Store.import_baostock_capture(directory)` | 显式离线导入合法 capture，重复输入幂等；校验失败不升级为可读成功 |
+| `Store.baostock(capture_id)` | 核验固定完整 SHA256 版本，返回 `BaoStockView`，不联网 |
+| `view.get_price()` / `get_security_info()` / `get_trade_days()` | 离线读取对应类型；错误种类明确拒绝 |
+| `view.descriptor()` / `lineage()` / `quality()` / `coverage()` | 来源、原始行、完整性及覆盖报告 |
+| `store.baostock_snapshots()` / `recover_baostock()` | 本地目录与显式中断恢复，不重新采集 |
+
+失败采集会保留失败版本和诊断，异常 details 中可取得版本 ID；失败记录不等于成功空数据。价格为 Decimal，volume 为整数股，amount 为人民币元。原字段、原价和源前收分别保留。
+
+## 日线、分钟与截止时间
+
+日线最多31个连续自然日。分钟显式指定 `5m`、`15m`、`30m`、`60m`，最多2个连续自然日；**不提供 BaoStock 1m**，不自动聚合或降级频率。
+
+分钟原 `time` 必须是17位时间标签，毫秒保留，按 Asia/Shanghai 解释。`bar_start`、`bar_end`、`available_at` 未证时保持未知。价格、volume、amount 的原字符串及逐行摘要可追溯；源标签不自动变为已认证的结束标签。
+
+```python
+result = BaoStockSource().get_price(
+    '600000.XSHG', store=store, start_date='2026-09-30', end_date='2026-09-30',
+    frequency='5m', end='2026-09-30T14:55:00+08:00', end_inclusive=True,
+)
+```
+
+`start_date/end_date` 决定整日采集范围，`end` 仅筛选返回标签，不缩减已封存原文。包含/排除端点、策略时钟和错误码详见 [分钟时间边界](baostock-time.md)。合法但偏离假设网格的标签保持原样，并列入覆盖诊断；缺记录不解释为无交易。
+
+## 状态、源前收和日历
+
+日状态使用 `get_status()`，源前收使用 `get_preclose()`，日历使用 `get_calendar()` / `get_calendar_links()`。它们返回保留原字段、时间和未知原因的类型化结果，见 [日状态](daily-status.md)、[preclose](preclose.md)、[日历](source-calendar.md)。
+
+完整性和可见性按原回执保留。压缩响应的外层校验仍未验证，读取成功不提升为历史 PIT 或最终性；`verified` 明确拒绝，`received` 也须满足本机接收与存储可见性条件。分钟与日线金额可能不一致，本库不改写差异。服务能力与使用边界见 [数据来源](sources.md)。

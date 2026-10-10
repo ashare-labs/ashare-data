@@ -16,11 +16,14 @@ def run(wheel, *, offline=False, cache=None):
     env["UV_PYTHON_DOWNLOADS"] = "never"
     with tempfile.TemporaryDirectory(prefix="ashare-wheel-") as temporary:
         root = Path(temporary)
-        env["UV_CACHE_DIR"] = str(cache or root / "empty-cache")
+        env["UV_CACHE_DIR"] = str(Path(cache).resolve() if cache else root / "empty-cache")
         executable = root / "venv" / "bin" / "python"
         requirements = root / "requirements.txt"
         def command(args, cwd=project):
-            return subprocess.run(args, cwd=cwd, env=env, check=True, capture_output=True, text=True)
+            result = subprocess.run(args, cwd=cwd, env=env, capture_output=True, text=True)
+            if result.returncode:
+                raise RuntimeError(result.stderr or result.stdout or f"exit {result.returncode}")
+            return result
         command(["uv", "export", "--locked", "--no-dev", "--no-emit-project", "--no-config",
                  "--format", "requirements-txt", "--output-file", str(requirements)])
         command(["uv", "venv", "--no-config", "--python", sys.executable, str(root / "venv")])
@@ -29,7 +32,7 @@ def run(wheel, *, offline=False, cache=None):
         command(["uv", "pip", "install", "--no-config", "--no-deps", "--python", str(executable),
                  str(Path(wheel).resolve())])
         origin = command([str(executable), "-I", "-c", "import ashare_data; print(ashare_data.__file__)"], root).stdout.strip()
-        assert origin.startswith(str(root / "venv"))
+        assert Path(origin).resolve().is_relative_to((root / "venv").resolve())
         golden = command([str(executable), "-I", str(project / "examples" / "golden.py"), "--store", str(root / "golden")], root)
         capabilities = command([str(root / "venv" / "bin" / "ashare-data"), "capabilities"], root)
         return {"wheel": Path(wheel).name, "isolated_import_confirmed": True, "editable_install": False,

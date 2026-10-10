@@ -13,7 +13,10 @@ from ashare_data.m2_source import event_identities, source_limits, source_volume
 
 
 def recipe(kind):
-    root = Path(os.environ["ASHARE_M2_COMPONENTS"]) / kind
+    location = os.environ.get("ASHARE_M2_COMPONENTS")
+    if not location:
+        pytest.skip("private M2 components absent; set ASHARE_M2_COMPONENTS to run")
+    root = Path(location) / kind
     body = json.loads((root / "component.json").read_text())
     for doc in body["documents"]:
         for key, artifact in list(doc["artifacts"].items()):

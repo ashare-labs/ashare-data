@@ -145,5 +145,5 @@ JSON 与 Parquet 都纳入 manifest 引用 hash。内容 hash 只能证明未改
 发布顺序：对象持久化 → SQLite prepared 事务 →
 manifest 写临时文件/fsync/原子 rename/目录 fsync → SQLite published 事务。
 recover 在持有写锁时核对并补齐 prepared；内容不符则 aborted。异常进程退出后 OS 释放写锁。
-import 中断产生的无目录引用对象对读者不可见，重复导入相同内容可继续；本轮不实现垃圾回收。
+import 中断产生的无目录引用对象对读者不可见，重复导入相同内容可继续；暂不提供垃圾回收。
 无跨机器/网络文件系统并发保证，无全盘断电与硬件损坏容错认证，无同用户恶意篡改防御承诺。

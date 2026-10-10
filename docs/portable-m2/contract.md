@@ -1,6 +1,6 @@
-# 可移植 M2 生产契约 v1（实施前冻结，0.8.0.dev1 候选）
+# 可移植 M2 生产契约 v1
 
-基于公开代码 a4086b1；不修改已发布代码、0.7.0.dev1 wheel、A宽或验收前端。仅离线、有界、600000.XSHG 未复权日线、初始零持仓/旧权益、原 m2a/w1/w2 几何；不增加因子、交易系统或网络 fallback。
+仅离线、有界、600000.XSHG 未复权日线、初始零持仓/旧权益、原 m2a/w1/w2 几何；不增加因子、交易系统或网络 fallback。
 
 ## 公共流程
 
@@ -31,7 +31,7 @@ m2a 执行01-03/06；w1执行01-03～16十日；w2执行01-06～17十日。P/T/n
 P-only T09 strategy、T15/日末 engine、terminal仅有界挂牌全部沿原契约。四项 owner 假设与三项 backend 假设不变。
 source available_at、PIT、finality、市场真实性、事件完整性仍 unknown，不因导入成功或记录 HTTP200 升级。
 
-owner 校验当前 context 一致性，不维护可信 Session 的调用历史；generation/cursor 不倒退、同 generation 不换 epoch 由 A宽检查。要求数据端单独拒绝所有“回退”与现有无状态接口不一致，本轮明确保留原分工。过期 Auth 的当前消费、跨run/request/window拒绝由 owner 保持。
+owner 校验当前 context 一致性，不维护可信 Session 的调用历史；generation/cursor 不倒退、同 generation 不换 epoch 由 A宽检查。要求数据端单独拒绝所有“回退”与现有无状态接口不一致，由调用方维护。过期 Auth 的当前消费、跨run/request/window拒绝由 owner 保持。
 
 ## 来源与事实解释边界
 

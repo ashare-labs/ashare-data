@@ -155,7 +155,7 @@ r=s.validate([b],requirements=json.loads(sys.argv[3]))
 assert r['passed']
 print(json.dumps({'batch':b,'report':r['id'],'snapshot':s.publish(r['id'])}))
 """
-    env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(ROOT / "review/rc1/guard"), str(old_source)]),
+    env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(ROOT / "tests/fixtures/legacy_rc1/guard"), str(old_source)]),
                PYTHONDONTWRITEBYTECODE="1")
     child = subprocess.run([sys.executable, "-B", "-c", script, str(root), str(data), json.dumps(requirements)],
                            env=env, cwd=tmp_path, check=True, capture_output=True, text=True)

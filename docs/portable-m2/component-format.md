@@ -112,4 +112,18 @@ validate打印完整报告，BLOCKED时exit2；compose阻断时exit2且错误det
 
 新v2产品的WindowPlan增加`owner_validation_dependencies`（security/raw_price_dates/state_dates/calendar/consumer_read_permission=false），供数据依赖检查；不是新的消费者角色。m2a/w1的校验锚点为2019-12-31，w2为2020-01-02。下游应保留完整Plan及其owner摘要；不把这个依赖表变成可调用的read_roles。
 
-0.8.0.dev2 的数值范围、事件最小结构及错误行为详见[发布前校验契约](validation-fix.md)。
+
+
+## 数值契约
+
+价格、amount（存在时）、前收均使用消费端 `decimal_text`：十进制字符串最长48字符，禁止指数、空白、NaN/Infinity；绝对值小于 10^24，规范值最多8位小数。OHLC 为正且满足高低关系；amount 非负，空字符串保留缺失含义。前收必须为正，其实际生成的90%/110%价格限制也须通过同一编码器。
+
+源 volume 为1至24位 ASCII 数字的非负整数字符串；有限的前导零可保留。长度检查先于整数转换，5000个零也拒绝；不修改 Python 全局整数转换限制。这是本版输入/序列化边界，不是对市场真实成交量的认证。校验与消费共用转换逻辑，保留原始文本与对象 hash，不修补或重写源字段。
+
+市场数值非法时生成可重开的 `BLOCKED` 报告，`compose_m2` 报 `M2_COMPOSITION_BLOCKED`，不产生产品快照。组件格式或事件结构非法可在导入时提前返回 `DataError`。
+
+## 事件身份契约
+
+每条事件必须为对象，包含 `id`、`event_type` 和 `entitled_security`。ID/类型为1至128字符标识符：首字符为 ASCII 字母或数字，其余可含字母、数字、`_ . : -`。事件 ID 唯一。证券代码为六位数字加 `.XSHG` / `.XSHE` / `.XBSE`；null、空白、unknown 或错误类型不能解释成已知无关。已提供的关键日期须为 `YYYY-MM-DD` 字符串或 null。
+
+先检查全部事件结构及身份，再按明确的证券代码过滤相关性。保留 `360003.XSHG` 优先股记录的既有排除行为；普通股相关事件仍须满足已支持类型、必要日期和窗口外日期限制。格式有效只代表明确的输入声明，不认证证券或事件真实存在。证据引用、事实完整性 unknown、`verified_absent=false` 与 PIT unknown 均保持原义。

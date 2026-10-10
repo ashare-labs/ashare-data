@@ -1,4 +1,4 @@
-# 逐证券、日期、用途的研究输入盘点（0.8.7.dev1）
+# 逐证券、日期、用途的研究输入盘点
 
 Preflight把用户显式绑定的本地不可变版本转成有证据的研究值和缺口。没有采集、默认选源、换源、跨日历capture拼接、事实回填或执行授权。`research_values_complete=True`只表示下表要求的研究字段有来源值，停牌/ST为True或preclose为零也仍是已知来源值；不表示可以买卖、PIT成立或满足M2/INITIALIZE要求。
 
@@ -31,7 +31,7 @@ ID示例是占位符；实际必须为64位小写SHA256。`ResearchInputRef(kind
 
 `ResearchSecurityInputs(security, price=None, status=None, preclose=None)`每个证券一份，未绑定项返回INPUT_NOT_BOUND。输入限1–10个唯一规范证券（六位ASCII代码.XSHG/.XSHE）；锚点为1–31个唯一date或精确YYYY-MM-DD，最早至最晚的自然日包络至多31天。拒绝datetime截断、重复、子类/其他类型和非bool严格标志。按锚点输入顺序、证券输入顺序、下表三用途顺序返回。
 
-JSON请求格式与上面的构造一致：顶层必须且仅为 `inputs`、`calendar`、`trading_dates`。证券绑定字段为security及可选price/status/preclose；引用字段为kind/version_id及可选store_path。未知字段拒绝；完整有效实样请求放在包外preflight-r1-evidence。
+JSON请求格式与上面的构造一致：顶层必须且仅为 `inputs`、`calendar`、`trading_dates`。证券绑定字段为security及可选price/status/preclose；引用字段为kind/version_id及可选store_path。未知字段拒绝。
 
 ```shell
 ashare-data --store /本地store research-preflight --request request.json
@@ -77,11 +77,5 @@ Python JSON入口是 `Store.preflight_research_request(request, require_complete
 | INTEGRITY、BAOSTOCK_NOT_PUBLISHED、RESEARCH_NOT_PUBLISHED、QUERY_KIND_MISMATCH、SOURCE_REQUEST_FAILED等 | 破坏、未发布、错种类、失败源或畸形源输入整体拒绝，不降为正常缺口 |
 
 合法来源中的COVERAGE_INCOMPLETE、SOURCE_FIELD_MISSING、UNSUPPORTED_FIELD、CACHE_MISS转成对应字段unknown并保留错误；日历未知/闭市/越界/边界不足转成calendar_relation缺口。日状态与preclose沿用其精确未知原因，false和0不误判缺失。不会吞掉未知异常后返回成功。
-
-## 本轮真实边界
-
-优先用例600000.XSHG/2026-09-29、前日09-28、后继09-30来自已封存材料：已有BaoStock价线提供当日OHLCV/amount，源日状态/preclose分别显式绑定；未重采。000001.XSHE、300750.XSHE复用同窗Sina价线，amount仍缺失，不暗中换Bao或计算金额。三种用途研究字段是否齐全不改变所有执行阻断。
-
-新19日日历恢复只用了获准的2次匿名会话，均DNS解析失败、业务查询0次，未取得新增覆盖；仍使用已验证三日capture。真实报告、固定身份和本候选验证位于包外preflight-r1-evidence，不继承父版测试/准入结论。完整权益、历史资格、限价规则、严格PIT、任意owner窗口与原生执行仍待独立数据工作。
 
 路径错误契约：`store_path` 的空白、NUL 或本地不可编码字符串返回 `PREFLIGHT_ARGUMENT`；有效字符串在系统分辨或访问目录时发生的错误（包括超长路径）返回 `PREFLIGHT_SOURCE_IO_ERROR`。库抛出 `DataError`，CLI 返回相同 code、退出 2；两者都不降格为空数据或缺口。既有 `STORE_NOT_FOUND`、`INTEGRITY` 等数据错误原样传播。

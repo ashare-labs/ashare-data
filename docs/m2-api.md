@@ -1,23 +1,23 @@
-> 0.8.0.dev1 保留本文消费类型与角色约束，新增可移植来源与组合流程见 [生产契约](portable-m2/contract.md)。
+> 可移植来源与组合流程见 [生产契约](portable-m2/contract.md)。
 > 下文74文件固定输入描述仅适用于旧v1导入；新v2产品由公共组件生成，身份动态计算，无旧清单白名单。
 
-# M2 公开契约 v1（0.7.0.dev1，候选待独审）
+# M2 消费接口
 
 这是日频离线条件研究数据产品；不是原生执行器。仅600000.XSHG、m2a/w1/w2，显式固定版本和四项ack。
-严格D1、旧BR1、received/verified、分钟/paper不扩权；没有网络fallback。独立新分支基于281908，稳定目录不修改。
+严格D1、旧BR1、received/verified、分钟/paper不扩权；没有网络fallback。
 
 ## 入口与返回
 
 | Python入口 | 返回与限制 |
 |---|---|
 | `Store.import_m2(directory)` | 固定74文件来源包的不可变dataset_id；核原文闭包、wire/SDK、源日历、事实/规则/事件；不联网；重复幂等 |
-| `Store.m2_profiles(dataset_id)` | tuple[M2Document]：两份已实现候选profile名称及精确SHA，供调用方显式选择；不选latest |
+| `Store.m2_profiles(dataset_id)` | tuple[M2Document]：两份已实现profile名称及精确SHA，供调用方显式选择；不选latest |
 | `Store.m2(dataset_id, *, profile_sha256, mode)` | M2View；mode只接受明确`conditional_research`，没有默认opt-in |
 | `view.descriptor()/profile()/quality()/lineage()/capabilities()` | 不可变M2Document，`to_dict()`返回隔离副本；原质量和扩窗证据引用可检查 |
 | `view.windows()` | tuple[M2Document]，每窗完整geometry、源P/next、所有读角色、owner pin、spec/plan/query SHA |
 | `view.assumptions(window_id)` | 按固定顺序返回四个完整AssumptionRef；每项有ID/version/content_sha256/window_id |
 | `view.use(window_id, *, assumption_ack, consumer_binding)` | M2UseView；只接受精确有序四项ack与此owner/选中窗口/plan的M2ConsumerBinding |
-| `use.envelope()` | 有稳定envelope_sha256的候选数据使用回执；backend_execution_authorized=false；external_product_review=PENDING |
+| `use.envelope()` | 有稳定envelope_sha256的数据使用回执；backend_execution_authorized=false；external_product_review=PENDING |
 | `use.context(**fields)` | 与固定consumer声明合并生成M2ReadContext；aware时间统一UTC六微秒；每次query再核时序/读域 |
 | `use.decision_prev_close(context, *, call)` | M2Read，`.value`是Decimal；仅P raw close×有限ratio1，P行引用；仅strategy/DECIDE |
 | `use.execution_bar(context)` | M2Read；T15的engine raw OHLC、volume整数股、amount原值或null；raw源字段放sources |
@@ -63,7 +63,7 @@ owner不认证宿主时钟诚实，也不把这些调用方声明当密码学签
 同一源物理行可复用，但需要重新取得对应窗口的合法证据。已提交09决策的历史回执留在checkpoint，不换成新读；
 未提交重放/缓存消费取得当前授权，来源/Evidence不能改变。09/15两阶段原子持久化和账户归属由后端负责。
 
-## R1/R4：规范编码与摘要输入域
+## 规范编码与摘要输入域
 
 公开`ashare_data.m2_types`的`canonical_bytes/canonical_hash/decimal_text/aware_time/exact_int`，以及
 `m2_payloads.query_payload/economic_payload/query_contract`是唯一owner codec，不使用Pydantic默认dump，也不借后端digest。
@@ -95,7 +95,7 @@ WindowSpec先固定，profile引用Spec；OwnerPin后生成；WindowPlan引用Ow
 Envelope引用Plan/Owner，排除自己的envelope_sha256。外部独审、后端DataBinding不反向进入owner对象。
 黄金向量由`examples/m2_demo.py`生成，含嵌套listing、两个generation授权、时区和十进制等价向量。
 
-## R2/R3：范围和事实假设
+## 范围和事实假设
 
 | 窗口（2020） | 执行日 | 暖启动 | 终后继 | 价基域 | 保守登记域 |
 |---|---|---|---|---|---|
@@ -123,7 +123,7 @@ A-VIS明确这是T15及日末**事后日线模拟**，不是源当时已发布/�
 available_at=null、historical_pit=false、finality=UNVERIFIED、daily_query_complete=false、verified_absent=false、
 绝对退市日unknown保持不变。后端三假设A-CLOSE/A-COST/A-POOL及七项bundle由后端负责。
 
-## 原生参数/返回codec（本轮不启动RQ）
+## 原生参数与返回 codec
 
 `m2_codec.native_ad08_call(..., time_policy='rq641_shanghai_midnight')`接收完整实际tuple，支持Python date、午夜datetime、
 零纳秒pandas.Timestamp；naive只按显式上海午夜政策解释，aware转上海后须午夜。非午夜或多余形状拒绝。

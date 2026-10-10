@@ -1,6 +1,6 @@
 # 数据准入契约 v1
 
-0.3.0.dev4是本地修复候选，未发布。A数达负责采集、缺口检测及补齐能力、单位/量额、复权/状态资产、可见性模型与保证检查。上层只传策略逻辑时钟和所需保证，消费结果或明确错误，不再另建清洗、填价或猜测停牌逻辑。
+A数达负责采集、缺口检测及补齐能力、单位/量额、复权/状态资产、可见性模型与保证检查。上层只传策略逻辑时钟和所需保证，消费结果或明确错误，不再另建清洗、填价或猜测停牌逻辑。
 
 ## 接口
 
@@ -81,12 +81,12 @@ freshness分开记录last_source_label、last_returned_label、两者相对逻�
 
 从dev2开始分别返回：source_watermark_status（源已选可见记录水位）、selected_window_status（最终返回子集水位）、trading_status（当前事实决策），以及组合admissible。CoverageContract.freshness没有查询子集，故组合源水位与交易状态；Client再加入所选窗口。status保留stale优先诊断；水位已达但市场关闭/午休/停牌则分别为closed_market/session_break/suspended，admissible=False。只有未来标签时为unknown并给FUTURE_SOURCE_LABEL。
 
-require_fresh在此开发候选中加强为上述组合准入，不再只是标签水位检查：STALE_SOURCE、STALE_SELECTED_WINDOW、MARKET_CLOSED、SESSION_BREAK、SUSPENDED或FRESHNESS_UNKNOWN。范围外新bar不会给返回的旧窗口背书。历史研究不带保证仍可返回；需要检验当时准入应使用自身as_of及明确visibility模型。require_tradable只检查状态，不能替代require_fresh、require_complete、require_final。
+require_fresh使用上述组合准入，不只是标签水位检查：STALE_SOURCE、STALE_SELECTED_WINDOW、MARKET_CLOSED、SESSION_BREAK、SUSPENDED或FRESHNESS_UNKNOWN。范围外新bar不会给返回的旧窗口背书。历史研究不带保证仍可返回；需要检验当时准入应使用自身as_of及明确visibility模型。require_tradable只检查状态，不能替代require_fresh、require_complete、require_final。
 
 DataFrame仍使用原float列保持兼容；原十进制文本保留在source_rows，对账直接用Decimal，不对浮点列求和。live及offline共用正数、有限、小于1e17和OHLC关系门禁；离线原6位精度要求未放宽。公开价格还必须在float64正常正数范围内；小于sys.float_info.min的次正规/下溢输入明确拒绝，不舍入为零或补值，原十进制文本继续保留。非法行情不缓存。
 
-同源分钟与日累计仍差52300股及约507179元，不得通过放宽舍入容差、扣除含义未证尾字段或造两根分钟改成通过。CLI的live-coverage/acquire-price/reconcile-day在所请求验收未满足时退出2；可保留原始研究记录，但不能当合格资产。获取任意历史、状态/复权与完整成交验收的剩余阻塞见[data-attribution.md](data-attribution.md)。
+源分钟与日累计的差异不得通过放宽舍入容差、扣除含义未证尾字段或造记录改成通过。CLI的live-coverage/acquire-price/reconcile-day在所请求验收未满足时退出2；可保留原始研究记录，但不能当合格资产。获取任意历史、状态/复权与完整成交验收的剩余阻塞见[量额检查](turnover-diagnostics.md)。
 
 CLI提供trading-status、live-coverage、acquire-price、reconcile-day；price支持--as-of、--visibility、--coverage-contract、--require-complete、--require-fresh、--require-final、--require-tradable。trading-status在tradable时退出0，其他状态退出2，均不联网。策略只传时钟与保证，A数达实施检查；显式采集与固定观测查询分离。
 
-覆盖assess检查请求的闭区间标签子集；范围外标签另列out_of_request_labels，不按请求内缺陷报错。已证休市/停牌的空集合仍可complete=True，但status分别为closed_market/suspended、tradable=False；该字段说明请求范围有无可交易槽，当前paper状态应读trading_status。C14/C15原冻结结果保留；独立裁决新增5项通过，见[第三轮修复与版本化裁决](review3-fixes.md)。
+覆盖assess检查请求的闭区间标签子集；范围外标签另列out_of_request_labels，不按请求内缺陷报错。已证休市/停牌的空集合仍可complete=True，但status分别为closed_market/suspended、tradable=False；该字段说明请求范围有无可交易槽，当前paper状态应读trading_status。
