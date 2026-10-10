@@ -159,17 +159,137 @@ class IndependentQueryView:
                 "historical_pit": False, "strategy_visible": False, "matching_feed": False,
                 "source": deepcopy(source), "rows": rows, **extra}
 
-    def read_daily(self, product_id, security, *, source, role):
+    def read_daily(self, product_id, security, *, source, role, standardize=False):
         b, p = self._open(product_id, security, role, "daily")
+        require(type(standardize) is bool, "INDEPENDENT_ARGUMENT", "Standardize must be boolean")
         require(source in p["sources"], "INDEPENDENT_SCOPE", "Source not bound to this product")
         s = b["sources"][source]
         start, end = day(p["start_date"]), day(p["end_date"])
         require(start <= end, "INDEPENDENT_SCHEMA", "Reversed daily window")
-        rows = [{"date": r["date"], "fields": _fields(r)} for r in self._daily(s) if start <= r["date"] <= end]
+        daily = self._daily(s)
+        rows = [{"date": r["date"], "fields": _fields(r)} for r in daily if start <= r["date"] <= end]
+        if standardize:
+            config = p.get("daily_standardization", {})
+            require(type(config) is dict and config.get("policy") == "raw_identity_previous_session_close.v1"
+                    and "calendar" in config,
+                    "INDEPENDENT_SCOPE", "Daily standardization is not bound to this product")
+            calendar = _json(self._checked(config["calendar"]))
+            dates = calendar.get("dates")
+            require(type(dates) is list and 1 < len(dates) <= 20000
+                    and dates == sorted(set(day(d) for d in dates)),
+                    "INDEPENDENT_SCHEMA", "Invalid previous-session calendar")
+            previous = dict(zip(dates[1:], dates[:-1], strict=True))
+            by_date = {r["date"]: r for r in daily}
+            for row in rows:
+                fields = row["fields"]
+                fields["factor"] = _value(1, "declared_raw_price_identity",
+                                           corporate_action_factor=False)
+                prior = previous.get(row["date"])
+                if prior in by_date:
+                    fields["pre_close"] = _value(by_date[prior]["close"], "derived_previous_session_raw_close",
+                                                  previous_date=prior, exchange_ex_reference=False)
+                else:
+                    fields["pre_close"] = {"state": "unsupported", "value": None,
+                                           "reason": "previous calendar session has no bound raw close",
+                                           "previous_date": prior}
         return self._result(product_id, p, s, rows, start_date=start, end_date=end,
                             missing_row_policy="omit; absence reason unknown, never filled",
                             full_session_coverage_certified=False,
-                            units={"price": "CNY/share", "volume": "share", "money": "CNY"})
+                            units={"price": "CNY/share", "volume": "share", "money": "CNY"},
+                            **({"standardization_policy": config["policy"],
+                                "calendar_evidence": deepcopy(config["calendar"])} if standardize else {}))
+
+    def read_corporate_actions(self, product_id, security, *, source, role):
+        """Expose separate CNinfo event observations, without certifying a factor chain."""
+        b, p = self._open(product_id, security, role, "corporate_actions")
+        require(source in p["sources"], "INDEPENDENT_SCOPE", "Unbound corporate action source")
+        s = b["sources"][source]
+        payload = _json(self._checked(s))
+        records = payload.get("records")
+        require(payload.get("resultcode") == 200 and type(records) is list
+                and type(payload.get("total")) is int and len(records) == payload["total"]
+                and 0 < len(records) <= 1000,
+                "INDEPENDENT_SCHEMA", "Incomplete corporate action response")
+        start, end = day(p["start_date"]), day(p["end_date"])
+        require(start <= end, "INDEPENDENT_SCHEMA", "Reversed corporate action window")
+        rows = []
+        for item in records:
+            if s["kind"] == "cninfo_dividends":
+                label = day(item["F020D"])
+                fields = {"cash_per_10_shares": "F012N", "bonus_shares_per_10": "F010N",
+                          "capitalization_shares_per_10": "F011N"}
+                dates = {"announcement_date": "F006D", "record_date": "F018D",
+                         "cash_payment_date": "F023D", "share_arrival_date": "F025D"}
+                detail = {"source_plan": item["F007V"], "event_kind": "dividend"}
+            elif s["kind"] == "cninfo_rights":
+                require(item.get("SECCODE") == security[:6], "INDEPENDENT_SCHEMA", "Wrong rights security")
+                label = day(item["F012D"])
+                fields = {"rights_price": "F005N", "rights_shares_per_10": "F004N"}
+                dates = {"announcement_date": "DECLAREDATE", "record_date": "F011D",
+                         "payment_start_date": "F013D", "payment_end_date": "F014D",
+                         "rights_listing_date": "F038D"}
+                detail = {"event_kind": "rights", "source_record_id": item["SUBID"]}
+            else:
+                raise DataError("INDEPENDENT_SCHEMA", "Unsupported corporate action source")
+            if not start <= label <= end:
+                continue
+            rows.append({"ex_date": label, **detail,
+                         "fields": {k: _value(_decimal(item[v])) if item[v] is not None else
+                                    {"state": "unsupported", "value": None, "reason": "source null; not assumed zero"}
+                                    for k, v in fields.items()},
+                         **{k: day(item[v]) if item[v] is not None else None for k, v in dates.items()}})
+        rows.sort(key=lambda r: (r["ex_date"], r["event_kind"]))
+        require(len({(r["ex_date"], r["event_kind"]) for r in rows}) == len(rows),
+                "INDEPENDENT_SCHEMA", "Ambiguous same-day corporate actions")
+        return self._result(product_id, p, s, rows, start_date=start, end_date=end,
+                            historical_action_chain_complete=False, adjustment_factor_certified=False,
+                            source_publication_time=None,
+                            date_semantics="Source event/announcement labels; not verified historical receipt times",
+                            policy="Separate source ledgers; nulls preserved; no factor fitted or merged")
+
+    def read_halt_events(self, product_id, security, *, role):
+        """Read explicit full-day provider events, never infer halts from absent bars."""
+        b, p = self._open(product_id, security, role, "halt_events")
+        s = b["sources"][p["sources"][0]]
+        require(s["kind"] == "eastmoney_stock_calendar_html",
+                "INDEPENDENT_SCHEMA", "Unsupported halt event source")
+        raw = self._checked(s).decode("utf8")
+        marker = re.search(r"\bvar\s+pagedata\s*=\s*", raw)
+        require(marker is not None, "INDEPENDENT_SCHEMA", "Missing event JSON envelope")
+        # Decode a JSON value, never evaluate the page's JavaScript.
+        try:
+            payload, _ = json.JSONDecoder().raw_decode(raw[marker.end():])
+            records = payload["sjyl"]["result"]["data"]
+        except (ValueError, KeyError, TypeError) as exc:
+            raise DataError("INDEPENDENT_SCHEMA", "Invalid event JSON") from exc
+        require(type(records) is list and 0 < len(records) <= 20000,
+                "INDEPENDENT_SCHEMA", "Unexpected event rows")
+        dates = p.get("dates")
+        require(type(dates) is list and 0 < len(dates) <= 1000
+                and dates == sorted(set(day(d) for d in dates)),
+                "INDEPENDENT_SCHEMA", "Invalid halt scope")
+        rows = []
+        for row in records:
+            if row.get("EVENT_TYPE_CODE") != "023" or row.get("NOTICE_DATE", "")[:10] not in dates:
+                continue
+            require(row.get("SECURITY_CODE") == security[:6]
+                    and row.get("SECUCODE") == security[:6] + (".SZ" if security.endswith("XSHE") else ".SH"),
+                    "INDEPENDENT_SCHEMA", "Wrong halt security")
+            label = day(row["NOTICE_DATE"][:10])
+            content = row["LEVEL1_CONTENT"]
+            stamp = label[:4] + "年" + label[5:7] + "月" + label[8:] + "日"
+            pattern = r"因(.+?)停牌一天，" + stamp + r"\s+9:30-" + stamp + r"\s+15:00停牌"
+            match = re.fullmatch(pattern, content)
+            require(match is not None, "INDEPENDENT_COVERAGE", "Event does not explicitly document a full-day halt")
+            rows.append({"date": label, "full_day_paused": True, "reason": match[1],
+                         "source_content": content, "source_notice_date": row["NOTICE_DATE"],
+                         "source_quality": "provider historical event record",
+                         "official_announcement_chain_verified": False})
+        rows.sort(key=lambda r: r["date"])
+        require([r["date"] for r in rows] == dates, "INDEPENDENT_COVERAGE",
+                "Missing or duplicate requested halt event")
+        return self._result(product_id, p, s, rows, source_publication_time=None,
+                            policy="Explicit event records; no price fills and no inference from missing daily bars")
 
     def read_index_members(self, product_id, security, *, as_of_date, source, role,
                            allow_uncertified=False):

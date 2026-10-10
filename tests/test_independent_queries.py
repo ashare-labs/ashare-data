@@ -62,6 +62,136 @@ def test_daily_preserves_share_precision_and_unknown_fields(delivery):
     assert r["strategy_visible"] is False and r["historical_pit"] is False
 
 
+def standardization(delivery, dates=None):
+    root, b = delivery
+    ref = write(root, "calendar.json", {"dates": dates or ["2024-03-01", "2024-03-04"]})
+    b["products"]["daily"]["daily_standardization"] = {
+        "policy": "raw_identity_previous_session_close.v1", "calendar": ref}
+
+
+def test_standardization_is_explicit_and_preserves_precision(delivery):
+    standardization(delivery)
+    v = view(delivery)
+    plain = v.read_daily("daily", "000001.XSHE", source="sina", role=ROLE)
+    normalized = v.read_daily("daily", "000001.XSHE", source="sina", role=ROLE, standardize=True)
+    assert plain["rows"][1]["fields"]["pre_close"]["state"] == "unsupported"
+    fields = normalized["rows"][1]["fields"]
+    assert fields["pre_close"]["value"] == "13" and fields["pre_close"]["previous_date"] == "2024-03-01"
+    assert fields["pre_close"]["exchange_ex_reference"] is False
+    assert fields["factor"]["value"] == "1" and fields["factor"]["corporate_action_factor"] is False
+    for key in ("money", "volume", "avg", "paused", "high_limit", "low_limit", "open_interest", "vwap"):
+        assert fields[key] == plain["rows"][1]["fields"][key]
+
+
+def test_previous_close_never_jumps_over_missing_session(delivery):
+    standardization(delivery, ["2024-03-01", "2024-03-02", "2024-03-04"])
+    r = view(delivery).read_daily("daily", "000001.XSHE", source="sina", role=ROLE, standardize=True)
+    assert r["rows"][1]["fields"]["pre_close"]["state"] == "unsupported"
+    assert r["rows"][1]["fields"]["pre_close"]["previous_date"] == "2024-03-02"
+
+
+def test_previous_calendar_is_pinned_and_must_be_ordered(delivery):
+    standardization(delivery, ["2024-03-04", "2024-03-01"])
+    with pytest.raises(DataError, match="calendar"):
+        view(delivery).read_daily("daily", "000001.XSHE", source="sina", role=ROLE, standardize=True)
+    standardization(delivery)
+    v = view(delivery)
+    (delivery[0] / "calendar.json").write_text('{}')
+    with pytest.raises(DataError, match="digest"):
+        v.read_daily("daily", "000001.XSHE", source="sina", role=ROLE, standardize=True)
+
+
+def test_standardization_requires_bound_contract(delivery):
+    with pytest.raises(DataError, match="not bound"):
+        view(delivery).read_daily("daily", "000001.XSHE", source="sina", role=ROLE, standardize=True)
+    with pytest.raises(DataError, match="boolean"):
+        view(delivery).read_daily("daily", "000001.XSHE", source="sina", role=ROLE, standardize=1)
+
+
+@pytest.fixture
+def actions_delivery(delivery):
+    root, b = delivery
+    record = {"F020D": "2024-03-04", "F012N": 2.5, "F010N": None, "F011N": None,
+              "F006D": "2024-02-26", "F018D": "2024-03-01", "F023D": "2024-03-04",
+              "F025D": None, "F007V": "synthetic plan"}
+    ref = write(root, "actions.json", {"resultcode": 200, "total": 2,
+                 "records": [record, dict(record, F020D="2025-01-01")]})
+    b["sources"]["sina"].update(ref, kind="cninfo_dividends")
+    b["products"]["daily"]["kind"] = "corporate_actions"
+    return delivery
+
+
+def test_corporate_ledger_excludes_future_and_preserves_null(actions_delivery):
+    r = view(actions_delivery).read_corporate_actions("daily", "000001.XSHE", source="sina", role=ROLE)
+    assert len(r["rows"]) == 1
+    f = r["rows"][0]["fields"]
+    assert f["cash_per_10_shares"]["value"] == "2.5"
+    assert f["bonus_shares_per_10"]["state"] == "unsupported"
+    assert not r["historical_action_chain_complete"] and not r["adjustment_factor_certified"]
+
+
+@pytest.mark.parametrize("change", ["count", "duplicate", "value", "status"])
+def test_invalid_corporate_ledgers_refused(actions_delivery, change):
+    root, b = actions_delivery
+    d = json.loads((root / "actions.json").read_text())
+    if change == "count":
+        d["total"] = 3
+    elif change == "duplicate":
+        d["records"][1]["F020D"] = "2024-03-04"
+    elif change == "value":
+        d["records"][0]["F012N"] = -1
+    else:
+        d["resultcode"] = 500
+    b["sources"]["sina"].update(write(root, "actions.json", d))
+    with pytest.raises(DataError):
+        view(actions_delivery).read_corporate_actions("daily", "000001.XSHE", source="sina", role=ROLE)
+
+
+def test_rights_identity_and_date_roles(actions_delivery):
+    root, b = actions_delivery
+    record = {"SECCODE": "000001", "SUBID": 7, "F012D": "2024-03-04", "F005N": 8,
+              "F004N": 3, "DECLAREDATE": "2024-02-20", "F011D": "2024-03-01",
+              "F013D": "2024-03-04", "F014D": "2024-03-08", "F038D": "2024-03-20"}
+    d = {"resultcode": 200, "total": 1, "records": [record]}
+    b["sources"]["sina"].update(write(root, "actions.json", d), kind="cninfo_rights")
+    r = view(actions_delivery).read_corporate_actions("daily", "000001.XSHE", source="sina", role=ROLE)
+    assert r["rows"][0]["payment_end_date"] == "2024-03-08"
+    assert r["rows"][0]["rights_listing_date"] == "2024-03-20"
+    record["SECCODE"] = "000002"
+    b["sources"]["sina"].update(write(root, "actions.json", d))
+    with pytest.raises(DataError, match="security"):
+        view(actions_delivery).read_corporate_actions("daily", "000001.XSHE", source="sina", role=ROLE)
+
+
+@pytest.mark.parametrize("change", [None, "half_day", "wrong_security", "missing", "duplicate"])
+def test_halt_events_require_explicit_complete_evidence(delivery, change):
+    root, b = delivery
+    row = {"SECURITY_CODE": "000001", "SECUCODE": "000001.SZ", "EVENT_TYPE_CODE": "023",
+           "NOTICE_DATE": "2024-03-05 00:00:00",
+           "LEVEL1_CONTENT": "因股东大会停牌一天，2024年03月05日 9:30-2024年03月05日 15:00停牌"}
+    rows = [row]
+    if change == "half_day":
+        row["LEVEL1_CONTENT"] = row["LEVEL1_CONTENT"].replace("15:00", "11:30")
+    elif change == "wrong_security":
+        row["SECURITY_CODE"] = "000002"
+    elif change == "missing":
+        row["EVENT_TYPE_CODE"] = "001"
+    elif change == "duplicate":
+        rows.append(dict(row))
+    raw = ('var pagedata = ' + json.dumps({"sjyl": {"result": {"data": rows}}}) + '; throw Error("not executable");').encode()
+    b["sources"]["sina"].update(write(root, "events.html", raw), kind="eastmoney_stock_calendar_html")
+    b["products"]["daily"].update(kind="halt_events", dates=["2024-03-05"])
+    v = view(delivery)
+    if change:
+        with pytest.raises(DataError):
+            v.read_halt_events("daily", "000001.XSHE", role=ROLE)
+    else:
+        r = v.read_halt_events("daily", "000001.XSHE", role=ROLE)
+        assert r["rows"][0]["full_day_paused"] is True
+        assert r["rows"][0]["official_announcement_chain_verified"] is False
+        assert r["matching_feed"] is False
+
+
 @pytest.mark.parametrize("role", [None, "strategy", "matching", "engine_initialization"])
 def test_wrong_roles_rejected(delivery, role):
     with pytest.raises(DataError, match="role required"):
