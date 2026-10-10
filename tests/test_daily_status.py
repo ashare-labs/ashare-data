@@ -21,19 +21,22 @@ def raises_code(code):
     assert exc.value.code == code
 
 
-def captured(tmp_path, monkeypatch, rows=None, *, end="2020-01-02"):
+def captured(tmp_path, monkeypatch, rows=None, *, start="2020-01-02", end="2020-01-02", clock=None):
     original = api.request
     with monkeypatch.context() as patch:
         patch.setattr(api, "FIELDS", daily_status.FIELDS)
         patch.setattr(
             api,
             "request",
-            lambda kind, security, start, stop: original("daily_status", security, start, end),
+            lambda kind, security, ignored_start, stop: original(
+                "daily_status", security, start, end
+            ),
         )
         blobs, _ = bundle(
             tmp_path,
             "daily",
             rows=([["2020-01-02", "sh.600000", "1", "0", "3"]] if rows is None else rows),
+            clock=clock,
         )
     return persist(tmp_path / "export", blobs)
 
@@ -257,3 +260,68 @@ def test_invalid_strict_input_does_not_fetch(monkeypatch):
             end_date="2020-01-02",
             require_known=1,
         )
+
+
+def resign_receipt(directory, mutate):
+    """Re-sign an explicit synthetic inconsistency, not a real capture."""
+    receipt_path = directory / "capture/receipt.json"
+    receipt = json.loads(receipt_path.read_text())
+    mutate(receipt)
+    receipt.pop("receipt_id")
+    receipt["receipt_id"] = api.sh(receipt)
+    receipt_path.write_bytes(api.canonical(receipt))
+    research_path = directory / "capture/research-rows.json"
+    research = json.loads(research_path.read_text())
+    for row in research:
+        row["receipt_id"] = receipt["receipt_id"]
+    research_path.write_bytes(api.canonical(research))
+    storage_path = directory / "capture/storage-record.json"
+    storage = json.loads(storage_path.read_text())
+    storage["receipt_id"] = receipt["receipt_id"]
+    for entry in storage["artifacts"]:
+        value = (directory / "capture" / entry["path"]).read_bytes()
+        entry.update(bytes=len(value), sha256=api.bh(value))
+    storage.pop("storage_id")
+    storage["storage_id"] = api.sh(storage)
+    storage_path.write_bytes(api.canonical(storage))
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("last_byte_received_at", "not-a-timestamp"),
+        ("last_byte_received_at", "2020-01-02T00:00:00+00:00"),
+        ("last_byte_received_at", None),
+        ("first_byte_received_at", "2020-01-02T00:00:00+00:00"),
+        ("request_started_at", "2020-01-02T00:00:00+00:00"),
+    ],
+)
+def test_page_time_must_match_events(tmp_path, monkeypatch, field, value):
+    path = captured(tmp_path, monkeypatch)
+
+    def mutate(receipt):
+        if value is None:
+            receipt["pages"][0].pop(field)
+        else:
+            receipt["pages"][0][field] = value
+
+    resign_receipt(path, mutate)
+    with raises_code("DAILY_STATUS_CLOCK_INVALID"):
+        Store.init(tmp_path / "store").import_baostock_capture(path)
+
+
+def test_recorded_missing_clock_stays_unknown(tmp_path, monkeypatch):
+    path = captured(tmp_path, monkeypatch, clock=lambda: None)
+    store = Store.init(tmp_path / "store")
+    result = store.baostock(store.import_baostock_capture(path)).get_status(require_known=True)
+    assert result.rows[0].response_received_at is None
+    assert result.report["quality"]["capture_clock_state"] == "unknown"
+
+
+def test_max_date_empty_capture_returns_unknown(tmp_path, monkeypatch):
+    path = captured(tmp_path, monkeypatch, rows=[], start="9999-12-31", end="9999-12-31")
+    store = Store.init(tmp_path / "store")
+    result = store.baostock(store.import_baostock_capture(path)).get_status()
+    assert len(result.rows) == 1
+    assert result.rows[0].trade_date.isoformat() == "9999-12-31"
+    assert result.rows[0].is_st.state == "row_missing_unknown"

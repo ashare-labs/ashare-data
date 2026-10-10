@@ -1,4 +1,4 @@
-# 历史日线状态公共契约（0.8.3.dev1）
+# 历史日线状态公共契约（0.8.3.dev2）
 
 本增量复用BaoStock已接入的匿名公共SDK、固定回执和离线capture，不按三股写特判。每次显式一个证券、至多31个自然日；不支持分钟状态、历史证券池或自动补数。字段定义来自[官方历史K线文档](https://www.baostock.com/mainContent?file=stockKData.md)：`tradestatus=1`正常交易、`0`停牌；`isST=1`是、`0`否。文档没有明确盘中部分停牌细节或ST子类别。
 
@@ -28,6 +28,8 @@
 ## 日期、知识时点和覆盖
 
 trade_date是来源日线标签。response_received_at是该行所在原始响应最后一字节的本次接收时刻，不是历史发布/生效时刻。historical_available_at和historical_eligible仍None；intraday_halts_verified和execution_permission仍False。
+
+0.8.3.dev2的投影策略`daily-source-status-2`把逐页请求、首字节和末字节时间绑定至已校验的wall_clock_events，检查带时区ISO格式；缺字段、非法文本或事件不一致报`DAILY_STATUS_CLOCK_INVALID`。明确记录的时钟失败保留None/unknown。真实压缩帧的顶层`response_completed_at`仍为None；末字节接收记录不等于已验证完成。本版另修复日期上界9999-12-31的空结果投影，返回未知网格，不再溢出。两项来自dev1独立审查，真实九行沿用原件，无重采。
 
 请求起止日期包含端点，投影列出其自然日网格；它不是交易日历，不按工作日猜开闭。`requested_values_known=True`只表示网格中两字段均有已知源值；原query_complete、market_coverage、complete_history和PIT质量不提升。
 

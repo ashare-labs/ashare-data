@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from .d1_types import Projection, SourceRecord
 from .model import canonical, digest, require
@@ -12,7 +13,7 @@ from .research import _day
 
 FIELDS = "date,code,tradestatus,isST,adjustflag"
 VERSION = "baostock-daily-status-1/receipt-4.1"
-POLICY = "daily-source-status-1"
+POLICY = "daily-source-status-2"
 
 
 @dataclass(frozen=True)
@@ -92,6 +93,63 @@ def _flag(row, requested, name, *, inverted=False):
     return DailyStatusFlag(name, raw, raw == ("0" if inverted else "1"), "source_observed")
 
 
+def page_received_times(receipt):
+    """Bind page convenience fields to recorded events; never project unchecked text."""
+    require(
+        all(
+            isinstance(e, dict) and isinstance(e.get("event"), str) and "at" in e
+            for e in receipt["wall_clock_events"]
+        ),
+        "DAILY_STATUS_CLOCK_INVALID",
+        "时钟事件结构无效",
+    )
+    result = {}
+    for page in receipt["pages"]:
+        number = page["page_index"]
+        starts = [
+            e["at"]
+            for e in receipt["wall_clock_events"]
+            if e["event"] == f"page_{number}_request_started"
+        ]
+        receives = [
+            (e["event"], e["at"])
+            for e in receipt["wall_clock_events"]
+            if re.fullmatch(rf"page_{number}_recv_[0-9]+", e["event"])
+        ]
+        require(
+            len(starts) == 1
+            and bool(receives)
+            and [name for name, _ in receives]
+            == [f"page_{number}_recv_{i}" for i in range(1, len(receives) + 1)],
+            "DAILY_STATUS_CLOCK_INVALID",
+            "逐页请求/接收事件缺失、重复或乱序",
+        )
+        expected = {
+            "request_started_at": starts[0],
+            "first_byte_received_at": receives[0][1],
+            "last_byte_received_at": receives[-1][1],
+        }
+        require(
+            all(name in page and page[name] == value for name, value in expected.items()),
+            "DAILY_STATUS_CLOCK_INVALID",
+            "逐页时间不等于对应原始时钟事件",
+        )
+        for value in [*starts, *(at for _, at in receives)]:
+            if value is None:
+                continue  # Recorded clock failure is unknown, never a fabricated timestamp.
+            try:
+                parsed = datetime.fromisoformat(value) if isinstance(value, str) else None
+            except ValueError:
+                parsed = None
+            require(
+                parsed is not None and parsed.tzinfo is not None and parsed.utcoffset() is not None,
+                "DAILY_STATUS_CLOCK_INVALID",
+                "逐页事件时间须为带时区ISO时间或明确未知",
+            )
+        result[number] = receives[-1][1]
+    return result
+
+
 def project(view, *, require_known=False):
     require(type(require_known) is bool, "INVALID_ARGUMENT", "require_known必须为bool")
     req = view._attempt["request"]
@@ -110,12 +168,13 @@ def project(view, *, require_known=False):
     requested = params["fields"].split(",")
     start, end = _day(params["start_date"]), _day(params["end_date"])
     by_date = {r["date"]: r for r in view._rows}
+    received_times = page_received_times(view._receipt)
     pages = {r["date"]: page for page in view._receipt["pages"] for r in page["rows"]}
     code = params["code"]
     security = code[3:] + (".XSHG" if code.startswith("sh.") else ".XSHE")
     rows = []
-    day = start
-    while day <= end:
+    for offset in range((end - start).days + 1):
+        day = start + timedelta(days=offset)
         row = by_date.get(day.isoformat())
         page = pages.get(day.isoformat())
         rows.append(
@@ -127,12 +186,11 @@ def project(view, *, require_known=False):
                 view._id,
                 digest(row) if row is not None else None,
                 page["raw_response_sha256"] if page else None,
-                page["last_byte_received_at"] if page else None,
+                received_times[page["page_index"]] if page else None,
                 view._attempt["evidence_kind"],
                 canonical(row or {}).decode(),
             )
         )
-        day += timedelta(days=1)
     missing = [d.isoformat() for d in (r.trade_date for r in rows) if d.isoformat() not in by_date]
     unknown = [
         {"date": r.trade_date.isoformat(), "field": f.source_field, "state": f.state}

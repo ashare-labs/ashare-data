@@ -470,6 +470,8 @@ def _verify_impl(blobs):
         )
     if not safe:
         return attempt, receipt, storage, [], "source_response_unusable"
+    if kind == "daily_status":
+        daily_status.page_received_times(receipt)
     try:
         if kind == "daily" and rows:
             _bao(

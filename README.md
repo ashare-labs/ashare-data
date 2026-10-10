@@ -1,4 +1,4 @@
-# A数达 0.8.3.dev1：历史日线交易状态与ST
+# A数达 0.8.3.dev2：历史日线交易状态与ST
 
 [日状态公共契约](docs/daily-status.md)新增通用BaoStock `daily_status` 显式采集及固定capture离线读取。每次一证券、至多31自然日；不按三只股票特判。三股2026-09-28至30真实九行均返回tradestatus="1"、isST="0"，仅为来源日线状态声明，不授予PIT或执行许可。
 
