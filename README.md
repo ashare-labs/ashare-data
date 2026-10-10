@@ -1,4 +1,12 @@
-# A数达 0.8.6.dev1：固定源日历与开市邻日
+# A数达 0.8.7.dev1：多证券研究输入 preflight
+
+新增 `Store.preflight_research()`、严格JSON请求入口和 `research-preflight` CLI。显式绑定本地固定来源，按证券、锚点和前日/当日/后继用途列出源值、单位、来源hash、质量与缺口；缺项不补默认值，研究值齐全也不授予执行或PIT资格。
+
+[公共类型与错误契约](docs/research-preflight.md) · [离线示例](examples/research_preflight.py)
+
+本轮优先回应AQ的600000.XSHG/2026-09-29三日研究请求，另两股只复用已有材料验证通用接口。未重采已有价格/状态/preclose；同范围日历恢复两次会话均DNS失败，新增真实行0。固定代码、实样请求、作者验证及独审见包外preflight-r1-evidence；旧版本和现有执行owner pin保持冻结。
+
+## 0.8.6.dev1：固定源日历与开市邻日
 
 新增 `Store.baostock(capture_id).get_calendar()` 和 `get_calendar_links(trading_dates=[...])`。
 逐日保留源开闭声明、原字段、摘要及接收时间；在同一个capture内给出有据的前一/当前/后一开市日。缺行、未知、关闭锚点或捕获边界不足明确拒绝，不按工作日补数据。

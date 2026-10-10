@@ -107,6 +107,9 @@ def parser():
     q.add_argument("--allow-partial", action="store_true", help="仅 bars：明确返回缺口，仍不允许来源冲突")
     for name in ("research-snapshots", "research-recover"):
         sub.add_parser(name)
+    pf = sub.add_parser("research-preflight", help="离线逐证券/日期/用途研究输入与缺口；不授予执行许可")
+    pf.add_argument("--request", required=True, help="显式固定来源ID与可选本地store路径的JSON")
+    pf.add_argument("--require-complete", action="store_true", help="所需研究字段有缺口则拒绝；不升级PIT或执行资格")
     ri = sub.add_parser("research-import", help="封存旧本地 Bao 原价日线；接收时间保持未知")
     ri.add_argument("paths", nargs="+")
     ri.add_argument("--calendar")
@@ -286,6 +289,9 @@ def main(argv=None):
                     value = getattr(store.listing_fact(args.snapshot), args.operation)()
                     result = ([x.to_dict() for x in value] if isinstance(value, tuple)
                               else value.to_dict() if hasattr(value, "to_dict") else value)
+            elif args.command == "research-preflight":
+                result = store.preflight_research_request(
+                    read_json(args.request), require_complete=args.require_complete).to_dict()
             elif args.command == "d1-import-facts":
                 result = {"facts_component_id": store.import_d1_facts(args.directory)}
             elif args.command == "br1-compose":

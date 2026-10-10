@@ -297,6 +297,15 @@ class Store:
         from .baostock import recover
         return recover(self)
 
+    def preflight_research(self, *, inputs, calendar, trading_dates, require_complete=False):
+        from .research_preflight import preflight
+        return preflight(self, inputs=inputs, calendar=calendar, trading_dates=trading_dates,
+                         require_complete=require_complete)
+
+    def preflight_research_request(self, request, *, require_complete=False):
+        from .research_preflight import from_request
+        return from_request(self, request, require_complete=require_complete)
+
     def research(self, dataset_id):
         """Reopen a fixed, verified local research dataset without network access."""
         from .research import ResearchView
@@ -508,6 +517,9 @@ class Store:
 
     def capabilities(self):
         return {"version": "0.1.0", "network": "unsupported", "snapshot_required": True,
+                "research_preflight": {"policy": "research-input-preflight-1", "offline": True,
+                    "max_securities": 10, "max_anchor_dates": 31, "max_natural_day_span": 31,
+                    "source_kinds": ["research", "baostock"], "execution_permission": False},
                 "frequency": ["1m"], "prices": "unadjusted", "volume_unit": "shares",
                 "amount_unit": "CNY", "timezone": "Asia/Shanghai",
                 "instruments_as_of": "requires dated visible universe evidence",

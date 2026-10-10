@@ -8,7 +8,7 @@ resolution-markers = [
 
 [[package]]
 name = "ashare-data"
-version = "0.8.6.dev1"
+version = "0.8.7.dev1"
 source = { editable = "." }
 dependencies = [
     { name = "duckdb" },
