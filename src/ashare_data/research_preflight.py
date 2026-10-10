@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 import json
+import os
 import re
 
 from .d1_types import Projection
@@ -158,6 +159,12 @@ def _check_ref(ref, kinds):
             "PREFLIGHT_ARGUMENT", "必须显式固定完整小写版本ID")
     require(ref.store_path is None or type(ref.store_path) is str and bool(ref.store_path.strip()),
             "PREFLIGHT_ARGUMENT", "store_path须为本地路径字符串或None")
+    if ref.store_path is not None:
+        require("\0" not in ref.store_path, "PREFLIGHT_ARGUMENT", "store_path不可含NUL")
+        try:
+            os.fsencode(ref.store_path)
+        except UnicodeError as exc:
+            raise DataError("PREFLIGHT_ARGUMENT", "store_path无法编码为本地路径") from exc
 
 
 def _fact(name, value=None, *, state="available", ref=None, evidence=None, reason=None,
@@ -208,7 +215,12 @@ def preflight(store, *, inputs, calendar, trading_dates, require_complete=False)
             return None
         key = (ref.kind, ref.version_id, ref.store_path)
         if key not in views:
-            owner = store if ref.store_path is None else Store(ref.store_path)
+            try:
+                owner = store if ref.store_path is None else Store(ref.store_path)
+            except (OSError, ValueError, RuntimeError) as exc:
+                raise DataError("PREFLIGHT_SOURCE_IO_ERROR", "无法解析或访问显式来源目录",
+                                {"error_type": type(exc).__name__,
+                                 "errno": getattr(exc, "errno", None)}) from exc
             view = getattr(owner, ref.kind)(ref.version_id)
             views[key] = view
             sources[f"{ref.kind}:{ref.version_id}"] = {

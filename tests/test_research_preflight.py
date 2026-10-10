@@ -328,3 +328,25 @@ def test_real_aq_priority_and_multistock_explicit_gaps(tmp_path, monkeypatch):
     for cid in failed_ids:
         with raises_code("SOURCE_REQUEST_FAILED"):
             store.preflight_research_request(dict(request, calendar={"kind": "baostock", "version_id": cid}))
+
+
+@pytest.mark.parametrize("slot", ["calendar", "price", "status", "preclose"])
+@pytest.mark.parametrize("bad_path,code", [
+    ("a\0b", "PREFLIGHT_ARGUMENT"),
+    ("a\ud800b", "PREFLIGHT_ARGUMENT"),
+    ("x" * 10000, "PREFLIGHT_SOURCE_IO_ERROR"),
+], ids=["nul", "unencodable", "too-long"])
+def test_path_errors_match_library_and_cli(ready, tmp_path, capsys, slot, bad_path, code):
+    store, binding, calendar = ready
+    request = {"inputs": [binding.to_dict()], "calendar": calendar.to_dict(),
+               "trading_dates": ["2024-01-06"]}
+    target = request["calendar"] if slot == "calendar" else request["inputs"][0][slot]
+    target["store_path"] = bad_path
+    before = hashes(store.root)
+    with raises_code(code):
+        store.preflight_research_request(request)
+    path = tmp_path / "invalid-path-request.json"
+    path.write_text(json.dumps(request))
+    assert main(["--store", str(store.root), "research-preflight", "--request", str(path)]) == 2
+    assert json.loads(capsys.readouterr().err)["error"]["code"] == code
+    assert hashes(store.root) == before

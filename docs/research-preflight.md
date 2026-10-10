@@ -83,3 +83,5 @@ Python JSON入口是 `Store.preflight_research_request(request, require_complete
 优先用例600000.XSHG/2026-09-29、前日09-28、后继09-30来自已封存材料：已有BaoStock价线提供当日OHLCV/amount，源日状态/preclose分别显式绑定；未重采。000001.XSHE、300750.XSHE复用同窗Sina价线，amount仍缺失，不暗中换Bao或计算金额。三种用途研究字段是否齐全不改变所有执行阻断。
 
 新19日日历恢复只用了获准的2次匿名会话，均DNS解析失败、业务查询0次，未取得新增覆盖；仍使用已验证三日capture。真实报告、固定身份和本候选验证位于包外preflight-r1-evidence，不继承父版测试/准入结论。完整权益、历史资格、限价规则、严格PIT、任意owner窗口与原生执行仍待独立数据工作。
+
+路径错误契约：`store_path` 的空白、NUL 或本地不可编码字符串返回 `PREFLIGHT_ARGUMENT`；有效字符串在系统分辨或访问目录时发生的错误（包括超长路径）返回 `PREFLIGHT_SOURCE_IO_ERROR`。库抛出 `DataError`，CLI 返回相同 code、退出 2；两者都不降格为空数据或缺口。既有 `STORE_NOT_FOUND`、`INTEGRITY` 等数据错误原样传播。

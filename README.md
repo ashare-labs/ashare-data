@@ -1,4 +1,4 @@
-# A数达 0.8.7.dev1：多证券研究输入 preflight
+# A数达 0.8.7.dev2：多证券研究输入 preflight
 
 新增 `Store.preflight_research()`、严格JSON请求入口和 `research-preflight` CLI。显式绑定本地固定来源，按证券、锚点和前日/当日/后继用途列出源值、单位、来源hash、质量与缺口；缺项不补默认值，研究值齐全也不授予执行或PIT资格。
 
