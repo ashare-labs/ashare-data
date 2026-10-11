@@ -154,6 +154,14 @@ class Store:
         from .baostock import BaoStockView
         return BaoStockView(self, capture_id)
 
+    def import_recorded_market(self, sources, *, source_kind):
+        from .recorded_market import import_recorded_market
+        return import_recorded_market(self, sources, source_kind=source_kind)
+
+    def recorded_market(self, dataset_id):
+        from .recorded_market import RecordedMarketView
+        return RecordedMarketView(self, dataset_id)
+
     def import_jq_observations(self, sources, *, source_kind):
         from .jq_observations import import_observations
         return import_observations(self, sources, source_kind=source_kind)

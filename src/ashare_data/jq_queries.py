@@ -22,6 +22,7 @@ EVENT_FIELDS = {
     "data_result": {"api", "label", "columns", "dtypes", "rows", "symbol"},
     "query_request": {"label", "params"}, "query_return": {"label", "columns", "rows"},
     "query_exception": {"label", "error", "error_type", "native_repr"},
+    "query_rows": {"label", "offset", "rows"},
     "field_request": {"field", "params"},
     "field_return": {"field", "columns", "dtypes", "rows"},
     "field_exception": {"field", "error", "error_type", "native_repr"},
@@ -149,7 +150,7 @@ def _extract_queries(src):
     lines = _read_file(src.events_path, src.events_sha256).splitlines()
     _read_file(src.script_path, src.script_sha256)
     require(1 <= len(lines) <= 1000, "JQ_INPUT", "source must have 1..1000 events")
-    accepted, run_tag = [], None
+    accepted, run_tag, recorder_v2 = [], None, False
     for seq, line in enumerate(lines, 1):
         e = _json(line, exact=True)
         require(type(e) is dict and type(e.get("seq")) is int and e["seq"] == seq
@@ -161,11 +162,16 @@ def _extract_queries(src):
                     and settings.get("end_date") == end and settings.get("frequency") == "minute"
                     and settings.get("use_real_price") is True, "JQ_SCOPE", "source identity mismatch")
             run_tag = _text(e.get("run_tag"))
+            recorder_v2 = settings.get("recorder_revision") == 2
         require(e.get("run_tag") == run_tag and type(e.get("kind")) is str,
                 "JQ_QUERY_SCHEMA", "source run mismatch")
         if e["kind"] not in EVENT_FIELDS:
             continue
-        require(set(e) == BASE_FIELDS | EVENT_FIELDS[e["kind"]],
+        extras = EVENT_FIELDS[e["kind"]]
+        if recorder_v2 and e["kind"] == "query_return":
+            extras = {"label", "columns", "row_count"}
+        base = BASE_FIELDS | ({"version"} if recorder_v2 else set())
+        require(set(e) == base | extras,
                 "JQ_QUERY_SCHEMA", "unexpected query event fields")
         observed = _source_time(e["time"])
         require(start <= observed[:10] <= end, "JQ_SCOPE", "event outside source run")
@@ -215,6 +221,18 @@ def _extract_queries(src):
                 require(e["symbol"] == pending["params"]["security"], "JQ_SCOPE", "result security mismatch")
             if "api" in e:
                 require(e["api"] == pending["api"], "JQ_QUERY_SCHEMA", "result API mismatch")
+            if recorder_v2 and k == "query_return":
+                require(chunks is None and e["columns"] == pending["params"]["fields"]
+                        and type(e["row_count"]) is int and 0 <= e["row_count"] <= 6000,
+                        "JQ_QUERY_SCHEMA", "invalid chunked query summary")
+                chunks = {"rows": [], "count": e["row_count"],
+                          "refs": [pending["ref"], ref], "kind": "query_return"}
+                if not e["row_count"]:
+                    record(pending["api"], pending["params"],
+                           {"status": "observed_empty", "rows": [],
+                            "columns": e["columns"], "dtypes": None}, chunks["refs"])
+                    pending = chunks = None
+                continue
             if k.endswith("exception"):
                 result = {"status": "observed_source_error", "rows": [],
                           "source_error": {"type": _text(e["error_type"]), "message": _text(e["error"])} }
@@ -234,6 +252,24 @@ def _extract_queries(src):
                     result.update(published_at=None, revision_id=None, timestamp_scope=_text(e["timestamp_scope"]))
             record(pending["api"], pending["params"], result, [pending["ref"], ref])
             pending = None
+        elif k == "query_rows":
+            require(recorder_v2 and pending is not None and chunks is not None
+                    and chunks["kind"] == "query_return" and e["label"] == pending["label"]
+                    and ref["observed_at"] == pending["ref"]["observed_at"]
+                    and type(e["offset"]) is int and e["offset"] == len(chunks["rows"])
+                    and type(e["rows"]) is list and 1 <= len(e["rows"]) <= 20,
+                    "JQ_QUERY_SCHEMA", "unbound, overlapping or missing query chunks")
+            chunks["rows"].extend(_price_rows(e["rows"], pending["params"]["fields"],
+                                            ref["observed_at"]))
+            chunks["refs"].append(ref)
+            require(len(chunks["rows"]) <= chunks["count"], "JQ_QUERY_SCHEMA", "chunk overflow")
+            if len(chunks["rows"]) == chunks["count"]:
+                require(len({r["index"] for r in chunks["rows"]}) == chunks["count"],
+                        "JQ_QUERY_SCHEMA", "duplicate labels across chunks")
+                record(pending["api"], pending["params"],
+                       {"status": "observed_rows", "rows": chunks["rows"],
+                        "columns": pending["params"]["fields"], "dtypes": None}, chunks["refs"])
+                pending = chunks = None
         elif k in {"universe_summary", "depth_summary"}:
             require(pending is not None and chunks is None, "JQ_QUERY_SCHEMA", "unbound chunk summary")
             require(type(e["native_count"]) is int and 0 <= e["native_count"] <= 6000,
@@ -406,6 +442,8 @@ class JQQueryView:
             end = params["end_date"]
             require(end <= (clock[:10] if len(end) == 10 else clock),
                     "JQ_FUTURE_QUERY", "requested price end is later than the read clock")
+        if api == "get_price":
+            validate_daily_visibility(params, clock)
         anchor = timestamp(observed_at).isoformat() if observed_at is not None else None
         found = [r for r in self._load()["queries"] if r["api"] == api and r["parameters"] == params
                  and r["available_at"] <= clock and (anchor is None or r["observed_at"] == anchor)]
@@ -450,3 +488,11 @@ class JQQueryView:
                        rows=[{"security": security, "source_label_at": label_date + "T00:00:00+08:00",
                               "values": {"close": matches[0]["close"]}}])
         return JQObservationRead(canonical(out).decode())
+
+
+def validate_daily_visibility(params, clock):
+    """Independent field-level guard, including an end timestamp equal to now."""
+    if (params["frequency"] == "daily" and params["end_date"][:10] == clock[:10]
+            and clock[11:19] < "15:00:00"):
+        require(set(params["fields"]) <= {"open"} and clock[11:19] >= "09:30:00",
+                "JQ_INCOMPLETE_DAILY", "unfinished session daily fields are not available")
