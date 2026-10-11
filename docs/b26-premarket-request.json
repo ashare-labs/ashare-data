@@ -1,0 +1,47 @@
+{
+  "schema": "ad.premarket-reference-request.v1",
+  "status": "BLOCKED_NO_ADMITTED_INPUT",
+  "case_id": "B26",
+  "security": "000001.XSHE",
+  "session_date": "2024-06-14",
+  "previous_session": "2024-06-13",
+  "as_of": "2024-06-14T09:00:00+08:00",
+  "timezone": "Asia/Shanghai",
+  "adjustment_basis_date": "2024-06-14",
+  "requested_role": "engine_premarket_valuation_only_after_native_corporate_action",
+  "price": null,
+  "source_price_precision": null,
+  "historical_available_at": null,
+  "availability_evidence": null,
+  "source_provenance": null,
+  "corporate_action_binding": {
+    "path": "/Users/yinming/Documents/Codex/2026-10-10/task-3/round-one-data-delivery/corporate-action/binding.json",
+    "sha256": "b7de4c9cac991d194adeda0a815771248bd33c757938fab19f9e10d95856b371"
+  },
+  "required_evidence": [
+    "Independent source price semantics and native precision, without a target answer",
+    "Exact security/session/previous-session/adjustment-basis binding",
+    "As-of and available-at with independent historical availability evidence, or an explicit bounded research assumption separately reviewed by AQ",
+    "Immutable source files and hashes; actual capture time distinct from historical effective/available clocks",
+    "Known action linkage and retained unknown action coverage",
+    "Explicit rejection of future rows, same-day closing inputs, mismatched basis and unsupported roles"
+  ],
+  "consumer_boundary": {
+    "cash_credit": "native account unchanged",
+    "quantity": "native account unchanged",
+    "average_cost_and_hold_cost": "not valuation marks; unchanged",
+    "application_phase": "after native dividend processing, before 09:00 callback",
+    "next_legal_intraday_mark": "replaces premarket mark normally",
+    "strategy_visible": false,
+    "matching_eligible": false,
+    "historical_pit": false,
+    "live_execution_permission": false
+  },
+  "not_admitted": [
+    "JoinQuant answer or supplement as a market input",
+    "Rounding or truncating an unrounded theoretical price solely to match JoinQuant",
+    "Backfilling a 15:30 pre_close into 09:00",
+    "Using 09:30 day_open or 10:00 point before its clock",
+    "Assuming date-only action evidence proves intraday payment or price availability"
+  ]
+}
