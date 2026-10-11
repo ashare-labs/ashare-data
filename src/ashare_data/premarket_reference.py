@@ -13,6 +13,7 @@ from .model import day, require, symbol, timestamp
 
 ROLE = "premarket_reference_reconstruction"
 POLICY = "sina_native_prevclose_known_cash_research.v1"
+CAPITALIZATION_POLICY = "sina_native_prevclose_known_cash_capitalization_research.v1"
 
 
 class PremarketReferenceView(IndependentQueryView):
@@ -23,7 +24,7 @@ class PremarketReferenceView(IndependentQueryView):
         b = _json(self._checked({"path": self.path.name, "sha256": self.sha256}))
         require(
             b.get("schema") == "ad.premarket-reference-binding.v1"
-            and b.get("policy") == POLICY
+            and b.get("policy") in {POLICY, CAPITALIZATION_POLICY}
             and b.get("role") == ROLE
             and b.get("historical_pit") is False
             and b.get("strategy_visible") is False
@@ -53,19 +54,30 @@ class PremarketReferenceView(IndependentQueryView):
             "Bound raw close must be the adjacent previous session",
         )
         action = _json(self._checked(b["cash_fact"]))
+        capitalization = _decimal(action["capitalization_share_ratio"])
+        with_capitalization = b["policy"] == CAPITALIZATION_POLICY
         require(
             action.get("schema") == "ad.document-cash-dividend-fact.v1"
             and action.get("security") == security
-            and action.get("event_type") == "cash_dividend"
+            and action.get("event_type")
+            == ("cash_dividend_capitalization" if with_capitalization else "cash_dividend")
             and day(action["announcement_date"]) < prior
             and action.get("record_date") == prior
             and action.get("ex_date") == ex
             and action.get("payment_date") == ex
             and action.get("currency") == "CNY"
             and _decimal(action["bonus_share_ratio"]) == 0
-            and _decimal(action["capitalization_share_ratio"]) == 0,
+            and (
+                (
+                    capitalization > 0
+                    and action.get("new_shares_tradable_date") == ex
+                    and action.get("shares_credit_date") == ex
+                )
+                if with_capitalization
+                else capitalization == 0
+            ),
             "PREMARKET_ACTION",
-            "Requires an earlier announced cash-only event",
+            "Requires an earlier announced cash event and policy-consistent share dates",
         )
         document = b["primary_document"]
         self._checked(document)
@@ -116,14 +128,15 @@ class PremarketReferenceView(IndependentQueryView):
         reference = _decimal(selected[ex + "T00:00:00.000Z"]["prevclose"])
         gross = _decimal(action["gross_cash_per_share"])
         tick = _decimal(b["source_price_unit"])
+        theoretical = (raw_close - gross) / (1 + capitalization)
         require(
             raw_close > gross > 0
             and reference > 0
             and tick == Decimal("0.01")
             and reference % tick == 0
-            and abs(reference - (raw_close - gross)) < tick,
+            and abs(reference - theoretical) < tick,
             "PREMARKET_CONSISTENCY",
-            "Source marker inconsistent with cash event within one price unit",
+            "Source marker inconsistent with documented distribution within one price unit",
         )
         return {
             "schema": "ad.premarket-reference-result.v1",
@@ -131,7 +144,7 @@ class PremarketReferenceView(IndependentQueryView):
             "security": security,
             "status": "available",
             "role": ROLE,
-            "policy": POLICY,
+            "policy": b["policy"],
             "historical_pit": False,
             "strategy_visible": False,
             "matching_eligible": False,
@@ -145,11 +158,21 @@ class PremarketReferenceView(IndependentQueryView):
                 "reference_price": str(reference),
                 "raw_previous_close": str(raw_close),
                 "gross_cash_per_share": str(gross),
+                **(
+                    {"capitalization_share_ratio": str(capitalization)}
+                    if with_capitalization
+                    else {}
+                ),
             },
             "origin": "source_encoded_prevclose; no rounding or factor inversion",
             "consistency": {
                 "raw_close_minus_gross": str(raw_close - gross),
-                "source_marker_minus_theoretical": str(reference - (raw_close - gross)),
+                **(
+                    {"cash_and_capitalization_theoretical": str(theoretical)}
+                    if with_capitalization
+                    else {}
+                ),
+                "source_marker_minus_theoretical": str(reference - theoretical),
                 "test": "difference smaller than one source price unit; not a rounding rule",
             },
             "evidence": {

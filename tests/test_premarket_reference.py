@@ -159,3 +159,54 @@ def test_nonadjacent_calendar_refused(delivery):
     )
     with pytest.raises(DataError, match="adjacent"):
         read(delivery)
+
+
+@pytest.fixture
+def capitalization_delivery(delivery):
+    from ashare_data.premarket_reference import CAPITALIZATION_POLICY
+
+    root, b = delivery
+    fact = json.loads((root / "fact.json").read_text())
+    fact.update(
+        event_type="cash_dividend_capitalization",
+        capitalization_share_ratio="0.3",
+        new_shares_tradable_date="2024-03-04",
+        shares_credit_date="2024-03-04",
+    )
+    b["cash_fact"] = write(root, "fact.json", fact)
+    b["policy"] = CAPITALIZATION_POLICY
+    decoded = json.loads((root / "decoded.json").read_text())
+    decoded["rows"][1]["prevclose"] = "9.73"  # Source marker, theoretical 9.7330769...
+    b["source"].update(write(root, "decoded.json", decoded))
+    return delivery
+
+
+def test_capitalization_source_marker_does_not_round_theory(capitalization_delivery):
+    r = read(capitalization_delivery)
+    assert r["row"]["reference_price"] == "9.73"
+    assert r["row"]["capitalization_share_ratio"] == "0.3"
+    assert r["historical_pit"] is False
+    assert "FORBIDDEN_SAME_DAY" not in json.dumps(r)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("capitalization_share_ratio", "0"),
+        ("capitalization_share_ratio", "-0.3"),
+        ("capitalization_share_ratio", "NaN"),
+        ("capitalization_share_ratio", "0.5"),
+        ("shares_credit_date", "2024-03-05"),
+        ("new_shares_tradable_date", "2024-03-05"),
+        ("payment_date", "2024-03-05"),
+        ("bonus_share_ratio", "0.1"),
+        ("event_type", "cash_dividend"),
+    ],
+)
+def test_capitalization_conflicts_refuse(capitalization_delivery, field, value):
+    root, b = capitalization_delivery
+    fact = json.loads((root / "fact.json").read_text())
+    fact[field] = value
+    b["cash_fact"] = write(root, "fact.json", fact)
+    with pytest.raises(DataError):
+        read(capitalization_delivery)

@@ -4,6 +4,8 @@ const vm = require('vm');
 const crypto = require('crypto');
 const path = require('path');
 const root = process.argv[2];
+const ex = (process.argv[3] || '2024-06-14') + 'T00:00:00.000Z';
+const prior = (process.argv[4] || '2024-06-13') + 'T00:00:00.000Z';
 const sha = b => crypto.createHash('sha256').update(b).digest('hex');
 const read = n => fs.readFileSync(path.join(root, n));
 const raw = read('sina-pingan-daily.js');
@@ -23,10 +25,10 @@ if (decoder.toString().split(needle).length !== 2) throw Error('instrumentation 
 // Log the already encoded marker and precision; do not alter the calculation.
 const auditRows = decode(decoder.toString().replace(needle,
   'a.p && (i.prevclose = P(a.p, r.p_p), i.audit = {encoded: a.p, precision_code: r.p_p, scale_exponents: T(r.p_p)})'));
-const audit = auditRows.find(r => r.date === '2024-06-14T00:00:00.000Z');
+const audit = auditRows.find(r => r.date === ex);
 console.log(JSON.stringify({all_rows_match: true, count: rows.length,
   raw_sha256: sha(raw), decoder_sha256: sha(decoder),
-  selected: rows.filter(r => ['2024-06-13T00:00:00.000Z','2024-06-14T00:00:00.000Z'].includes(r.date))
+  selected: rows.filter(r => [prior,ex].includes(r.date))
     .map(r => ({date: r.date, ...(r.prevclose === undefined ? {previous_raw_close: r.close} : {source_prevclose: r.prevclose})})),
   marker_audit: audit.audit,
   explanation: 'The encoded previous-price integer is scaled independently of current-day OHLC. This proves the frozen source marker, not a JQ rounding rule or historical delivery clock.'}, null, 2));
