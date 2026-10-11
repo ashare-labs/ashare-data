@@ -17,6 +17,7 @@ from .jq_queries import JQQueryView
 from .tdx_points import TDXPointInput, TDXPointView
 from .calendar_binding import BoundedCalendarView
 from .independent_queries import IndependentQueryView
+from .premarket_reference import PremarketReferenceView
 from .baostock import BaoStockSource, BaoStockView
 from .zzshare import ZzshareSource, ZzshareView
 from .zzshare_types import ZzshareValue, SourceClaimedLimits, ZzshareDailyRow, ZzshareDailyResult
@@ -60,3 +61,4 @@ __all__ += ["JQQueryView"]
 __all__ += ["TDXPointInput", "TDXPointView"]
 __all__ += ["BoundedCalendarView"]
 __all__ += ["IndependentQueryView"]
+__all__ += ["PremarketReferenceView"]
