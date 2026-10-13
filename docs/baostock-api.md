@@ -36,6 +36,20 @@ print(Store(path).baostock(capture_id).get_price().data)  # 离线重开
 
 失败采集会保留失败版本和诊断，异常 details 中可取得版本 ID；失败记录不等于成功空数据。价格为 Decimal，volume 为整数股，amount 为人民币元。原字段、原价和源前收分别保留。
 
+### 有界行动查询的原生空集合
+
+底层 `capture_query` 的 `query_dividend_data`（type14）和 `query_adjust_factor`（type16）
+允许已核实格式的原生空数据段：服务端成功码、完整且已核实的字段列表、长度、终止符、CRC、
+请求身份及终止分页均须通过。5 个真实空集合报文和 10 个非空对照保存在
+本地忽略的真实验证材料目录（不随软件分发），含原始请求/响应 SHA256、原回执指纹及原 SDK 行。
+
+成功空查询沿用 `complete_empty_unknown`，仅表示该参数范围内查询完整返回零行。
+缺失/异常字段仍判无效报文，错误码仍判 `provider_error_response`，接收不完整仍判传输失败。
+`complete_history`、`confirmed_no_events`、`strict_admitted` 均保持 false，历史可见时点保持 null。
+此修复不扩大公开 `BaoStockSource` 接口，也不改变压缩 type96 的外层完整性未知状态。
+旧回执不原地重写；`scripts/verify_baostock_native_empty.py` 用已保存原文离线重放 pinned SDK，
+另存新回执，并明确区分原采集时间、此次离线重放时间和未知的历史市场可见时间。
+
 ## 日线、分钟与截止时间
 
 日线最多31个连续自然日。分钟显式指定 `5m`、`15m`、`30m`、`60m`，最多2个连续自然日；**不提供 BaoStock 1m**，不自动聚合或降级频率。

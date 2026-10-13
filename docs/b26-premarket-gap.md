@@ -11,7 +11,7 @@
 本次只记录实际公开接口检查及数据请求；没有新增价格投影、修改行情、开放角色或发布版本。
 
 已实际调用 `IndependentQueryView.read_adjusted`：binding 为
-`/Users/yinming/Documents/Codex/2026-10-10/task-3/independent-query-delivery/binding.json`，
+`evidence/binding.json`，
 SHA256 `15861bfe56e337f001f4f6eac38601dcb6f051ab30fb652b566a6dc60a7e1313`；
 产品 `B25-adjustment`，证券 `000001.XSHE`，`basis_date=2024-06-14`，`fq=pre`，
 角色 `independent_retrospective_query_research`。既有产品覆盖前一日，允许检查候选，
@@ -36,4 +36,4 @@ SHA256 `15861bfe56e337f001f4f6eac38601dcb6f051ab30fb652b566a6dc60a7e1313`；
 应先由独立来源或有独立依据的显式研究绑定满足该请求，再由 AQ 审查并接入。
 
 实际请求、完整公共响应及回归日志位于本工作树 `.verification/b26/`，最终冻结副本位于
-`/Users/yinming/Documents/Codex/2026-10-11/task-6/b26-closeout/ad/`。
+`evidence/ad/`。

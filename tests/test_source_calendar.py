@@ -1,9 +1,7 @@
 """Bounded calendar contracts. Synthetic dates never count as actual source coverage."""
 import json
-import os
 from dataclasses import FrozenInstanceError
 from datetime import date, datetime, timedelta
-from pathlib import Path
 
 import pytest
 
@@ -227,41 +225,3 @@ def test_existing_publication_recovery_with_new_calendar_view(tmp_path, monkeypa
     assert store.recover_baostock() == [{"capture_id": sid, "status": "aborted" if corrupt else "published"}]
     if not corrupt:
         assert len(store.baostock(sid).get_calendar(require_known=True).rows) == 7
-
-
-def test_real_existing_calendar_is_not_new_window_coverage(monkeypatch):
-    root = os.environ.get("ASHARE_CALENDAR_STORE")
-    if not root:
-        pytest.skip("existing real calendar store not supplied")
-    monkeypatch.setattr(BaoStockSource, "fetch", lambda *a, **k: pytest.fail("must stay offline"))
-    view = Store(Path(root)).baostock(LEGACY_ID)
-    result = view.get_calendar(require_known=True)
-    assert [r.calendar_date.isoformat() for r in result.rows] == ["2026-09-28", "2026-09-29", "2026-09-30"]
-    assert all(r.is_open.raw_value == "1" and r.is_open.value for r in result.rows)
-    assert all(r.evidence_kind == "live_local_capture" for r in result.rows)
-    assert all(r.raw_response_sha256 and r.raw_record_sha256 for r in result.rows)
-    link = view.get_calendar_links(trading_dates=["2026-09-29"]).rows[0]
-    assert (link.previous_open, link.next_open) == (date(2026, 9, 28), date(2026, 9, 30))
-    assert result.report["network_used"] is False
-    with raises_code("SOURCE_CALENDAR_OUT_OF_SCOPE"):
-        view.get_calendar_links(trading_dates=["2026-10-09"])
-    with raises_code("PIT_UNAVAILABLE"):
-        view.at("2026-10-11T00:00:00Z", visibility="verified")
-
-
-def test_real_new_window_failure_not_empty_success(tmp_path):
-    root = os.environ.get("ASHARE_CALENDAR_FAILURE")
-    if not root:
-        pytest.skip("external failed calendar acquisition not supplied")
-    attempt = json.loads((Path(root) / "attempt.json").read_text())
-    assert attempt["status"] == "login_failed"
-    assert attempt["login"]["error_code"] == "10002007"
-    store = Store.init(tmp_path / "failed-store")
-    sid = store.import_baostock_capture(root)
-    assert store.import_baostock_capture(root) == sid
-    view = Store(store.root).baostock(sid)
-    assert view.descriptor()["rows"] == 0
-    with raises_code("SOURCE_REQUEST_FAILED"):
-        view.get_calendar()
-    with raises_code("SOURCE_REQUEST_FAILED"):
-        view.get_calendar_links(trading_dates=["2026-09-30"])

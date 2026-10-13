@@ -1,0 +1,115 @@
+{
+  "schema": "ad.f1-remaining-research-integration.v1",
+  "base_main": "1a24321c5597a0b25e43f7677ef43929cc396ddf",
+  "purpose": "Deliver existing offline calculations for the three remaining slots; no new factor-equivalence acceptance",
+  "integration_independent_review": {
+    "status": "prepared_not_completed",
+    "passed": false,
+    "prior_reviews_do_not_certify_new_ports": true
+  },
+  "slots": {
+    "PV01": {
+      "entry": "roc120_native_candidate",
+      "definition": "catalog_roc120_native_sina_hfq.research.v1",
+      "source": {
+        "native_commit": "6eae4900d7c80814453fcf3bc5b92cc35a098bb0",
+        "reviewed_commit": "809b72522c0b6c17c1a3a5df53af993583a64818",
+        "file": "pv01/code/ashare_data/f1_price_volume.py",
+        "sha256": "2ae77e047ca9f645421f2c53bfec937b5b39a1f08e32b4380d299f5698cb4a6e"
+      },
+      "prior_review": "No obvious date or formula bug found; native ROC arithmetic and saved endpoint counterexamples examined",
+      "formula": "100*(C[t]-C[t-120])/C[t-120]; C=raw close times date-effective native Sina factor, Decimal50, no Q2/Q6",
+      "input_scope": "Explicit native source pack with pinned input hash and archived source files; 121 normal sessions",
+      "verified_existing_predictions": 24,
+      "alignment_status": "not_passed",
+      "source_issue": "ADJ-INPUT-001",
+      "known_counterexample": "2020-01-13 JQ public endpoints for 600000.XSHG and 000002.XSHE fail registered lag120/lag119 calculations",
+      "remaining_gap": "Actual factor endpoint identities and input versions/adjustment-processing contract",
+      "added_boundary": "Public research port refuses verified_zero_trade; only normal observed sessions supported"
+    },
+    "PV05": {
+      "entry": "vroc6_fixed_snapshot_candidate",
+      "definition": "sina_native_pricefactor_rescaled_volume_lag5.research.v1",
+      "source": {
+        "file": "pv05/research/native_snapshot.py",
+        "sha256": "07304ac1411af7a64257a7e9fdd6333990a56cf0280b5ea4a691ee5eab3bd818",
+        "package_manifest_sha256": "da79c9a1fb51ca9aaa5c402ee925fe9ecf2025209a5522703fe1116c1d0795ce"
+      },
+      "prior_review": "Author 15-test result only; no independent implementation sign-off located",
+      "source_implementation_independent_review_completed": false,
+      "fixed_scope": {
+        "security": "601012.XSHG",
+        "start": "2012-06-19",
+        "end": "2012-06-27",
+        "sessions": 6
+      },
+      "binding_sha256": "b661e8fa8e377e8f23b4bf98ca527fa2bda3e91d30141da40d7865eb2fd8b613",
+      "formula": "Q=half_even(raw shares/native Sina factor), then 100*(Q[t]/Q[t-5]-1)",
+      "quantity_policy_supplier_certified": false,
+      "alignment_status": "failed_keep_blocked",
+      "source_issue": "ADJ-INPUT-001",
+      "original_independent_AD": "5/160 failed",
+      "first_window_quantity": "0/6 failed",
+      "first_window_VROC": "0/1 failed",
+      "fixed_demo_JQ_target_compared": false,
+      "remaining_gap": "Historical adjusted-quantity definition, cumulative basis, event inputs, precision and revisions"
+    },
+    "FI03": {
+      "entry": "reported_operating_revenue_ttm",
+      "definition": "reported_operating_revenue_ttm.research.v1",
+      "source": {
+        "reused_main": "FinancialLedger.latest_period and quarter_ttm",
+        "original_financial_commit": "2205508f1cfa95b8457fe5941f62595e58568d92",
+        "original_file_sha256": "855818dd9f3f48fd38c377cd38247939e7ceb4159c7ea88f1b371334fb451db0"
+      },
+      "prior_review": "Shared ledger/quarter chain already integrated and reviewed; FI03 counterexample reproduced in earlier independent FI review",
+      "formula": "Consolidated operating revenue from four complete quarters, reconciled to annual/YTD bridge at the same cutoff; unquantized CNY",
+      "fixed_regression_dates": [
+        "2023-08-04",
+        "2023-10-23",
+        "2024-04-26",
+        "2024-04-29"
+      ],
+      "alignment_status": "not_passed",
+      "known_counterexample": "Two saved 2023 materialized TTM outputs disagree with reported-amount reconstruction; whole-CNY output rounding does not fix both periods",
+      "remaining_gap": "Actual materialized TTM component versions and storage/processing path"
+    }
+  },
+  "local_evidence": {
+    "root": ".local-evidence/f1-remaining",
+    "manifest_sha256": "c27ce9024a8892bc7c7fcdec54368372122882d1ca0b53216af3ce8ca5f20b06",
+    "file_count": 233
+  },
+  "unchanged_core_files": [
+    "src/ashare_data/f1_financial.py",
+    "src/ashare_data/f1_price_volume.py",
+    "src/ashare_data/f1_pv_semantic_contract.py",
+    "src/ashare_data/f1_fi_sv_scoped.py",
+    "src/ashare_data/f1_tvma6_bounded.py",
+    "src/ashare_data/f1_tvma6_composite.py"
+  ],
+  "source_mapping": [
+    {
+      "path": "src/ashare_data/f1_vroc6_snapshot.py",
+      "source": "pv05/research/native_snapshot.py",
+      "treatment": "byte-identical",
+      "source_sha256": "07304ac1411af7a64257a7e9fdd6333990a56cf0280b5ea4a691ee5eab3bd818"
+    },
+    {
+      "path": "src/ashare_data/f1_remaining.py",
+      "treatment": "Copy original ROC120 method and decimal conversion; reuse installed ledger and native source reader; add status-bearing research entries without new formulas"
+    },
+    {
+      "path": "src/ashare_data/f1.py",
+      "treatment": "Export three research entries and explicit definition/role constants"
+    }
+  ],
+  "jq_equivalent": false,
+  "strategy_visible": false,
+  "production_eligible": false,
+  "new_named_factor_acceptances": 0,
+  "new_market_reads": 0,
+  "new_JQ_queries": 0,
+  "new_framework": false,
+  "private_evidence_distributed": false
+}

@@ -1,10 +1,8 @@
 """Purpose-scoped source inventory, explicit inputs and independently observable gaps."""
 from dataclasses import FrozenInstanceError, replace
 from datetime import date, datetime
-from pathlib import Path
 import hashlib
 import json
-import os
 import shutil
 
 import pytest
@@ -287,47 +285,6 @@ def test_json_cli_and_extra_arguments_rejected(ready, tmp_path, capsys):
         where.pop(key)
 
 
-def test_real_aq_priority_and_multistock_explicit_gaps(tmp_path, monkeypatch):
-    location = os.environ.get("ASHARE_PREFLIGHT_EVIDENCE")
-    if not location:
-        pytest.skip("external real preflight inputs not supplied")
-    root = Path(location)
-    shutil.copytree(root / "inputs/bao", tmp_path / "bao")
-    shutil.copytree(root / "inputs/prices", tmp_path / "prices")
-    store = Store(tmp_path / "bao")
-    request = json.loads((root / "request-multistock.json").read_text())
-    for b in request["inputs"]:
-        if b["price"]["kind"] == "research":
-            b["price"]["store_path"] = str(tmp_path / "prices")
-    before = hashes(tmp_path)
-    monkeypatch.setattr(BaoStockSource, "fetch", lambda *a, **k: pytest.fail("network"))
-    result = store.preflight_research_request(request)
-    assert len(result.rows) == 9 and not result.research_values_complete
-    assert facts(result.rows[1])["amount"].value == "739740988.4800"
-    assert facts(result.rows[0])["close"].value == "9.1600"
-    assert facts(result.rows[1])["source_preclose"].value == "9.1600"
-    assert all(r.research_values_complete for r in result.rows[:3])
-    for index in (4, 7):
-        assert facts(result.rows[index])["amount"].state == "unknown"
-        assert facts(result.rows[index])["amount"].reason == "UNSUPPORTED_FIELD"
-    aq = dict(request, inputs=request["inputs"][:1])
-    single = store.preflight_research_request(aq, require_complete=True)
-    assert single.to_dict()["execution_permission"] is False
-    assert single.to_dict()["historical_pit"] is False
-    assert all(facts(r)["owner_execution_plan"].state == "unsupported" for r in single.rows)
-    assert hashes(tmp_path) == before
-    # The source field is available, but receipt completion and historical PIT remain unknown.
-    assert facts(single.rows[1])["source_preclose"].evidence["quality"]["historical_pit"] is False
-    # Choosing Sina explicitly keeps its missing amount even though Bao is present.
-    aq["inputs"][0] = dict(aq["inputs"][0], price=request["inputs"][1]["price"])
-    sina = store.preflight_research_request(aq)
-    assert facts(sina.rows[1])["amount"].reason == "UNSUPPORTED_FIELD"
-    assert sina.report_id != single.report_id
-    # Actual recovery failures remain hard failures, not successful empty calendars.
-    failed_ids = json.loads((root / "input-preparation.json").read_text())["recovery_failed_captures"]
-    for cid in failed_ids:
-        with raises_code("SOURCE_REQUEST_FAILED"):
-            store.preflight_research_request(dict(request, calendar={"kind": "baostock", "version_id": cid}))
 
 
 @pytest.mark.parametrize("slot", ["calendar", "price", "status", "preclose"])

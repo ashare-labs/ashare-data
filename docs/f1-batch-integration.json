@@ -1,0 +1,248 @@
+{
+  "schema": "ad.f1-batch-integration.v1",
+  "baseline_commit": "827a391c7209507a595f748c2aa4f70d3a287319",
+  "reviewed_commits": [
+    "e0bd880f7968b84cf061ce784f05f9d9c740b5b2",
+    "aaf6731d8ee10457e2b9d43e2e8eb3b788792c84"
+  ],
+  "integration_policy": "Only the two reviewed commits and review-completion documentation; reviewed Python, tests, scripts, scope and result snapshots stay byte-identical.",
+  "source_mapping": {
+    "docs/f1-batch-reference-results.json": {
+      "source_sha256": "a903ad70b4dffe4ad902f7e7443542142c0df3e9645ca23ae854fd3c92407b1f",
+      "integrated_sha256": "a903ad70b4dffe4ad902f7e7443542142c0df3e9645ca23ae854fd3c92407b1f",
+      "change": "byte_identical"
+    },
+    "docs/f1-batch-reference-validation.md": {
+      "source_sha256": "436f86db81f4ac55e2f238fb1743af92d2d03a90e578f3894680fe194b70881e",
+      "integrated_sha256": "8c12bc74a88a52adb8ad6ee960f978b412cebc0a5b7870748422f7225f43f0e9",
+      "change": "review_completion_and_scope_documentation"
+    },
+    "docs/f1-batch-results.json": {
+      "source_sha256": "08c859e4e05b98254ac06b8a6bb63dd4b9fd0e62cc3f6e2ca11df5ee42478529",
+      "integrated_sha256": "08c859e4e05b98254ac06b8a6bb63dd4b9fd0e62cc3f6e2ca11df5ee42478529",
+      "change": "byte_identical"
+    },
+    "docs/f1-batch-scope.json": {
+      "source_sha256": "a325595de1c2a3b788803df064e6f7cf55d2954c0130cff85e4ba57739b19461",
+      "integrated_sha256": "a325595de1c2a3b788803df064e6f7cf55d2954c0130cff85e4ba57739b19461",
+      "change": "byte_identical"
+    },
+    "docs/f1-batch-scope.sha256": {
+      "source_sha256": "24369b41285e3f840647726fa139ce62ab0ba76df709ea2192db5f0d29a3af66",
+      "integrated_sha256": "24369b41285e3f840647726fa139ce62ab0ba76df709ea2192db5f0d29a3af66",
+      "change": "byte_identical"
+    },
+    "docs/f1-batch-usability.md": {
+      "source_sha256": "10761efc7b78080ffd9467d0a98376d4550b18d8a3dc14b667869c6f90b3e7f2",
+      "integrated_sha256": "10761efc7b78080ffd9467d0a98376d4550b18d8a3dc14b667869c6f90b3e7f2",
+      "change": "byte_identical"
+    },
+    "docs/f1-research.md": {
+      "source_sha256": "f98ce4290570e265d542f74b46289a70e7502501d499ea2f7c35db372e6775c5",
+      "integrated_sha256": "0c56af46f04ccb5e57d9cfa332b86297245f8f25c977ecc3c2a6f459d09ca7b1",
+      "change": "review_completion_and_scope_documentation"
+    },
+    "scripts/capture_f1_batch.py": {
+      "source_sha256": "98cea019971adfa88c19bd0f1b929e0119dc2ff25bb1439165b0608691d78719",
+      "integrated_sha256": "98cea019971adfa88c19bd0f1b929e0119dc2ff25bb1439165b0608691d78719",
+      "change": "byte_identical"
+    },
+    "scripts/check_f1_batch.py": {
+      "source_sha256": "de0b75600f66e7bcf1598bca4610099e5c18f6d5e08459f461c278015ec345a4",
+      "integrated_sha256": "de0b75600f66e7bcf1598bca4610099e5c18f6d5e08459f461c278015ec345a4",
+      "change": "byte_identical"
+    },
+    "scripts/decode_f1_batch.cjs": {
+      "source_sha256": "f7848aa89a5c7ebc1cba0fd0098ddc5275b5d50904b622d6c0aa9d007a724827",
+      "integrated_sha256": "f7848aa89a5c7ebc1cba0fd0098ddc5275b5d50904b622d6c0aa9d007a724827",
+      "change": "byte_identical"
+    },
+    "scripts/prepare_f1_reference.py": {
+      "source_sha256": "12de69fdf53a4c4d941f7758d9bbd3530cda222ffbc80ff8cb4e432657a74608",
+      "integrated_sha256": "12de69fdf53a4c4d941f7758d9bbd3530cda222ffbc80ff8cb4e432657a74608",
+      "change": "byte_identical"
+    },
+    "scripts/run_f1_batch.py": {
+      "source_sha256": "0c73278b3cddba8ec1c0ca11c067034dafdf6f6e5cbef90bc961c6a35432be4f",
+      "integrated_sha256": "0c73278b3cddba8ec1c0ca11c067034dafdf6f6e5cbef90bc961c6a35432be4f",
+      "change": "byte_identical"
+    },
+    "scripts/validate_f1_reference.py": {
+      "source_sha256": "4f47b22b13eee31af0deff6643e03bb4b6c898f462102fc697093c6d028f311a",
+      "integrated_sha256": "4f47b22b13eee31af0deff6643e03bb4b6c898f462102fc697093c6d028f311a",
+      "change": "byte_identical"
+    },
+    "src/ashare_data/f1.py": {
+      "source_sha256": "46fdc94531bc6eec964fbd87fd78e1378790f0d37dab3037bcbd6b8341950fb7",
+      "integrated_sha256": "46fdc94531bc6eec964fbd87fd78e1378790f0d37dab3037bcbd6b8341950fb7",
+      "change": "byte_identical"
+    },
+    "src/ashare_data/f1_batch.py": {
+      "source_sha256": "0548fd1d5b19b0ce4d2bd860ca34b2db1271983dc7d856c3e5d0c699b5434e44",
+      "integrated_sha256": "0548fd1d5b19b0ce4d2bd860ca34b2db1271983dc7d856c3e5d0c699b5434e44",
+      "change": "byte_identical"
+    },
+    "src/ashare_data/f1_batch_reference.py": {
+      "source_sha256": "c65e9b279309672c1faaef381b16e3fb679186c5038e3834e0ae47c0d7690512",
+      "integrated_sha256": "c65e9b279309672c1faaef381b16e3fb679186c5038e3834e0ae47c0d7690512",
+      "change": "byte_identical"
+    },
+    "src/ashare_data/f1_batch_sources.py": {
+      "source_sha256": "a9f7e85c63d224b80edccc14462b8ffd752eaca2cf56bb7fa0f480bdbe2f3a8f",
+      "integrated_sha256": "a9f7e85c63d224b80edccc14462b8ffd752eaca2cf56bb7fa0f480bdbe2f3a8f",
+      "change": "byte_identical"
+    },
+    "tests/test_f1_batch.py": {
+      "source_sha256": "73fdee4f42b1205fb118ac9d4379c444cad77e37f396fbca674c5ba1ae35672e",
+      "integrated_sha256": "73fdee4f42b1205fb118ac9d4379c444cad77e37f396fbca674c5ba1ae35672e",
+      "change": "byte_identical"
+    },
+    "tests/test_f1_batch_reference.py": {
+      "source_sha256": "14834c3d23aa10341caa538eae2ec363fc8af7b4a59adacc2df951a383d74155",
+      "integrated_sha256": "14834c3d23aa10341caa538eae2ec363fc8af7b4a59adacc2df951a383d74155",
+      "change": "byte_identical"
+    }
+  },
+  "public_api": {
+    "module": "ashare_data.f1",
+    "functions": [
+      "compute_panel",
+      "compare_panels"
+    ],
+    "required_definition": "BATCH_RESEARCH_DEFINITION",
+    "mode": "BATCH_RESEARCH_MODE",
+    "qualification": "offline research; caller supplies lawful local inputs; missing values remain explicit"
+  },
+  "independent_review": {
+    "status": "completed_accepted_with_scoped_outcomes",
+    "completed": true,
+    "blocking_findings": [],
+    "report": ".local-evidence/f1-batch-integration/review/report.md",
+    "report_sha256": "d4ee324d71d883c9fa6eb21eaa3679e7f890cbed2e3aa6a2c434be043e8e4d8c",
+    "verdict": ".local-evidence/f1-batch-integration/review/review-verdict.json",
+    "verdict_sha256": "00d75b5091472bed2663bf761c5bacd7659393cb5091e5fdfdf4fb3015d38be4"
+  },
+  "scope": {
+    "securities": 12,
+    "local_output_days": 59,
+    "reference_dates": [
+      "2020-01-13",
+      "2023-08-04",
+      "2024-04-19",
+      "2024-04-29"
+    ],
+    "fields": 13,
+    "original_slots": 12,
+    "ATR6_and_ATR14_count_as_one_slot": true,
+    "returned": 624,
+    "finite": 622,
+    "paired": 610,
+    "numeric_passed": 564,
+    "rank_counts": {
+      "True": 48,
+      "False": 2,
+      "None": 2
+    },
+    "numeric_and_paired_rank_slots": [
+      "PV01",
+      "PV02",
+      "PV04",
+      "PV05",
+      "PV06",
+      "SV01",
+      "SV02"
+    ],
+    "rank_only_slots": [
+      "FI01",
+      "FI03",
+      "PV03"
+    ],
+    "insufficient_slots": [
+      "FI02",
+      "FI04"
+    ]
+  },
+  "retained_limits": {
+    "ROC120_full_pool_selection_passed": false,
+    "full_pool_tail_changed_panels": 7,
+    "VROC6": {
+      "windows": 48,
+      "inside_window_factor_events": 0,
+      "only_directly_supports_normal_windows": true,
+      "volume_adjustment_change_rule_identified": false,
+      "original_unresolved_status_retained": true
+    },
+    "SV02_numeric_exceptions": 2,
+    "FI02_paired_coverage": "42/48",
+    "FI04_paired_coverage": "41/48",
+    "old_exact_status": "5 slots limited support; 3 conditional; 4 unresolved; original failures and certificates retained",
+    "strict_PIT_certified": false,
+    "all_59_days_reference_certified": false,
+    "all_market_certified": false,
+    "all_twelve_slots_practically_usable": false,
+    "all_twelve_exact_compatibility": false,
+    "production_eligible": false
+  },
+  "historical_query_accounting": {
+    "prior_actual": 333,
+    "returned_including_NaN": 624,
+    "total_actual": 957,
+    "remaining_frozen_unused": 43
+  },
+  "integration_new_JQ_queries": 0,
+  "local_evidence": {
+    "manifest": ".local-evidence/f1-batch-integration/manifest.json",
+    "manifest_sha256": "5ccea5ce8e1c6f7208e445b3b1d20608d40af2008e8bf481e352455d1341d5e3",
+    "files_excluding_manifest": 330,
+    "roots": {
+      "f1-batch": 270,
+      "f1-batch-reference-20261013": 40,
+      "f1-batch-integration": 20
+    },
+    "source_archive_sha256": "c480249c46247a8da3e868263c310dfe19bc2d2c5c469bb3655869f4e1ec561a",
+    "private_archive_sha256": "f1670ab14a3ec28e639489c8ebf2a800a8b44868acbcfeb2e7f9c7c4a66a1f95",
+    "private_evidence_committed": false
+  },
+  "historical_pending_flags": "Frozen pre-review summaries are preserved byte-for-byte. The completed independent review is registered separately above.",
+  "independent_review_validation": {
+    "pytest_passed": 2347,
+    "pytest_skipped": 240,
+    "reference_replay_hashes_equal": 4,
+    "all_error_distributions_independently_equal": true,
+    "all_52_common_rank_panels_independently_equal": true,
+    "all_52_full_pool_diagnostics_independently_equal": true,
+    "raw_outputs_match_saved_DOM": true,
+    "all_622_native_float_bits_verified": true,
+    "AppleDouble_issue_closed": true
+  },
+  "integration_validation": {
+    "status": "offline_replay_regression_and_wheel_install_passed",
+    "pytest_passed": 2347,
+    "pytest_skipped": 240,
+    "skipped_reason": "Existing tests require external private inputs or live capture fixtures; not an alignment claim.",
+    "wheel_F1_tests_passed": 249,
+    "wheel_public_API_local_cells": 9204,
+    "wheel_public_API_local_values": 9036,
+    "wheel_public_API_output_byte_equivalent": true,
+    "wheel_public_API_network_blocked": true,
+    "independent_reference_audit_byte_identical": true,
+    "independent_VROC_audit_equal_except_relocated_path": true,
+    "reference_outputs_byte_identical": 4,
+    "frozen_local_and_reference_files_byte_identical_after_replay": 309,
+    "replayed_request_annotation_fields": [
+      "matrix_missing_cells",
+      "parent_delivery_status",
+      "prepared_at",
+      "reason_full_matrix",
+      "replay_script"
+    ],
+    "replayed_request_scope_inputs_predictions_budget_equal": true,
+    "sealed_evidence_unchanged": true,
+    "all_four_old_verifiers_preserve_original_outcomes": true,
+    "reviewed_Python_JavaScript_tests_byte_identical": true,
+    "ruff_changed_Python_passed": true,
+    "README_five_chapters_unchanged": true,
+    "AQ_web_unchanged": true,
+    "new_JQ_queries": 0
+  }
+}

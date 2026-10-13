@@ -1,0 +1,27 @@
+Alpha191 formula adaptation notice
+
+This directory's _formulas.py adapts the formula expressions and structure of
+DolphinDB's gtja191Alpha module, version 1.0.0. Original author: DolphinDB.
+Upstream repository: https://github.com/dolphindb/DolphinDBModules
+Fixed commit: c285bf60208f5c261f6b242c7dbf24717ca71483
+Original file: gtja191Alpha/1.0.0/src/gtja191Alpha.dos
+Upstream license: Apache License 2.0 (complete text in LICENSE.dolphindb).
+The fixed upstream tree contains no NOTICE file.
+
+Changes by ashare-data, 2026:
+- Translate to static Python expressions with a local NumPy/pandas evaluator.
+- Correct documented discrepancies against GTJA's 2017 report, Table 6.
+- Freeze numeric conventions and preserve underspecified formulas as unavailable.
+- Add explicit dependencies, seed, universe, missing-data and provenance handling.
+- Add opt-in explicit.v1 definitions for the eight originally blocked IDs, with
+  per-ID provenance and assumptions. Alpha146 requires the caller's missing SMA
+  parameter. Alpha165/183 use a documented rolling cumulative-path interpretation,
+  not the source's rowMax/rowMin implementation or a claim of unique report intent.
+See the per-factor notes, sources.json, and docs/alpha191.md.
+
+No DolphinDB server, SDK, executable, binary, or hosted service is required,
+installed, bundled, or invoked. No GPL or unlicensed candidate code was copied.
+The adapted formula material remains subject to Apache-2.0. This notice does
+not grant a new license to ashare-data's other code or change its licensing
+status. GTJA's research report and third-party market data are not redistributed.
+This is not official GTJA software or a claim of JoinQuant equivalence.

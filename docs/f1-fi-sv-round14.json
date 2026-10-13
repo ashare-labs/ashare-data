@@ -1,0 +1,247 @@
+{
+  "schema": "ad.f1-fi-sv-round14-integration.v1",
+  "integration_base": "c2b98e3699ca7be53191c99907ae6c06b9be6bee",
+  "candidate_source_commit": "7d67ba893eebbb50b89e644cfc02d0341d78aa7a",
+  "prediction_lock_sha256": "564cefb5f3dcfd57bba9a8f27a12e62fb6646b7c9e069853e18e3a34e56fb40d",
+  "acquisition": {
+    "data_calls": 4,
+    "returned_values": 11,
+    "global_before": 229,
+    "global_after": 240,
+    "limit": 1000,
+    "credits_before": 45,
+    "credits_after": 45,
+    "cost": 0,
+    "browser_released": true
+  },
+  "fixed_scope": {
+    "FI02": {
+      "security": "300124.XSHE",
+      "date": "2024-04-29",
+      "numeric_passed": true,
+      "precision_stage": "nearest6_nonmidpoint",
+      "version_policy_identified": false,
+      "nearest_vs_truncation_identified": false
+    },
+    "SV01": {
+      "security": "600519.XSHG",
+      "date": "2024-04-26",
+      "numeric_passed": true,
+      "precision_stage": "daily_percent_nearest4_nonmidpoint_then_exact_five_session_mean",
+      "observed_raw_turnover_sessions": 7
+    },
+    "SV02": {
+      "security": "600519.XSHG",
+      "date": "2024-04-26",
+      "numeric_passed": false,
+      "raw_1e8_CNY_field_passed": true,
+      "original_rule_retained": true,
+      "conversion_path_identified": false
+    }
+  },
+  "status": {
+    "passed_cells": 10,
+    "named_passed_cells": 2,
+    "raw_passed_cells": 8,
+    "finite_batch_passed": false,
+    "independent_review_completed": false,
+    "global_unexposed_proven": false,
+    "strict_PIT_certified": false,
+    "all_twelve_slots_passed": false
+  },
+  "port_contract": {
+    "FI02_complete_cases_replayed": 3,
+    "SV_dates_replayed": 8,
+    "frozen_arithmetic_preserved": true,
+    "new_boundary_restriction": "SV public research port requires positive observed volume; no zero-volume, halt, or missing-session semantics are certified",
+    "source_authentication": "Arithmetic accepts explicit caller-verified share evidence; authentication and archived source reconstruction remain in sealed evidence and independent review",
+    "entrypoint": "ashare_data.f1_fi_sv_scoped",
+    "general_alias_registered": false
+  },
+  "evidence_files": {
+    "fi-sv-confirmation-round14/authorization-binding.json": "cecd396686a9dc1529fe40a0a5e2d1465bf80e34ca871c26092e6ba9dab74be6",
+    "fi-sv-confirmation-round14/browser-release.json": "5de97998efa1e7efbe1ee13f81aead325bcb0c3c166cabbe82f0d9293054ae5c",
+    "fi-sv-confirmation-round14/call-results.json": "1c337a4cf2e49b728aaa964f5736cf7067dabe6f99dbd8660159dd513317b21e",
+    "fi-sv-confirmation-round14/call1-cell.txt": "dbf9832c2ebed1419472ec22dd5fc96494d669436387fe9f5c234324be2402b0",
+    "fi-sv-confirmation-round14/call2-cell.txt": "a095c2693d25e32c2057e77a7063078df1b5edcaa42f422e946c903a758cdf02",
+    "fi-sv-confirmation-round14/call3-cell.txt": "51f09e26972a5890f45144822c0fdd4206d5ccc7ac3eece4de0df10a7ad7c874",
+    "fi-sv-confirmation-round14/call4-cell.txt": "7055e53edb333971f1de1d3f38df72fe43bcbe61a2d2317cde5409e224ffef15",
+    "fi-sv-confirmation-round14/credits-after-call1-full.txt": "01603355d2e7527c5aa8642250efbc0e3283247737d44dc163321d52c5a0cb86",
+    "fi-sv-confirmation-round14/credits-after-call1.txt": "84068b512de281fdf9a1b8579c74e601a0a265626429279dc4933a0bebd8e789",
+    "fi-sv-confirmation-round14/credits-after-call2.txt": "97489b739f3ca28cfb6e2016b7f68396f3689c526bea23a99507067f749141f5",
+    "fi-sv-confirmation-round14/credits-after-call3.txt": "97489b739f3ca28cfb6e2016b7f68396f3689c526bea23a99507067f749141f5",
+    "fi-sv-confirmation-round14/credits-after-call4.txt": "91fa3e0a8b4825c45b41247b3aeaa2f5ed34fbeb7381013b87524ed93cb42519",
+    "fi-sv-confirmation-round14/credits-after.png": "4cfa7a3142499512665a0e4c8f2030a7b3f1c12fff28955ebad453daf7b2aec8",
+    "fi-sv-confirmation-round14/credits-before.png": "79f5fde89616d6e38a4e7664dc9b77cdb2e3b62955ef537afebfe63f23a7f993",
+    "fi-sv-confirmation-round14/credits-before.txt": "97489b739f3ca28cfb6e2016b7f68396f3689c526bea23a99507067f749141f5",
+    "fi-sv-confirmation-round14/execution-preflight.json": "5ec660ecee0295c8d3231ac7d7cc7616293b8b519f4462d268149a2b82c742d0",
+    "fi-sv-confirmation-round14/input-preparation.json": "79945ed8ce72534c50967abc7e9da47e7788026984313ee6c04966e19a17541d",
+    "fi-sv-confirmation-round14/integration-inputs.json": "5dcb9b9ec1f10ea24f3fbb513153c05041ff372d1e45469dfed07c2345ea64d9",
+    "fi-sv-confirmation-round14/notebook-before.json": "9407d4e4e6b0975c24ce831ae64289c21aae225dd2953e56f3bbc532ebf2b156",
+    "fi-sv-confirmation-round14/notebook-preservation.json": "2e8d2305f3653aa3289991789927ab4a72b52954a6198594f78013c850762744",
+    "fi-sv-confirmation-round14/notebook-reloaded.json": "8600550fdc360ce6658c11bf6e98174e19fae9099b9a657d2853e1b6f19882c5",
+    "fi-sv-confirmation-round14/prefreeze-verification.json": "51fbc314a010f8186e838213c0eef9d705673ef1d2d4e04581674a1e3e52da4d",
+    "fi-sv-confirmation-round14/reference-records.json": "0bc886155dd327d56391f6e3f48fc4d5ac67b6877384cebcf6a5704020bc8c29",
+    "fi-sv-confirmation-round14/request-call2.py": "a8b99c929f7f4e36263f2faca6b319f532b5813dbbb2d022dcc738f5f645ca14",
+    "fi-sv-confirmation-round14/request-call3.py": "399de12dfc745629750e9ea85a257cc09321920e71fd7352838be2fc492e681c",
+    "fi-sv-confirmation-round14/request-call4.py": "9c3afe19dd7d937200a5bed5c40fe2f3446da5f15032cea34e41f381863703b0",
+    "fi-sv-confirmation-round14/request-first.py": "e63e9749d85be4a0e86366e3c451ae1fc82cb4268e2bfdb69b1b4a2fef5b92a7",
+    "fi-sv-confirmation-round14/results-saved.png": "64e29535f269688a27ff109ab7ff5551504d715afcbd144af45639a3b5164afd",
+    "fi-sv-confirmation-round14/scoped-replay.json": "8f62b63fdeb5d8b56c4b2c61d1bbb4b8dacbf3c13c915576bbf60f899db1637f",
+    "fi-sv-confirmation-round14/summary-cell.py": "0ad96efada2f0dec78c5f33b4d492cc2058ff95f66966526ab71d9d14a51661c",
+    "evidence/fi-sv-comparison-round14.json": "74fafd8d4b1fe84f6021cd1db75b02b2845e818a1090645177a252597dafb3d3",
+    "evidence/source-freeze-fi-sv-round13.json": "df833c2d727f7e253babaf58dcebe85e4361f9376fa7e57d763d1f17b8a3f4cf"
+  },
+  "historical_status_note": "status and fixed_scope preserve the original observation-stage zero-ULP experiment; independent_review below is a later, separate finite assessment.",
+  "independent_review": {
+    "completed": true,
+    "decision": "finite_research_increment_supported",
+    "reviewed_commit": "285abef5131d7d320fc6027f12176adf6b8e5f38",
+    "exact_named_keys": [
+      [
+        "300124.XSHE",
+        "2024-04-29",
+        "net_profit_growth_rate"
+      ],
+      [
+        "600519.XSHG",
+        "2024-04-26",
+        "VOL5"
+      ]
+    ],
+    "exact_raw_keys": [
+      [
+        "600519.XSHG",
+        "2024-04-19",
+        "turnover_ratio"
+      ],
+      [
+        "600519.XSHG",
+        "2024-04-22",
+        "turnover_ratio"
+      ],
+      [
+        "600519.XSHG",
+        "2024-04-23",
+        "turnover_ratio"
+      ],
+      [
+        "600519.XSHG",
+        "2024-04-24",
+        "turnover_ratio"
+      ],
+      [
+        "600519.XSHG",
+        "2024-04-25",
+        "turnover_ratio"
+      ],
+      [
+        "600519.XSHG",
+        "2024-04-26",
+        "turnover_ratio"
+      ],
+      [
+        "600519.XSHG",
+        "2024-04-29",
+        "turnover_ratio"
+      ],
+      [
+        "600519.XSHG",
+        "2024-04-26",
+        "circulating_market_cap"
+      ]
+    ],
+    "numeric_equivalence_key": [
+      "600519.XSHG",
+      "2024-04-26",
+      "circulating_market_cap"
+    ],
+    "numeric_equivalence_api": "jqfactor.get_factor_values",
+    "SV02_finite_numeric_equivalence": true,
+    "equivalence_basis": "exact decimal unit conversion and independent binary64 error propagation; original 0-ULP failed path retained",
+    "original_experiment_reclassified_as_pass": false,
+    "supplier_conversion_order_identified": false,
+    "remaining_evidence_limits": [
+      "FI02 unique version selection",
+      "FI02 nearest versus truncation at this key",
+      "SV02 unique server conversion order",
+      "strict historical PIT",
+      "other securities/windows and zero-volume/halt semantics"
+    ],
+    "additional_holdout_required_for_these_keys": false,
+    "new_queries_needed_to_close_this_scope": false,
+    "P3_clarification": {
+      "original_Inovance_2022Q1_report_in_pack": false,
+      "available_source": "2023Q1 comparative, published before 2023-04-29 prior cutoff",
+      "all_original_report_versions_same_value_proven": false,
+      "old_lock_bytes_modified": false
+    },
+    "recorded_exposure_review_files": 22,
+    "matching_prior_target_records": 0,
+    "unrecorded_external_queries_excluded": false,
+    "strict_PIT_certified": false,
+    "all_twelve_slots_passed": false,
+    "report_path": "reviews/ROUND14-INDEPENDENT-REVIEW.md",
+    "report_sha256": "da051c25aab75f2dbe65b36c4a63988920caca86eb250480a7604239af1ef10b",
+    "verdict_path": "reviews/outputs-round14/scoped-verdict.json",
+    "verdict_sha256": "25b419f5012adfc0d3bf6e36127e075197e316476f6781e1a68732bba3778cc0"
+  },
+  "local_integration": {
+    "source_commit": "285abef5131d7d320fc6027f12176adf6b8e5f38",
+    "base_commit": "c2b98e3699ca7be53191c99907ae6c06b9be6bee",
+    "local_evidence_root": ".local-evidence/f1-round14",
+    "manifest_sha256": "412dc1b7bf98c17f0f3baff4e14c361eb88eed0e4acfc0c37c33e2135973d917",
+    "archive_sha256": "02b87faa0cd4b054a41cff15ba610a380a3d4f68b7277eca3bc705b8aa84460b",
+    "evidence_file_count": 503,
+    "unchanged_code": [
+      {
+        "path": "src/ashare_data/f1_fi_sv_scoped.py",
+        "source_sha256": "797f8e4a7cd9828fa474ad1cd2f4e334f0f9ad5008a321b6850f2e420f6383f9"
+      },
+      {
+        "path": "scripts/verify_f1_fi_sv_round14.py",
+        "source_sha256": "4e346b7cd2d9c64d20eccf62889879daa15e8a3ede2a1892028edff1e5f7e1c0"
+      },
+      {
+        "path": "tests/test_f1_fi_sv_scoped.py",
+        "source_sha256": "0166b8e89c743c39469a72dc3b4f9f7a957a4516d7feb97cef66f53746e7d825"
+      }
+    ],
+    "source_mapping": [
+      {
+        "path": "src/ashare_data/f1_fi_sv_scoped.py",
+        "source_sha256": "797f8e4a7cd9828fa474ad1cd2f4e334f0f9ad5008a321b6850f2e420f6383f9",
+        "treatment": "byte-identical"
+      },
+      {
+        "path": "scripts/verify_f1_fi_sv_round14.py",
+        "source_sha256": "4e346b7cd2d9c64d20eccf62889879daa15e8a3ede2a1892028edff1e5f7e1c0",
+        "treatment": "byte-identical"
+      },
+      {
+        "path": "tests/test_f1_fi_sv_scoped.py",
+        "source_sha256": "0166b8e89c743c39469a72dc3b4f9f7a957a4516d7feb97cef66f53746e7d825",
+        "treatment": "byte-identical"
+      },
+      {
+        "path": "docs/f1-fi-sv-round14.md",
+        "source_sha256": "93b94727da03c316dac728f9b46b3c5a29e20673b6c35784f2114bcbd96527cd",
+        "treatment": "Public scope documentation; raw values retained only in local evidence, review and P3 notes added."
+      },
+      {
+        "path": "docs/f1-fi-sv-round14.json",
+        "source_sha256": "939973b9b344a6347664da71a086913f408a2fddcf7fe435081535563f65e96b",
+        "treatment": "Public scope documentation; raw values retained only in local evidence, review and P3 notes added."
+      }
+    ],
+    "additional_public_entry": "ashare_data.f1",
+    "general_alias_registered": false,
+    "private_evidence_or_reference_values_distributed": false,
+    "scope": "FI02/SV01 named samples and raw-stage checks; separate bounded SV02 numeric equivalence, original strict failure retained."
+  },
+  "unchanged_blocks": [
+    "FI03",
+    "PV05",
+    "ROC"
+  ]
+}

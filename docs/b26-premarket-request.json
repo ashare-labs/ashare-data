@@ -15,7 +15,7 @@
   "availability_evidence": null,
   "source_provenance": null,
   "corporate_action_binding": {
-    "path": "/Users/yinming/Documents/Codex/2026-10-10/task-3/round-one-data-delivery/corporate-action/binding.json",
+    "path": "evidence/binding.json",
     "sha256": "b7de4c9cac991d194adeda0a815771248bd33c757938fab19f9e10d95856b371"
   },
   "required_evidence": [

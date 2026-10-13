@@ -1,0 +1,59 @@
+{
+  "schema": "ad.financial-pit-evidence.v1",
+  "baseline": "827a391c7209507a595f748c2aa4f70d3a287319",
+  "pack_sha256": "1e4d4d181351098dc8df874000fa922ec4d417d4646087411bcfdb2406bdf884",
+  "cases_sha256": "ef776ec4de435a164dcc6b445081996ad9d272124ddc169588dad95e41f29f4d",
+  "coverage": {
+    "securities": [
+      "000637.XSHE",
+      "300124.XSHE",
+      "300630.XSHE",
+      "603169.XSHG"
+    ],
+    "reports": 18,
+    "raw_observations": 66,
+    "source_files": 48,
+    "source_bytes": 46197398,
+    "explicit_corrected_cells": 13,
+    "cases": 90
+  },
+  "evidence_path": ".local-evidence/financial-pit",
+  "original_inovance_pack_sha256": "125cc507a18d1041136859d09c4a055e0f4a6da638e756838d4dd1a9098c2ce0",
+  "source_acquisition": "Current official CNINFO indices and PDFs; historical original byte availability not certified.",
+  "independent_review_completed": false,
+  "historical_pit_certified": false,
+  "jq_equivalent": false,
+  "limitations": [
+    "Date labels from captured official current announcement indices; no historical first-release clock or full revision archive.",
+    "Copied 300124 official source bytes from accepted local FI input archive; no JoinQuant raw input or factor labels included.",
+    "Selected samples only; not a full-market or full-revision inventory.",
+    "Original PDFs fetched now are matched to original announcement IDs, byte hashes retained; no historical web archive proof for every byte.",
+    "FY2023 Poly facts limited to three fields here because only these summary cells were verified.",
+    "No intraday release-time guarantee."
+  ],
+  "excluded_sources": [
+    {
+      "announcement_id": "1221364107",
+      "security": "000637.XSHE",
+      "indexed_date": "2024-04-29",
+      "pdf_creation_date": "2024-10-11",
+      "reason": "Current official attachment metadata postdates indexed announcement; not accepted as original disclosure bytes without archive validation."
+    }
+  ],
+  "validation": {
+    "python": "3.12.13",
+    "platform": "macOS arm64",
+    "fixed_real_queries_passed": 90,
+    "official_index_reports_verified": 18,
+    "pdf_amount_cells_verified": 66,
+    "source_hashes_verified": 48,
+    "scoped_tests_passed": 194,
+    "full_suite_passed": 2495,
+    "full_suite_skipped": 240,
+    "skip_reason": "Pre-existing tests require separate external market/evidence bundles; financial PIT captured-byte test ran.",
+    "wheel_isolated_install_smoke_passed": true,
+    "sdist_rebuilt_wheel_byte_identical": true,
+    "ruff_changed_python_passed": true,
+    "author_validation_only": true
+  }
+}

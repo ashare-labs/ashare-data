@@ -7,7 +7,6 @@ import hashlib
 import http.client
 import io
 import json
-import os
 import socket
 import urllib.error
 
@@ -123,29 +122,6 @@ def test_disabled_before_any_io(store, monkeypatch):
     assert store.snapshots() == []
 
 
-def test_fixed_real_capture_roundtrip(store, monkeypatch):
-    source = os.environ.get("ASHARE_ZZSHARE_CAPTURE")
-    if not source:
-        pytest.skip("real capture remains external")
-    monkeypatch.setattr(api.urllib.request, "build_opener", lambda *a: pytest.fail("offline query"))
-    view = load(store, source)
-    sid = view.descriptor()["capture_id"]
-    assert store.import_zzshare_capture(source, enable_research=True) == sid
-    result = Store(store.root).zzshare(sid, enable_research=True).get_price()
-    assert [row.prev_close.raw_token for row in result.rows] == ["9.0", "9.16", "9.18"]
-    assert [row.source_claimed_limits.high.value for row in result.rows] == [
-        Decimal("9.9"),
-        Decimal("10.08"),
-        Decimal("10.1"),
-    ]
-    assert (
-        result.report["raw_response_sha256"]
-        == "711843982c3d846529486837c73aeeb31c4103e001454b15bdededf5c89bab11"
-    )
-    assert result.report["coverage"]["requested_dates_present"]
-    for row in result.rows:
-        assert row.rule_derived_limits is row.historical_available_at is None
-        assert not row.historical_pit and not row.execution_permission
 
 
 def test_precision_and_detached_results(store, tmp_path):

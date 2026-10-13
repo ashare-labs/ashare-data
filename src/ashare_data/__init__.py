@@ -15,9 +15,17 @@ from .research_preflight import (ResearchInputRef, ResearchSecurityInputs, Resea
 from .jq_observations import JQObservationInput, JQObservationRead, JQObservationView
 from .jq_queries import JQQueryView
 from .tdx_points import TDXPointInput, TDXPointView
+from .tdx_bars import TDXBarSource, TDXBarView
+from .minute_session import TDXMinuteSessionView, TDXSessionSource
 from .calendar_binding import BoundedCalendarView
 from .independent_queries import IndependentQueryView
 from .premarket_reference import PremarketReferenceView
+from .daily_research import DailyResearchView
+from .daily_execution import DailyExecutionView
+from .financial_pit import FinancialPIT
+from .f2 import FactorResearchView
+
+from .historical_market import HistoricalMarketView
 from .baostock import BaoStockSource, BaoStockView
 from .zzshare import ZzshareSource, ZzshareView
 from .zzshare_types import ZzshareValue, SourceClaimedLimits, ZzshareDailyRow, ZzshareDailyResult
@@ -26,6 +34,7 @@ from .d1_types import D1OwnerReceipt, D1PrevCloseCall, Evidence, FactRecord
 from .br1 import BR1View, BR1Receipt
 from .br1_listing import BR1ListingContract, BR1ListingProjection, BR1ListingView
 from .live import Client, capabilities, get_all_securities, get_price, get_security_info, get_trade_days
+from .minute_evidence import MinuteEvidenceView, seal_minute_evidence
 
 from .m2 import M2View, M2UseView
 from .m2_types import M2AD08Call, M2ConsumerBinding, M2ReadContext, M2Read, M2Document
@@ -34,7 +43,7 @@ __all__ = ["BaoStockSource", "BaoStockView", "ResearchResult", "ResearchView", "
            "get_all_securities", "capabilities", "CoverageContract", "reconcile_turnover", "reconcile_sina_day",
            "D1Facts", "D1View", "D1OwnerReceipt", "D1PrevCloseCall", "BR1View", "BR1Receipt"]
 __all__ += ["BR1ListingContract", "BR1ListingProjection", "BR1ListingView"]
-__version__ = "0.9.1.dev10"
+__version__ = "0.9.1.dev13"
 
 __all__ += ["M2View", "M2UseView", "M2AD08Call", "M2ConsumerBinding", "M2ReadContext", "M2Read", "M2Document"]
 
@@ -59,6 +68,17 @@ __all__ += ["ResearchInputRef", "ResearchSecurityInputs", "ResearchInputFact",
 __all__ += ["JQObservationInput", "JQObservationRead", "JQObservationView"]
 __all__ += ["JQQueryView"]
 __all__ += ["TDXPointInput", "TDXPointView"]
+__all__ += ["TDXBarSource", "TDXBarView"]
+__all__ += ["TDXMinuteSessionView", "TDXSessionSource"]
 __all__ += ["BoundedCalendarView"]
 __all__ += ["IndependentQueryView"]
 __all__ += ["PremarketReferenceView"]
+__all__ += ["DailyResearchView"]
+
+__all__ += ["DailyExecutionView"]
+__all__ += ["FinancialPIT"]
+__all__ += ["FactorResearchView"]
+
+__all__ += ["HistoricalMarketView"]
+
+__all__ += ["MinuteEvidenceView", "seal_minute_evidence"]

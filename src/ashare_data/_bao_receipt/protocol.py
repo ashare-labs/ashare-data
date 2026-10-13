@@ -47,6 +47,36 @@ METHODS = {
     ),
 }
 
+# Saved real 0.9.4 type-14/16 replies use a literal empty data segment for
+# successful zero-row queries. Scope this exception to the observed schemas;
+# absent columns, whitespace, malformed JSON and other message types are not
+# evidence of an empty collection. Request identity is still checked separately.
+NATIVE_EMPTY_FIELDS = {
+    "query_adjust_factor": [
+        "code",
+        "dividOperateDate",
+        "foreAdjustFactor",
+        "backAdjustFactor",
+        "adjustFactor",
+    ],
+    "query_dividend_data": [
+        "code",
+        "dividPreNoticeDate",
+        "dividAgmPumDate",
+        "dividPlanAnnounceDate",
+        "dividPlanDate",
+        "dividRegistDate",
+        "dividOperateDate",
+        "dividPayDate",
+        "dividStockMarketDate",
+        "dividCashPsBeforeTax",
+        "dividCashPsAfterTax",
+        "dividStocksPs",
+        "dividCashStock",
+        "dividReserveToStockPs",
+    ],
+}
+
 
 class FrameError(ValueError):
     pass
@@ -170,7 +200,17 @@ def decode_response(raw):
         raise FrameError("invalid response page metadata")
     echo = dict(zip(spec["response_keys"], chunks[7:], strict=True))
     names = fields(echo["fields"])
-    record = json.loads(chunks[6]).get("record")
+    if chunks[6] == "":
+        if kind != spec["response"] or method not in NATIVE_EMPTY_FIELDS:
+            raise FrameError("native-empty response type/method is unverified")
+        if names != NATIVE_EMPTY_FIELDS[method]:
+            raise FrameError("native-empty response fields differ from verified schema")
+        record = []
+    else:
+        payload = json.loads(chunks[6])
+        if not isinstance(payload, dict):
+            raise FrameError("data is not a record object")
+        record = payload.get("record")
     if not isinstance(record, list):
         raise FrameError("record is not a list")
     rows = []

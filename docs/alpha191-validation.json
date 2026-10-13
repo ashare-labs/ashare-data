@@ -1,0 +1,185 @@
+{
+  "schema": "ashare-data.alpha191-validation.v1",
+  "definition": "gtja191.public.v1",
+  "base_commit": "a644f4319bdc95c54539271a8ae0ef908fec4355",
+  "review_status": "candidate; independent parent review and main integration pending",
+  "runtime": {
+    "python": "3.12.13",
+    "pandas": "2.3.3",
+    "numpy": "2.5.3",
+    "platform": "macOS-26.6.2-arm64-arm-64bit"
+  },
+  "coverage": {
+    "IMPLEMENTED": 178,
+    "AMBIGUOUS_FORMULA": 8,
+    "REQUIRES_BENCHMARK": 3,
+    "REQUIRES_EXTERNAL_FACTORS": 1,
+    "REQUIRES_EXPLICIT_SEED": 1
+  },
+  "source_full_suite": {
+    "tests": "3038",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "241",
+    "time": "43.377"
+  },
+  "installed_wheel_full_suite": {
+    "tests": "3038",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "241",
+    "time": "42.352"
+  },
+  "skips": "241 existing tests require separately supplied external/private captures or components; no newly fabricated inputs",
+  "ruff": "all src/tests/examples/scripts pass",
+  "uv_lock": "offline --check passes; existing locked NumPy versions now explicit direct requirements",
+  "source_origin": {
+    "repository": "https://github.com/dolphindb/DolphinDBModules",
+    "commit": "c285bf60208f5c261f6b242c7dbf24717ca71483",
+    "source_path": "gtja191Alpha/1.0.0/src/gtja191Alpha.dos",
+    "source_sha256": "270cb8bb8981a04c36c124db57f26a27891e5cf24f1b05cb94358d790371fac1",
+    "license": "Apache-2.0",
+    "license_sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+  },
+  "real_input_validation": {
+    "schema": "alpha191.real-validation.v1",
+    "panel_sha256": "a1ffe1c109f6762f1db5f1f5edd9f4dd98905862df22fb963bc9806cc36ebda3",
+    "calculation_input_sha256": "5395a4936f58c35b42be2f1f8ccde7b1196149e9f5e8d674a2703d7ea606fff7",
+    "sessions": 342,
+    "securities": 12,
+    "dates": [
+      "2022-12-01",
+      "2024-04-30"
+    ],
+    "valid_cells": 620737,
+    "total_cells": 783864,
+    "factors_with_any_valid_cells": 168,
+    "missing_dependencies": {
+      "alpha030": [
+        "hml",
+        "mkt",
+        "smb"
+      ],
+      "alpha075": [
+        "benchmark_close",
+        "benchmark_open"
+      ],
+      "alpha143": [
+        "alpha143_seed"
+      ],
+      "alpha149": [
+        "benchmark_close"
+      ],
+      "alpha182": [
+        "benchmark_close",
+        "benchmark_open"
+      ]
+    },
+    "nan_factors": [
+      "alpha016",
+      "alpha030",
+      "alpha032",
+      "alpha036",
+      "alpha054",
+      "alpha064",
+      "alpha074",
+      "alpha075",
+      "alpha090",
+      "alpha101",
+      "alpha119",
+      "alpha127",
+      "alpha130",
+      "alpha141",
+      "alpha143",
+      "alpha146",
+      "alpha149",
+      "alpha165",
+      "alpha166",
+      "alpha179",
+      "alpha181",
+      "alpha182",
+      "alpha183"
+    ],
+    "historical_pit_certified": false,
+    "joinquant_equivalence": false,
+    "source_dataset_sha256": "36a2b406eeeadc0976505e1fd6c89e76c532d0bb482e4e51b3c8a2a7297647fe",
+    "real-values.csv_sha256": "e406bcded98878c89dfda9ae3edf03772454033b251f9742fe1b9a4d8603a208",
+    "real-status.csv_sha256": "1a57f38ea01fa16fe21f52b26e387af7e55540f3e848cce4ef95c14e85ff23f6",
+    "real-coverage.csv_sha256": "f14556848d1eae80279c640d256974ca699918f6a3c7583f371298ae4a9394db"
+  },
+  "synthetic_benchmark": {
+    "schema": "alpha191.benchmark.v1",
+    "version": "gtja191.public.v1",
+    "synthetic": true,
+    "sessions": 512,
+    "securities": 128,
+    "factor_ids": 191,
+    "elapsed_seconds": 2.0284058329998516,
+    "output_cells": 12517376,
+    "valid_cells": 11208848,
+    "peak_process_rss_bytes": 418168832,
+    "python": "3.12.13",
+    "numpy": "2.5.3",
+    "pandas": "2.3.3",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "processor": "arm64",
+    "rank_policy": "available",
+    "ambiguous_formulas": 8,
+    "input_sha256": "026dbfea8ff4a2194dd6ea4ee4601e99e233195942f5471f887b2359b06ea155"
+  },
+  "wheel": {
+    "sha256": "1cc9ee7f91fe4fcdd5c4762a6d180a2c3ef4c131d6a07ba6f4de17b4354fad2c",
+    "installation": "offline --no-deps into a separate venv; already installed trusted locked dependencies linked in, no download",
+    "import_origin_verified": "installed wheel package, not source tree",
+    "license_resources": [
+      "NOTICE",
+      "LICENSE.dolphindb",
+      "sources.json"
+    ],
+    "contains_real_market_data": false
+  },
+  "unchanged": [
+    "聚宽主因子库（部分实现）：18 original entries / 19 exposed fields; existing F1/F2 calculations and all historical JQ comparison reports retained",
+    "FinancialPIT",
+    "historical JQ differences",
+    "AQ JoinQuant backtest objective"
+  ],
+  "source_files_sha256": {
+    "src/ashare_data/alpha191/LICENSE.dolphindb": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "src/ashare_data/alpha191/NOTICE": "a7ac973c4d0696fecfe61e8b8440f6916c7b6250c76ec6ffa6880e1ee04e3b03",
+    "src/ashare_data/alpha191/__init__.py": "0d608a628169addae1957370f6c621d789531b8c6a2ede08ecb19adc4da745f0",
+    "src/ashare_data/alpha191/_engine.py": "00b3b073a2722f3b0ed584bc3547942d3dadebfe82c3c66ba8c605e3205338be",
+    "src/ashare_data/alpha191/_formulas.py": "09ef1c9132e67a5e1c6bb166a86e693dbf0d062905a48c4c41a50cf7b8ddf67a",
+    "src/ashare_data/alpha191/sources.json": "1b2ae557ee49998344f4c2c1d382869cc9fb2032a2aa27541e76344d8b18b490",
+    "src/ashare_data/factors.py": "80986c5ce554e638e694294169e3099dc553b4fa47cf6263d075bea36e692737"
+  },
+  "previous_candidate": "c5584c88f8192c688ae6657d03994f4381bb2d8e",
+  "factor_libraries_and_alpha191_suite": {
+    "tests": "38",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "time": "3.946"
+  },
+  "library_catalog": {
+    "joinquant": {
+      "namespace": "joinquant",
+      "label": "聚宽主因子库（部分实现）",
+      "entry_count": 18,
+      "api_field_count": 19
+    },
+    "alpha191": {
+      "namespace": "alpha191",
+      "label": "Alpha191",
+      "entry_count": 191,
+      "api_field_count": 191
+    }
+  },
+  "naming_followup_numerical_identity": {
+    "numerical_values_identical_to_c5584c8": true,
+    "statuses_identical_to_c5584c8": true,
+    "input_sha256_unchanged": "5395a4936f58c35b42be2f1f8ccde7b1196149e9f5e8d674a2703d7ea606fff7",
+    "library": "alpha191",
+    "namespace": "alpha191"
+  }
+}

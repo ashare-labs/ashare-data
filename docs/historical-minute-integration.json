@@ -1,0 +1,401 @@
+{
+  "schema": "ad.historical-minute-integration.v1",
+  "baseline_commit": "ecf63882329cff3ae093cab32d6cb9c209208c6d",
+  "source_commit": "720ff0a4c9ed0c73870b76240a3692e8d484d838",
+  "source_baseline": "827a391c7209507a595f748c2aa4f70d3a287319",
+  "source_chain": [
+    "7b403c844e1e8868202e62f0b5cbaf86634c8bfc",
+    "964025c189e0d6ce3cd44b6af6d25a3daf44cbc8",
+    "d851553f9aa18f4347a58aea37cc19813dfe5392",
+    "7bf2069d31090f69c09df7a6b711f9b596b4728d",
+    "720ff0a4c9ed0c73870b76240a3692e8d484d838"
+  ],
+  "integration_method": "Merge the complete frozen five-commit chain; preserve both parents. Union public exports and changelog; retain five README chapters. Add current review status in documentation only.",
+  "source_mapping": {
+    "CHANGELOG.md": {
+      "source_sha256": "af14022e7ed683534bcb9cae9963fae7238351acccfb825f661210e5ece743a5",
+      "integrated_sha256": "1d4fb55365b9a196ce25ea2309b481a25b6d91a16f2facb8c15a8ad1b6333993"
+    },
+    "README.md": {
+      "source_sha256": "89d349b03db9876cf3415bf89c08b38c06653c78913a21ad11041e11fd723a30",
+      "integrated_sha256": "194beee117f93d13054527fd0d03095a247e31700d530091995615e2292aab9f"
+    },
+    "docs/baostock-api.md": {
+      "source_sha256": "ae5ba5295f86f4479a7d7c4f09791a287c514ba6e84e5a9f9043ce60bacafca5",
+      "integrated_sha256": "ae5ba5295f86f4479a7d7c4f09791a287c514ba6e84e5a9f9043ce60bacafca5"
+    },
+    "docs/corporate-actions.md": {
+      "source_sha256": "e89152f69d5d36974dfb26b55ad334cf9cdcc3057701e358dbed17fa14d063ea",
+      "integrated_sha256": "e89152f69d5d36974dfb26b55ad334cf9cdcc3057701e358dbed17fa14d063ea"
+    },
+    "docs/historical-market.md": {
+      "source_sha256": "c55f56c1111da91ec35d47fa7ea3802772f85337f00d8170cce82c2edf6f6a22",
+      "integrated_sha256": "8340b69ed76de188b11924e55017e0ebae0d341597db0e0a6c8d328b35b7844d"
+    },
+    "docs/minute-evidence.md": {
+      "source_sha256": "803539c2c0d62142743d7b8cef09c492c0ee20384698e19dea4bb91423695189",
+      "integrated_sha256": "df6930aec2c332aa5c0008e4b2a82fa224f704dd3f75001b3ed9c88ef11fcff6"
+    },
+    "examples/historical_market.py": {
+      "source_sha256": "481e4fe93e693d9ed7f80c14d77d1f1a543bf88c4e8305e95ad4874fee0e9345",
+      "integrated_sha256": "481e4fe93e693d9ed7f80c14d77d1f1a543bf88c4e8305e95ad4874fee0e9345"
+    },
+    "scripts/build_historical_market.py": {
+      "source_sha256": "b536e0be6dd091c64272fc2ae25c528b4540555f05321064f4b02f850a483091",
+      "integrated_sha256": "b536e0be6dd091c64272fc2ae25c528b4540555f05321064f4b02f850a483091"
+    },
+    "scripts/build_minute_evidence.py": {
+      "source_sha256": "f316badd6c259d1ea42f11103391746035f5a04c1268754dbd53c5f281acb61c",
+      "integrated_sha256": "f316badd6c259d1ea42f11103391746035f5a04c1268754dbd53c5f281acb61c"
+    },
+    "scripts/repair_historical_review_batch.py": {
+      "source_sha256": "af4a3b5a44924d5c49544c1d0cfa18854c304292657ffa381fc15f29daf89788",
+      "integrated_sha256": "af4a3b5a44924d5c49544c1d0cfa18854c304292657ffa381fc15f29daf89788"
+    },
+    "scripts/supplement_minute_evidence.py": {
+      "source_sha256": "9a80d47c1790ad25c1bdbae9abfaff2562a4f4578d2c5a88e838c7403fb09520",
+      "integrated_sha256": "9a80d47c1790ad25c1bdbae9abfaff2562a4f4578d2c5a88e838c7403fb09520"
+    },
+    "scripts/verify_baostock_native_empty.py": {
+      "source_sha256": "7f6f179fcc2abb937b870e30bc8ab8c567f0be67fe429e170cb1688bcfc0dc6c",
+      "integrated_sha256": "7f6f179fcc2abb937b870e30bc8ab8c567f0be67fe429e170cb1688bcfc0dc6c"
+    },
+    "scripts/verify_historical_market.py": {
+      "source_sha256": "cec04b2aa1c0501e218207027798ec572e3f01462a006671866b150656bc5afa",
+      "integrated_sha256": "cec04b2aa1c0501e218207027798ec572e3f01462a006671866b150656bc5afa"
+    },
+    "scripts/verify_historical_universe.py": {
+      "source_sha256": "2c20da9611748f892932ebb7090b29375281a39f1fcdf1b9af4b2947a76f3919",
+      "integrated_sha256": "2c20da9611748f892932ebb7090b29375281a39f1fcdf1b9af4b2947a76f3919"
+    },
+    "scripts/verify_minute_evidence.py": {
+      "source_sha256": "dc332f2d78afc670d558e063ada8219983128db6904fa3fa50170b54b54c362e",
+      "integrated_sha256": "dc332f2d78afc670d558e063ada8219983128db6904fa3fa50170b54b54c362e"
+    },
+    "scripts/verify_minute_supplement.py": {
+      "source_sha256": "b457d899c9411c3c9a823f4cbd49fcb32b4a92978494ac465c58deb8c965fce9",
+      "integrated_sha256": "b457d899c9411c3c9a823f4cbd49fcb32b4a92978494ac465c58deb8c965fce9"
+    },
+    "src/ashare_data/__init__.py": {
+      "source_sha256": "ece8c803bd0ce8a53287217ad47e637c2a0fc58e1883adb2bf710eb6ccff1961",
+      "integrated_sha256": "7bb324f8917dd2397af5fa055da664188e604eba83fdf3f0af35769d743f4429"
+    },
+    "src/ashare_data/_bao_receipt/protocol.py": {
+      "source_sha256": "ad32800cb490bed993505051fb233379a13869e84678e19a4a353fe83b20323e",
+      "integrated_sha256": "ad32800cb490bed993505051fb233379a13869e84678e19a4a353fe83b20323e"
+    },
+    "src/ashare_data/historical_market.py": {
+      "source_sha256": "70e7520fc7e58cb0c257eaa358903086a724167c819977a7046913a17be63253",
+      "integrated_sha256": "70e7520fc7e58cb0c257eaa358903086a724167c819977a7046913a17be63253"
+    },
+    "src/ashare_data/minute_evidence.py": {
+      "source_sha256": "df520faf11d641b5797f1bd0d848fe446be43fea86bba06bafa8de76e0226256",
+      "integrated_sha256": "df520faf11d641b5797f1bd0d848fe446be43fea86bba06bafa8de76e0226256"
+    },
+    "tests/fixtures/baostock_native_empty/manifest.json": {
+      "source_sha256": "891f01c2769a0003f07a1fb44c99dcad4182d59aab50b14bd6925878dcd39045",
+      "integrated_sha256": "891f01c2769a0003f07a1fb44c99dcad4182d59aab50b14bd6925878dcd39045"
+    },
+    "tests/fixtures/baostock_native_empty/sh.600000-query_adjust_factor-20261008-12/page-01.request.bin": {
+      "source_sha256": "7711e72c3b4a5062793379e6d6370fe55f79e96ac5343f135a126369b397c62f",
+      "integrated_sha256": "7711e72c3b4a5062793379e6d6370fe55f79e96ac5343f135a126369b397c62f"
+    },
+    "tests/fixtures/baostock_native_empty/sh.600000-query_adjust_factor-20261008-12/page-01.response.bin": {
+      "source_sha256": "c965307b7ffbb3092cbfc71bfe74470745d6a1a0d6eea2d1c9ec862f6d89d4ee",
+      "integrated_sha256": "c965307b7ffbb3092cbfc71bfe74470745d6a1a0d6eea2d1c9ec862f6d89d4ee"
+    },
+    "tests/fixtures/baostock_native_empty/sh.600000-query_adjust_factor-20261008-12/sdk-rows.json": {
+      "source_sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "integrated_sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    "tests/fixtures/baostock_native_empty/sh.600000-query_dividend_data-2017/page-01.request.bin": {
+      "source_sha256": "7dfbeb083597ab35e722a96b14e15d5803e5b3e89f769fb0e4252373a48ae643",
+      "integrated_sha256": "7dfbeb083597ab35e722a96b14e15d5803e5b3e89f769fb0e4252373a48ae643"
+    },
+    "tests/fixtures/baostock_native_empty/sh.600000-query_dividend_data-2017/page-01.response.bin": {
+      "source_sha256": "8df92fb29527561837d22fa8c71e604d1c157737889dd0edbd1ed1a266d54277",
+      "integrated_sha256": "8df92fb29527561837d22fa8c71e604d1c157737889dd0edbd1ed1a266d54277"
+    },
+    "tests/fixtures/baostock_native_empty/sh.600000-query_dividend_data-2017/sdk-rows.json": {
+      "source_sha256": "c6f367e8e2b645b4f3e3e4c078eba81e1df466e8bd1983746296236674d49081",
+      "integrated_sha256": "c6f367e8e2b645b4f3e3e4c078eba81e1df466e8bd1983746296236674d49081"
+    },
+    "tests/fixtures/baostock_native_empty/sh.600000-query_dividend_data-2023/page-01.request.bin": {
+      "source_sha256": "cafc4b1e01e0b89cf163a04e17dca456700dcc3064d43751018b87d922364a5f",
+      "integrated_sha256": "cafc4b1e01e0b89cf163a04e17dca456700dcc3064d43751018b87d922364a5f"
+    },
+    "tests/fixtures/baostock_native_empty/sh.600000-query_dividend_data-2023/page-01.response.bin": {
+      "source_sha256": "9541970ea2b8beb950e2764b95951dbc183e2b2b9430c3ec1a1661a5d95afc5c",
+      "integrated_sha256": "9541970ea2b8beb950e2764b95951dbc183e2b2b9430c3ec1a1661a5d95afc5c"
+    },
+    "tests/fixtures/baostock_native_empty/sh.600000-query_dividend_data-2023/sdk-rows.json": {
+      "source_sha256": "308c8c403af978d956e8143f61b1c1a35904c0062f0d7c790e1514d6f4eb59bd",
+      "integrated_sha256": "308c8c403af978d956e8143f61b1c1a35904c0062f0d7c790e1514d6f4eb59bd"
+    },
+    "tests/fixtures/baostock_native_empty/sh.600000-query_dividend_data-2025/page-01.request.bin": {
+      "source_sha256": "92ae95c9545de2f4e2d9c9d86269e5212c3f0e3fc965907593ed1d4b0f2a5331",
+      "integrated_sha256": "92ae95c9545de2f4e2d9c9d86269e5212c3f0e3fc965907593ed1d4b0f2a5331"
+    },
+    "tests/fixtures/baostock_native_empty/sh.600000-query_dividend_data-2025/page-01.response.bin": {
+      "source_sha256": "191fddca04d3226282b15757b26bd72f55d229bcd3652e9c2bf68531522bba36",
+      "integrated_sha256": "191fddca04d3226282b15757b26bd72f55d229bcd3652e9c2bf68531522bba36"
+    },
+    "tests/fixtures/baostock_native_empty/sh.600000-query_dividend_data-2025/sdk-rows.json": {
+      "source_sha256": "a92c2993ba4a3bfd896f158ac13ebbc9c3ae7e9b8bb09dcd6d924fc21ade8df5",
+      "integrated_sha256": "a92c2993ba4a3bfd896f158ac13ebbc9c3ae7e9b8bb09dcd6d924fc21ade8df5"
+    },
+    "tests/fixtures/baostock_native_empty/sh.600000-query_dividend_data-2026/page-01.request.bin": {
+      "source_sha256": "c32f46a85cc0eafc74e991e8a8180a9bcc61b656a6fa1d3b8aca50de64253e6f",
+      "integrated_sha256": "c32f46a85cc0eafc74e991e8a8180a9bcc61b656a6fa1d3b8aca50de64253e6f"
+    },
+    "tests/fixtures/baostock_native_empty/sh.600000-query_dividend_data-2026/page-01.response.bin": {
+      "source_sha256": "bfcafd76acb06d41e726e995cc3222793c11a8e7b418a127d249dab6e8320f6f",
+      "integrated_sha256": "bfcafd76acb06d41e726e995cc3222793c11a8e7b418a127d249dab6e8320f6f"
+    },
+    "tests/fixtures/baostock_native_empty/sh.600000-query_dividend_data-2026/sdk-rows.json": {
+      "source_sha256": "41d564851c86815f5498fc2bbfbdbe62ece2b71a5d9f6fc345bda30126c30e97",
+      "integrated_sha256": "41d564851c86815f5498fc2bbfbdbe62ece2b71a5d9f6fc345bda30126c30e97"
+    },
+    "tests/fixtures/baostock_native_empty/sz.000001-query_adjust_factor-20261008-12/page-01.request.bin": {
+      "source_sha256": "7c2a655d6ca790165595535bfbbce47a77d36fdbe60111d9cce464ab0e6c39a3",
+      "integrated_sha256": "7c2a655d6ca790165595535bfbbce47a77d36fdbe60111d9cce464ab0e6c39a3"
+    },
+    "tests/fixtures/baostock_native_empty/sz.000001-query_adjust_factor-20261008-12/page-01.response.bin": {
+      "source_sha256": "05dc65935a665f3ceeadcd56297641ae60ae14d1c1567d0304ef1878e4aa197b",
+      "integrated_sha256": "05dc65935a665f3ceeadcd56297641ae60ae14d1c1567d0304ef1878e4aa197b"
+    },
+    "tests/fixtures/baostock_native_empty/sz.000001-query_adjust_factor-20261008-12/sdk-rows.json": {
+      "source_sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "integrated_sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    "tests/fixtures/baostock_native_empty/sz.000001-query_dividend_data-2017/page-01.request.bin": {
+      "source_sha256": "9fb577804bc5633964a5c4345b508aab16ec034a13fef32281117c3b54b9577b",
+      "integrated_sha256": "9fb577804bc5633964a5c4345b508aab16ec034a13fef32281117c3b54b9577b"
+    },
+    "tests/fixtures/baostock_native_empty/sz.000001-query_dividend_data-2017/page-01.response.bin": {
+      "source_sha256": "a7499809d05b0afa9b28c58d5cb934cac724ddf07fec3f7cf5f1929fd20772cf",
+      "integrated_sha256": "a7499809d05b0afa9b28c58d5cb934cac724ddf07fec3f7cf5f1929fd20772cf"
+    },
+    "tests/fixtures/baostock_native_empty/sz.000001-query_dividend_data-2017/sdk-rows.json": {
+      "source_sha256": "78275ca32f9ada447c70ca97d35a61a5b6ecaac20df34ed0cee34771e9449d2c",
+      "integrated_sha256": "78275ca32f9ada447c70ca97d35a61a5b6ecaac20df34ed0cee34771e9449d2c"
+    },
+    "tests/fixtures/baostock_native_empty/sz.000001-query_dividend_data-2023/page-01.request.bin": {
+      "source_sha256": "f80c9e75ead9d13cfecefdc312dab1a0b49773832f125ddd590be0aa1f38514f",
+      "integrated_sha256": "f80c9e75ead9d13cfecefdc312dab1a0b49773832f125ddd590be0aa1f38514f"
+    },
+    "tests/fixtures/baostock_native_empty/sz.000001-query_dividend_data-2023/page-01.response.bin": {
+      "source_sha256": "a091befbebd712583246a3c2ba078e271ce116024667d4b58e925cf22479fe73",
+      "integrated_sha256": "a091befbebd712583246a3c2ba078e271ce116024667d4b58e925cf22479fe73"
+    },
+    "tests/fixtures/baostock_native_empty/sz.000001-query_dividend_data-2023/sdk-rows.json": {
+      "source_sha256": "df3476649e850bf5404f98872b25d54e9d48adc955401b6092fbc5b5c67a3f0e",
+      "integrated_sha256": "df3476649e850bf5404f98872b25d54e9d48adc955401b6092fbc5b5c67a3f0e"
+    },
+    "tests/fixtures/baostock_native_empty/sz.000001-query_dividend_data-2025/page-01.request.bin": {
+      "source_sha256": "82aa71fac89bb351302f0b6097fd862578cd63d6e608c4c5b029e2ef773dd430",
+      "integrated_sha256": "82aa71fac89bb351302f0b6097fd862578cd63d6e608c4c5b029e2ef773dd430"
+    },
+    "tests/fixtures/baostock_native_empty/sz.000001-query_dividend_data-2025/page-01.response.bin": {
+      "source_sha256": "82058a272672009efe0dc3c490d041f99891a240128b12ab8c29fdc200eef6b3",
+      "integrated_sha256": "82058a272672009efe0dc3c490d041f99891a240128b12ab8c29fdc200eef6b3"
+    },
+    "tests/fixtures/baostock_native_empty/sz.000001-query_dividend_data-2025/sdk-rows.json": {
+      "source_sha256": "7308cc7ee16344144b1f37c6645d5348bab964d45ecadfe296551291e58de7e6",
+      "integrated_sha256": "7308cc7ee16344144b1f37c6645d5348bab964d45ecadfe296551291e58de7e6"
+    },
+    "tests/fixtures/baostock_native_empty/sz.000001-query_dividend_data-2026/page-01.request.bin": {
+      "source_sha256": "7ac8520e4c720f64accc3818de653d4d64f43d1efb0551b11efd97c205793d86",
+      "integrated_sha256": "7ac8520e4c720f64accc3818de653d4d64f43d1efb0551b11efd97c205793d86"
+    },
+    "tests/fixtures/baostock_native_empty/sz.000001-query_dividend_data-2026/page-01.response.bin": {
+      "source_sha256": "7c899584282ae7f6cf82bd7284dfd3b48eb08c37c3302d009c81d75ef204f663",
+      "integrated_sha256": "7c899584282ae7f6cf82bd7284dfd3b48eb08c37c3302d009c81d75ef204f663"
+    },
+    "tests/fixtures/baostock_native_empty/sz.000001-query_dividend_data-2026/sdk-rows.json": {
+      "source_sha256": "918da476582ff07d47b91a7cba0a4718cad6f1d9525bb6538a816cef42b6b707",
+      "integrated_sha256": "918da476582ff07d47b91a7cba0a4718cad6f1d9525bb6538a816cef42b6b707"
+    },
+    "tests/fixtures/baostock_native_empty/sz.000002-query_adjust_factor-20261008-12/page-01.request.bin": {
+      "source_sha256": "417033562c367e9b3a2ec2deb42cf50d1ac07033a65ee77a56685bac7eff72da",
+      "integrated_sha256": "417033562c367e9b3a2ec2deb42cf50d1ac07033a65ee77a56685bac7eff72da"
+    },
+    "tests/fixtures/baostock_native_empty/sz.000002-query_adjust_factor-20261008-12/page-01.response.bin": {
+      "source_sha256": "c490be4e436dad14586a29a02937c9269bfd7d315719088bd48e88e3249d1b6f",
+      "integrated_sha256": "c490be4e436dad14586a29a02937c9269bfd7d315719088bd48e88e3249d1b6f"
+    },
+    "tests/fixtures/baostock_native_empty/sz.000002-query_adjust_factor-20261008-12/sdk-rows.json": {
+      "source_sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "integrated_sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    "tests/fixtures/baostock_native_empty/sz.000002-query_dividend_data-2017/page-01.request.bin": {
+      "source_sha256": "ddfcf4c07bc60a30ba3e0ffb29aa21a7117f874d1b14abe6a8c05afd8a62ee42",
+      "integrated_sha256": "ddfcf4c07bc60a30ba3e0ffb29aa21a7117f874d1b14abe6a8c05afd8a62ee42"
+    },
+    "tests/fixtures/baostock_native_empty/sz.000002-query_dividend_data-2017/page-01.response.bin": {
+      "source_sha256": "b93b0164fb825dc4bc3682f7371ef8394e2e7300e1d9f93c1decf7a29a48e7b2",
+      "integrated_sha256": "b93b0164fb825dc4bc3682f7371ef8394e2e7300e1d9f93c1decf7a29a48e7b2"
+    },
+    "tests/fixtures/baostock_native_empty/sz.000002-query_dividend_data-2017/sdk-rows.json": {
+      "source_sha256": "41ca926430d427abe84babe53c0a5e768fd170e49169aba128399f4cdcdbd7a5",
+      "integrated_sha256": "41ca926430d427abe84babe53c0a5e768fd170e49169aba128399f4cdcdbd7a5"
+    },
+    "tests/fixtures/baostock_native_empty/sz.000002-query_dividend_data-2023/page-01.request.bin": {
+      "source_sha256": "d8c0dd984167065a07b4428f3ed8b4ec6da3874f13a4f0c0cd904b2c2d436eec",
+      "integrated_sha256": "d8c0dd984167065a07b4428f3ed8b4ec6da3874f13a4f0c0cd904b2c2d436eec"
+    },
+    "tests/fixtures/baostock_native_empty/sz.000002-query_dividend_data-2023/page-01.response.bin": {
+      "source_sha256": "08d683d934389445d1ecb8461445726bdbb2a2827489718770e3f31d58549df2",
+      "integrated_sha256": "08d683d934389445d1ecb8461445726bdbb2a2827489718770e3f31d58549df2"
+    },
+    "tests/fixtures/baostock_native_empty/sz.000002-query_dividend_data-2023/sdk-rows.json": {
+      "source_sha256": "4aa61c95846e62eed8b914066cbd6b4e721f17676489c6bab348f20ea7a46464",
+      "integrated_sha256": "4aa61c95846e62eed8b914066cbd6b4e721f17676489c6bab348f20ea7a46464"
+    },
+    "tests/fixtures/baostock_native_empty/sz.000002-query_dividend_data-2025/page-01.request.bin": {
+      "source_sha256": "32346550581c5750903d1dff93dc554848f88e79fb30980510700cf2ab86fb0a",
+      "integrated_sha256": "32346550581c5750903d1dff93dc554848f88e79fb30980510700cf2ab86fb0a"
+    },
+    "tests/fixtures/baostock_native_empty/sz.000002-query_dividend_data-2025/page-01.response.bin": {
+      "source_sha256": "8a99adf1dc8e4602e18eed8ddfcd66cac8765427b2a2e30655680d39db166cfb",
+      "integrated_sha256": "8a99adf1dc8e4602e18eed8ddfcd66cac8765427b2a2e30655680d39db166cfb"
+    },
+    "tests/fixtures/baostock_native_empty/sz.000002-query_dividend_data-2025/sdk-rows.json": {
+      "source_sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "integrated_sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    "tests/fixtures/baostock_native_empty/sz.000002-query_dividend_data-2026/page-01.request.bin": {
+      "source_sha256": "fd679fd21b039e5594cbc48c389095484343be893345620b04d29087d3428512",
+      "integrated_sha256": "fd679fd21b039e5594cbc48c389095484343be893345620b04d29087d3428512"
+    },
+    "tests/fixtures/baostock_native_empty/sz.000002-query_dividend_data-2026/page-01.response.bin": {
+      "source_sha256": "151af5311514e3e93271190a9bff9a7b491bfc419c232d1ce0c150013f35376d",
+      "integrated_sha256": "151af5311514e3e93271190a9bff9a7b491bfc419c232d1ce0c150013f35376d"
+    },
+    "tests/fixtures/baostock_native_empty/sz.000002-query_dividend_data-2026/sdk-rows.json": {
+      "source_sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "integrated_sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    "tests/test_baostock_native_empty.py": {
+      "source_sha256": "b708cdc7070dc522c45e1fb2cf517abae7c2bd2821ccb6b23838ac6cf1b928d9",
+      "integrated_sha256": "b708cdc7070dc522c45e1fb2cf517abae7c2bd2821ccb6b23838ac6cf1b928d9"
+    },
+    "tests/test_historical_market.py": {
+      "source_sha256": "dcba362114cff2ad5c90d86aafee21d2d5772a197fc93de1b5363bcb8d793080",
+      "integrated_sha256": "dcba362114cff2ad5c90d86aafee21d2d5772a197fc93de1b5363bcb8d793080"
+    },
+    "tests/test_historical_market_builder.py": {
+      "source_sha256": "eff459866beeab60ef86218da42d787c1088258ad4e429f0cea73cc9db465bff",
+      "integrated_sha256": "eff459866beeab60ef86218da42d787c1088258ad4e429f0cea73cc9db465bff"
+    },
+    "tests/test_historical_universe_conflicts.py": {
+      "source_sha256": "3141bfa583a1be47b8269c3a5bd5fd01c5d99fc90d2c418ac51687191d841004",
+      "integrated_sha256": "3141bfa583a1be47b8269c3a5bd5fd01c5d99fc90d2c418ac51687191d841004"
+    },
+    "tests/test_minute_evidence.py": {
+      "source_sha256": "15c4ec0b72345a116a374a314fc4a539bd986d3e93dbf1ece86f9f8fd4f5cd70",
+      "integrated_sha256": "15c4ec0b72345a116a374a314fc4a539bd986d3e93dbf1ece86f9f8fd4f5cd70"
+    }
+  },
+  "baseline_files_byte_preserved": 240,
+  "independent_review": {
+    "completed": true,
+    "outcome": "pass_bounded_historical_and_minute_diagnostic_scope",
+    "blocking_findings": [],
+    "report": ".local-evidence/historical-minute-integration/review/final-review/FINAL_REVIEW.md",
+    "report_sha256": "a36da6ed31a63b446afe64c2dcf245666e2c6c8dc7a5e1aa47df6722a9646a2b",
+    "verdict": ".local-evidence/historical-minute-integration/review/final-review/FINAL_REVIEW.json",
+    "verdict_sha256": "4311d765a3ac8ac2a5f3dc2b55e908af366dc4ab94680dd683054a83e5392291",
+    "resolved": [
+      "F1",
+      "F2",
+      "F3",
+      "F4",
+      "five_literal_native_empty_wires"
+    ],
+    "historical_author_and_review_status_fields_rewritten": false
+  },
+  "public_apis": {
+    "HistoricalMarketView": "Available for hash-bound historical state, universe, instrument and action evidence; unknowns and same-key conflicts remain explicit.",
+    "MinuteEvidenceView": "Available for offline source inspection and admission diagnostics; execution export remains blocked.",
+    "seal_minute_evidence": "Available for validating and sealing the bounded evidence format.",
+    "FinancialPIT": "Existing bounded reported-date research API preserved; real strict visibility remains unproven.",
+    "ashare_data.f1": "Existing bounded research APIs, thresholds and failed/pending statuses unchanged."
+  },
+  "retained_boundaries": {
+    "old_unavailable_security_days": 232,
+    "old_unavailable_fields": 696,
+    "old_fields_newly_filled": 0,
+    "minute_source_rows": 1428,
+    "minute_target_labels": 1422,
+    "unchanged_outside_window_tail_rows": 6,
+    "minute_blocked_gate_ids": [
+      "G03",
+      "G04",
+      "G05",
+      "G06",
+      "G07",
+      "G08",
+      "G09",
+      "G10",
+      "G11"
+    ],
+    "ready_for_execution": false,
+    "export_backtest_error": "MINUTE_GATES_BLOCKED",
+    "original_three_stock_two_day_real_backtest": "BLOCKED_PENDING_DATA",
+    "state_replay_default_enabled": false,
+    "historical_available_at": null,
+    "replay_effective_at": null,
+    "strict_historical_PIT_certified": false,
+    "full_market_certified": false,
+    "complete_action_absence_proved": false,
+    "native_empty_status": "complete_empty_unknown",
+    "native_empty_does_not_prove_no_events": true,
+    "native_wire_cases": 15,
+    "native_empty_cases": 5,
+    "nonempty_control_cases": 10,
+    "public_BaoStockSource_business_scope_expanded": false
+  },
+  "local_evidence": {
+    "manifest": ".local-evidence/historical-minute-integration/manifest.json",
+    "manifest_sha256": "b68fcc722ad2fd00c20df46d20252582661d65f7ce5eeef62b0227acfa7310b2",
+    "files_excluding_manifest": 5717,
+    "private_evidence_committed": false
+  },
+  "integration_validation": {
+    "status": "passed_in_isolated_combined_tree_and_installed_wheel",
+    "source_full_suite": {
+      "passed": 2688,
+      "skipped": 241
+    },
+    "skipped_financial_PIT_capture_test_separately_passed_with_sealed_evidence": 1,
+    "remaining_external_input_skips": 240,
+    "unchanged_historical_minute_independent_tests_per_source_and_wheel": [
+      69,
+      72
+    ],
+    "unchanged_FinancialPIT_independent_tests_per_source_and_wheel": 43,
+    "installed_wheel_combined_tests_passed": 591,
+    "real_source_verifier_assertions_per_source_and_wheel": {
+      "historical": 36,
+      "minute": 99,
+      "supplement": 905,
+      "universe": 350,
+      "native_wires": 1985
+    },
+    "rebuilt_minute_files_byte_identical": 784,
+    "FinancialPIT_real_queries": 90,
+    "official_indices": 18,
+    "PDF_amount_presence_cells": 66,
+    "F1_local_panel_cells": 9204,
+    "F1_reference_cells": 624,
+    "F1_replay_files_byte_identical": 309,
+    "F1_reference_passes_and_failures_unchanged": true,
+    "wheel_imports_installed_package": true,
+    "ruff_passed": true,
+    "README_human_chapters": 5,
+    "new_network_queries": 0,
+    "new_JQ_queries": 0,
+    "actual_main_post_merge_verification": "Recorded separately after the guarded main fast-forward; this pre-merge record makes no claim about a future main run."
+  }
+}

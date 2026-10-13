@@ -1,0 +1,230 @@
+{
+  "schema": "ad.f1-batch-scope.v1",
+  "frozen_at": "2026-10-13T02:01:08.689554+00:00",
+  "baseline": "827a391c7209507a595f748c2aa4f70d3a287319",
+  "securities": [
+    {
+      "security": "600000.XSHG",
+      "name": "浦发银行",
+      "selection_reason": "bank; reused 2020 evidence"
+    },
+    {
+      "security": "000002.XSHE",
+      "name": "万科A",
+      "selection_reason": "property; reused 2020 evidence"
+    },
+    {
+      "security": "600519.XSHG",
+      "name": "贵州茅台",
+      "selection_reason": "consumer; reused financial/share evidence; cash dividends"
+    },
+    {
+      "security": "300124.XSHE",
+      "name": "汇川技术",
+      "selection_reason": "industrial growth; reused financial/PV evidence"
+    },
+    {
+      "security": "000001.XSHE",
+      "name": "平安银行",
+      "selection_reason": "bank; prior VROC counterexample"
+    },
+    {
+      "security": "601012.XSHG",
+      "name": "隆基绿能",
+      "selection_reason": "solar; share-distribution/VROC counterexample"
+    },
+    {
+      "security": "600276.XSHG",
+      "name": "恒瑞医药",
+      "selection_reason": "pharma; share distributions"
+    },
+    {
+      "security": "300750.XSHE",
+      "name": "宁德时代",
+      "selection_reason": "battery; listing 2018; share/cash events"
+    },
+    {
+      "security": "600036.XSHG",
+      "name": "招商银行",
+      "selection_reason": "bank; A/H share denominator distinction"
+    },
+    {
+      "security": "601318.XSHG",
+      "name": "中国平安",
+      "selection_reason": "insurance; financial-field availability distinction"
+    },
+    {
+      "security": "000333.XSHE",
+      "name": "美的集团",
+      "selection_reason": "appliance; share changes"
+    },
+    {
+      "security": "000858.XSHE",
+      "name": "五粮液",
+      "selection_reason": "consumer; stable share structure"
+    }
+  ],
+  "reference_dates": [
+    "2020-01-13",
+    "2023-08-04",
+    "2024-04-19",
+    "2024-04-29"
+  ],
+  "local_output_windows": [
+    [
+      "2020-01-02",
+      "2020-01-23"
+    ],
+    [
+      "2023-08-01",
+      "2023-08-31"
+    ],
+    [
+      "2024-04-01",
+      "2024-04-30"
+    ]
+  ],
+  "input_windows": [
+    [
+      "2019-07-01",
+      "2020-01-31"
+    ],
+    [
+      "2022-12-01",
+      "2024-04-30"
+    ]
+  ],
+  "reference_date_reasons": [
+    "old 2020 PV failure regime",
+    "first Moutai H1 visibility; split/cash events in warmup",
+    "before Inovance 2023FY/2024Q1 release",
+    "after April earnings releases"
+  ],
+  "fields": [
+    "ROC120",
+    "Variance20",
+    "ATR6",
+    "ATR14",
+    "EMA5",
+    "VROC6",
+    "TVMA6",
+    "VOL5",
+    "circulating_market_cap",
+    "net_profit_to_total_operate_revenue_ttm",
+    "net_profit_growth_rate",
+    "operating_revenue_ttm",
+    "net_operate_cashflow_growth_rate"
+  ],
+  "thresholds": {
+    "ROC120": {
+      "atol": 0.1,
+      "rtol": 0.001
+    },
+    "Variance20": {
+      "atol": 0.0001,
+      "rtol": 0.01
+    },
+    "ATR6": {
+      "atol": 0.001,
+      "rtol": 0.01
+    },
+    "ATR14": {
+      "atol": 0.001,
+      "rtol": 0.01
+    },
+    "EMA5": {
+      "atol": 0.0001,
+      "rtol": 0
+    },
+    "VROC6": {
+      "atol": 0.1,
+      "rtol": 0.01
+    },
+    "TVMA6": {
+      "atol": 1,
+      "rtol": 1e-05
+    },
+    "VOL5": {
+      "atol": 0.001,
+      "rtol": 0.001
+    },
+    "circulating_market_cap": {
+      "atol": 10000,
+      "rtol": 0.0001
+    },
+    "net_profit_to_total_operate_revenue_ttm": {
+      "atol": 0.0001,
+      "rtol": 0.001
+    },
+    "net_profit_growth_rate": {
+      "atol": 0.0001,
+      "rtol": 0.001
+    },
+    "operating_revenue_ttm": {
+      "atol": 1,
+      "rtol": 1e-05
+    },
+    "net_operate_cashflow_growth_rate": {
+      "atol": 0.0001,
+      "rtol": 0.001
+    }
+  },
+  "numeric_rule": "abs(local-reference) <= atol + rtol*abs(reference); >=95% paired cells; never changes original exact tests",
+  "numeric_rationale": "ratio absolute floor 1bp; ROC/VROC percentage-point floors; variance/ATR 1% materiality; money/revenue 10ppm; cap 1e4 CNY quantization floor",
+  "coverage_min": 0.95,
+  "minimum_panel_size": 10,
+  "rank_rule": {
+    "spearman_min": 0.98,
+    "pair_concordance_min": 0.97,
+    "top_k": 3,
+    "top_overlap_min": 1.0,
+    "bottom_overlap_min": 1.0,
+    "all_eligible_panels_must_pass": true,
+    "tie_break": "security ascending for top/bottom; Spearman average tied ranks"
+  },
+  "selection_scope": "both high and low factor tails; diagnostic rank sensitivity, no return/profit claim",
+  "source_plan": {
+    "market": "Sina archived raw OHLCV/amount and native cumulative factor; independent Tencent daily cross-check where available",
+    "calendar": "explicit SZSE source session flags, reused first then missing months",
+    "shares": "Sina historical circulating A share disclosure dates, bounded source-claimed effective-date reconstruction; no reverse inference from turnover",
+    "financial": "Eastmoney report YTD/date snapshot for breadth; reuse exact archived CNINFO reports for authoritative anchors; no current snapshot promoted to original PIT"
+  },
+  "source_limits": [
+    "retrospective survivor-selected diagnostic panel, not historical universe",
+    "strict PIT not certified",
+    "no zero-volume/pause filling",
+    "price factor not certified volume-adjustment rule",
+    "unresolved financial original versions stay insufficient"
+  ],
+  "reference_budget": {
+    "authorized_total": 1000,
+    "already_spent": 333,
+    "remaining": 667,
+    "maximum_matrix_values": 624,
+    "reserve_not_authorized_for_automatic_spend": 43,
+    "browser": "parent schedules after backtest release; no current JQ access",
+    "balance_last_known": 45,
+    "balance_current": "unverified"
+  },
+  "original_status_preserved": {
+    "finite_support": [
+      "FI01",
+      "FI02",
+      "FI04",
+      "SV01",
+      "SV02"
+    ],
+    "conditional": [
+      "PV02",
+      "PV03",
+      "PV06"
+    ],
+    "unaligned": [
+      "PV01",
+      "PV04",
+      "PV05",
+      "FI03"
+    ]
+  },
+  "production_eligible": false
+}

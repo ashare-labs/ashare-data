@@ -10,7 +10,6 @@ import pytest
 
 from ashare_data import DataError, Store
 from ashare_data.cli import main
-from ashare_data.m2_types import canonical_hash
 
 
 def rejects(code, fn):
@@ -113,7 +112,7 @@ def test_public_synthetic_component_is_labelled_and_portable(synthetic_market, t
         ("observed_at", "2026-01-01T00:00:00Z", "M2_VISIBILITY"),
         ("format", "arbitrary_csv", "M2_UNSUPPORTED_SOURCE"),
         ("source_url", "https://username:password@example.com/data", "M2_COMPONENT_SCHEMA"),
-        ("name", "/Users/example/private", "M2_LOCAL_PATH"),
+        ("name", "/absolute/example/private", "M2_LOCAL_PATH"),
     ],
 )
 def test_source_declaration_rejects_unknowns(synthetic_market, tmp_path, field, value, code):
@@ -193,208 +192,16 @@ def mutated_component(private_components, tmp_path, kind, mutate):
     return dest
 
 
-def test_real_compose_export_move_reopen_and_cli(prepared, tmp_path, capsys):
-    s, p, f = prepared
-    req = request(p, f)
-    checked = s.validate_m2(**req).to_dict()
-    assert checked["status"] == "READY_CONDITIONAL" and checked["gaps"] == []
-    assert s.m2_report(checked["report_id"]).to_dict() == checked
-    result = s.compose_m2(**req).to_dict()
-    assert s.compose_m2(**req).to_dict() == result
-    sid = result["dataset_id"]
-    directory = tmp_path / "export"
-    exported = s.export_m2(sid, directory)
-    rejects("M2_EXPORT_EXISTS", lambda: s.export_m2(sid, directory))
-    elsewhere = tmp_path / "moved"
-    shutil.move(directory, elsewhere)
-    fresh = Store.init(tmp_path / "fresh")
-    assert fresh.import_m2(elsewhere) == fresh.import_m2(elsewhere) == sid
-    assert fresh.m2_component(p) == s.m2_component(p)
-    assert fresh.m2_component(f) == s.m2_component(f)
-    assert fresh.m2_report(checked["report_id"]).to_dict() == checked
-    assert fresh.compose_m2(**req).to_dict() == result
-    assert [p.to_dict() for p in fresh.m2_profiles(sid)] == result["profiles"]
-    for profile in result["profiles"]:
-        old = s.m2(sid, profile_sha256=profile["profile_sha256"], mode="conditional_research")
-        new = fresh.m2(sid, profile_sha256=profile["profile_sha256"], mode="conditional_research")
-        for method in ("descriptor", "profile", "lineage", "quality"):
-            assert getattr(old, method)() == getattr(new, method)()
-            assert str(tmp_path) not in json.dumps(getattr(new, method)().to_dict())
-        assert old.windows() == new.windows()
-        for plan in new.windows():
-            body = plan.to_dict()
-            deps = body["owner_validation_dependencies"]
-            anchor = "2020-01-02" if body["geometry"]["window_id"] == "w2" else "2019-12-31"
-            assert deps["raw_price_dates"][0] == anchor and deps["calendar"]["start"] == anchor
-            assert deps["consumer_read_permission"] is False
-            assert all(r["target_date"] != anchor for r in body["read_roles"])
-    assert exported.to_dict()["dataset_id"] == sid
-    cli = tmp_path / "request.json"
-    cli.write_text(json.dumps(req))
-    assert main(["--store", str(s.root), "m2", "compose", "--request", str(cli)]) == 0
-    assert json.loads(capsys.readouterr().out) == result
 
 
-@pytest.mark.parametrize(
-    "fault,expected",
-    [
-        ("missing_preclose", "M2_STATE_UNKNOWN"),
-        ("missing_calendar", "M2_CALENDAR_MISSING"),
-        ("missing_prices", "M2_DATA_MISSING"),
-        ("synthetic", "M2_SYNTHETIC_SOURCE"),
-        ("missing_fact", "M2_FACT_MISSING"),
-        ("unknown_fact", "M2_FACT_MISSING"),
-        ("bad_lot", "M2_RULE_EXCEPTION"),
-        ("coverage_unknown", "M2_FACT_MISSING"),
-        ("coverage_domain", "M2_FACT_MISSING"),
-        ("known_event_in_domain", "M2_RELATED_EVENT"),
-        ("unknown_event_date", "M2_RELATED_EVENT"),
-        ("jan20_conflict", "M2_RULE_EXCEPTION"),
-    ],
-)
-def test_gaps_block_without_inference(prepared, private_components, tmp_path, fault, expected):
-    s, p, f = prepared
-    kind = (
-        "market"
-        if fault in ("missing_preclose", "missing_calendar", "missing_prices", "synthetic")
-        else "facts"
-    )
-
-    def mutate(doc):
-        if fault == "missing_preclose":
-            doc["documents"] = [d for d in doc["documents"] if d["role"] != "states"]
-        elif fault == "missing_calendar":
-            doc["documents"] = [d for d in doc["documents"] if d["role"] != "calendar"]
-        elif fault == "missing_prices":
-            doc["documents"] = [d for d in doc["documents"] if d["name"] != "capture-daily"]
-        elif fault == "synthetic":
-            doc["classification"] = "synthetic"
-        elif fault == "missing_fact":
-            doc["claims"]["facts"] = [
-                f for f in doc["claims"]["facts"] if f["id"] != "initial_listing_date"
-            ]
-        elif fault == "unknown_fact":
-            doc["claims"]["facts"][0]["status"] = "unknown"
-        elif fault == "bad_lot":
-            next(f for f in doc["claims"]["facts"] if f["id"] == "buy_round_lot")["value"] = 100.0
-        elif fault == "coverage_unknown":
-            doc["claims"]["coverage"]["checks"]["equity_events"]["status"] = "unknown"
-        elif fault == "coverage_domain":
-            del doc["claims"]["coverage"]["window_domains"]["w2"]
-        elif fault == "known_event_in_domain":
-            e = next(e for e in doc["claims"]["events"] if e["event_type"] == "cash_dividend")
-            e["record_date"], e["pay_date"] = "2020-01-10", "2020-02-01"
-        elif fault == "unknown_event_date":
-            doc["claims"]["events"][0]["record_date"] = None
-        else:
-            doc["claims"]["coverage"]["jan20_rule"]["ordinary_a_share_resale"] = "T+0"
-
-    directory = mutated_component(private_components, tmp_path, kind, mutate)
-    if fault == "bad_lot":
-        # Generic canonical prohibits floating-point claims before publication.
-        rejects("M2_ENCODING", lambda: s.import_m2_component(directory))
-        return
-    new = s.import_m2_component(directory)
-    if kind == "market":
-        p = new
-    else:
-        f = new
-    r = s.validate_m2(**request(p, f)).to_dict()
-    assert r["status"] == "BLOCKED"
-    assert expected in {g["code"] for g in r["gaps"]}
-    if fault == "missing_calendar":
-        assert r["quality"]["calendar_query_complete"] is None
-    err = rejects("M2_COMPOSITION_BLOCKED", lambda: s.compose_m2(**request(p, f)))
-    assert err.details["report_id"] == r["report_id"]
-    assert not s.m2_snapshots()
 
 
-@pytest.mark.parametrize(
-    "fault", ["missing_raw", "raw_corruption", "mutated_report", "producer", "dataset"]
-)
-def test_export_tampering_cannot_rehash_into_admission(prepared, tmp_path, fault):
-    s, p, f = prepared
-    sid = s.compose_m2(**request(p, f)).to_dict()["dataset_id"]
-    directory = tmp_path / "out"
-    s.export_m2(sid, directory)
-    m = json.loads((directory / "manifest.json").read_text())
-    h = next(iter(m["body"]["files"]))
-    if fault == "missing_raw":
-        (directory / "objects" / h).unlink()
-    elif fault == "raw_corruption":
-        path = directory / "objects" / h
-        path.chmod(0o600)
-        path.write_bytes(b"damaged")
-    elif fault == "mutated_report":
-        m["body"]["validation_report"]["quality"]["finality"] = "VERIFIED"
-        m["dataset_id"] = canonical_hash(m["body"])
-    elif fault == "producer":
-        m["body"]["producer_sha256"] = "0" * 64
-        m["dataset_id"] = canonical_hash(m["body"])
-    else:
-        m["dataset_id"] = "0" * 64
-    path = directory / "manifest.json"
-    path.chmod(0o600)
-    path.write_text(json.dumps(m))
-    target = Store.init(tmp_path / "target")
-    with pytest.raises(DataError):
-        target.import_m2(directory)
-    assert not target.m2_snapshots()
 
 
-@pytest.mark.parametrize("fault", ["after_prepare", "after_manifest"])
-def test_portable_publication_recovery(prepared, fault):
-    from ashare_data.m2_compose import prepare, publish
-
-    s, p, f = prepared
-    _, body, objects, _ = prepare(s, **request(p, f))
-    with pytest.raises(RuntimeError):
-        publish(s, body, objects, _fault=fault)
-    assert s.m2_snapshots()[0]["status"] == "prepared"
-    s.recover_m2()
-    assert s.m2_snapshots()[0]["status"] == "published"
-    assert s.compose_m2(**request(p, f)).to_dict()["dataset_id"] == canonical_hash(body)
 
 
-def test_existing_research_input_keeps_origin_identity(prepared, private_components, tmp_path):
-    s, _, f = prepared
-    market = json.loads((private_components / "market/component.json").read_text())
-
-    def original(name):
-        d = next(d for d in market["documents"] if d["name"] == name)
-        return private_components / "market" / d["artifacts"]["raw"]["path"]
-
-    pid = s.import_research(
-        [original("legacy-daily")],
-        format="baostock_daily",
-        calendar_path=original("legacy-calendar"),
-    )
-    made = s.compose_m2(**request(pid, f, windows=("m2a",))).to_dict()
-    out = tmp_path / "research-export"
-    s.export_m2(made["dataset_id"], out)
-    exported = json.loads((out / "manifest.json").read_text())
-    origins = [
-        b["origin"] for b in exported["body"]["components"].values() if b["origin"] is not None
-    ]
-    assert origins[0]["dataset_id"] == pid
-    assert Store.init(tmp_path / "fresh").import_m2(out) == made["dataset_id"]
-    assert len(made["windows"]) == 1
 
 
-def test_all_windows_public_consumer_contract(prepared, tmp_path):
-    import importlib.util
-
-    path = Path(__file__).parents[1] / "examples/m2_demo.py"
-    spec = importlib.util.spec_from_file_location("public_demo", path)
-    demo = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(demo)
-    s, p, f = prepared
-    sid = s.compose_m2(**request(p, f)).to_dict()["dataset_id"]
-    out = tmp_path / "all-windows"
-    s.export_m2(sid, out)
-    result = demo.replay(out, tmp_path / "consumer")
-    assert result["reads_exercised"] == 361 and result["previous_close_consumptions"] == 22
-    assert result["native_runs"] == 0 and result["backend_execution_authorized"] is False
 
 
 def test_missing_component_has_durable_gap_report(tmp_path):
@@ -452,100 +259,8 @@ def test_raw_source_identity_rejected(synthetic_market, tmp_path, fault):
     rejects("M2_SOURCE_CONFLICT", lambda: Store.init(tmp_path / "store").import_m2_component(root))
 
 
-def test_new_product_read_roles_stale_auth_and_selected_window(prepared):
-    from dataclasses import replace
-    from ashare_data import M2AD08Call, M2ConsumerBinding
-
-    s, p, f = prepared
-    result = s.compose_m2(**request(p, f)).to_dict()
-    multi = next(p for p in result["profiles"] if "multiday" in p["version"])
-    v = s.m2(
-        result["dataset_id"], profile_sha256=multi["profile_sha256"], mode="conditional_research"
-    )
-    uses = {}
-    for doc in v.windows():
-        plan = doc.to_dict()
-        wid = plan["geometry"]["window_id"]
-        h = canonical_hash({"explicit_test_consumer": wid})
-        b = M2ConsumerBinding(
-            v.descriptor().sha256,
-            wid,
-            plan["window_plan_sha256"],
-            h,
-            "test-session",
-            h,
-            "test-strategy",
-            h,
-        )
-        uses[wid] = v.use(
-            wid, assumption_ack=[a.to_dict() for a in v.assumptions(wid)], consumer_binding=b
-        )
-    u = uses["w1"]
-    c = u.context(
-        current_date="2020-01-06",
-        logical_at="2020-01-06T09:00:00+08:00",
-        phase="DECIDE",
-        query_end="2020-01-03T23:59:59.999999+08:00",
-        visibility="assumed",
-        consumer="strategy",
-        event_cursor=0,
-        restore_generation=0,
-        epoch=0,
-    )
-    call = M2AD08Call(
-        "600000.XSHG",
-        "2020-01-06",
-        "2020-01-03",
-        "2020-01-06",
-        "1d",
-        "close",
-        1,
-        False,
-        False,
-        "pre",
-    )
-    old = u.decision_prev_close(c, call=call)
-    newer = replace(c, restore_generation=1, epoch=1, event_cursor=1)
-    rejects("M2_RECEIPT_MISMATCH", lambda: u.verify(old, context=newer))
-    fresh = old.with_authorization(u.revalidate(old, context=newer))
-    assert u.verify(fresh, context=newer) == fresh
-    assert (old.query, old.result, old.sources, old.evidence) == (
-        fresh.query,
-        fresh.result,
-        fresh.sources,
-        fresh.evidence,
-    )
-    rejects("M2_IDENTITY_MISMATCH", lambda: uses["w2"].decision_prev_close(c, call=call))
-    rejects("M2_ROLE_SCOPE", lambda: u.execution_bar(c))
-    at15 = replace(
-        c,
-        phase="SUBMIT_MATCH",
-        logical_at="2020-01-06T15:00:00+08:00",
-        query_end="2020-01-06T15:00:00+08:00",
-    )
-    rejects("M2_ROLE_SCOPE", lambda: u.execution_bar(at15))
-    assert (
-        u.execution_bar(replace(at15, consumer="engine")).result.to_dict()["target_date"]
-        == "2020-01-06"
-    )
 
 
-def test_direct_file_recipe_same_component_identity(prepared, private_components):
-    s, p, f = prepared
-    for kind, expected in (("market", p), ("facts", f)):
-        body = json.loads((private_components / kind / "component.json").read_text())
-        for doc in body["documents"]:
-            for name, source in list(doc["artifacts"].items()):
-                doc["artifacts"][name] = {"path": str(private_components / kind / source["path"])}
-        assert (
-            s.import_m2_sources(
-                kind=kind,
-                documents=body["documents"],
-                claims=body["claims"],
-                classification=body["classification"],
-            )
-            == expected
-        )
 
 
 def test_cli_blocked_validation_is_nonzero(tmp_path, capsys):

@@ -1,0 +1,355 @@
+{
+  "schema": "ad.f2-independent-batch-scope.v1",
+  "frozen_at": "2026-10-13T11:19:58.781662+00:00",
+  "baseline": "f080aac3ec2e31c2acd44ec369b3aa505f19f257",
+  "definition": "f2_six_representative_factors.research.v1",
+  "mode": "dated_source_snapshot_research",
+  "securities": [
+    {
+      "security": "000002.XSHE",
+      "name": "万科A",
+      "reason": "property; negative profit and financing cycle"
+    },
+    {
+      "security": "600519.XSHG",
+      "name": "贵州茅台",
+      "reason": "consumer; official report anchors"
+    },
+    {
+      "security": "300124.XSHE",
+      "name": "汇川技术",
+      "reason": "industrial; existing FinancialPIT anchors"
+    },
+    {
+      "security": "601012.XSHG",
+      "name": "隆基绿能",
+      "reason": "solar; losses and inventory"
+    },
+    {
+      "security": "600276.XSHG",
+      "name": "恒瑞医药",
+      "reason": "pharmaceutical; R&D and inventory"
+    },
+    {
+      "security": "300750.XSHE",
+      "name": "宁德时代",
+      "reason": "battery; verified 2023-04-26 split/cash event"
+    },
+    {
+      "security": "000333.XSHE",
+      "name": "美的集团",
+      "reason": "appliance; working capital and cash"
+    },
+    {
+      "security": "000858.XSHE",
+      "name": "五粮液",
+      "reason": "consumer; quarter disclosure boundary"
+    },
+    {
+      "security": "000651.XSHE",
+      "name": "格力电器",
+      "reason": "new issuer; inventory-heavy appliance"
+    },
+    {
+      "security": "600887.XSHG",
+      "name": "伊利股份",
+      "reason": "new issuer; food and dairy"
+    },
+    {
+      "security": "600309.XSHG",
+      "name": "万华化学",
+      "reason": "new issuer; cyclical capital-intensive chemicals"
+    },
+    {
+      "security": "002415.XSHE",
+      "name": "海康威视",
+      "reason": "new issuer; electronics and receivables"
+    }
+  ],
+  "universe_reason": "Nonfinancial issuer panel selected before calculation; current/noncurrent balance-sheet presentation required. Banks/insurers not silently treated as missing industrial issuers. Retrospective survivor-selected diagnostic universe.",
+  "fields": {
+    "BIAS5": {
+      "category": "short_horizon_mean_deviation",
+      "formula": "100 * (close / mean(close,5) - 1)",
+      "inputs": [
+        "close",
+        "effective_price_factor"
+      ],
+      "sessions": 5,
+      "atol": 0.01,
+      "rtol": 0.001
+    },
+    "CCI20": {
+      "category": "price_distribution_oscillator",
+      "formula": "(TP[-1]-mean(TP,20))/(0.015*mean(abs(TP-mean(TP,20)),20)); TP=(high+low+close)/3",
+      "inputs": [
+        "high",
+        "low",
+        "close",
+        "effective_price_factor"
+      ],
+      "sessions": 20,
+      "atol": 0.1,
+      "rtol": 0.001
+    },
+    "PSY": {
+      "category": "up_day_frequency",
+      "formula": "100 * count(close[t]>close[t-1] over last12 changes)/12; equal closes are not up",
+      "inputs": [
+        "close",
+        "effective_price_factor"
+      ],
+      "sessions": 13,
+      "atol": 1e-06,
+      "rtol": 0
+    },
+    "quick_ratio": {
+      "category": "short_term_liquidity",
+      "formula": "(TOTAL_CURRENT_ASSETS-INVENTORY)/TOTAL_CURRENT_LIAB",
+      "inputs": [
+        "balance:TOTAL_CURRENT_ASSETS",
+        "balance:INVENTORY",
+        "balance:TOTAL_CURRENT_LIAB"
+      ],
+      "atol": 1e-06,
+      "rtol": 0.0001
+    },
+    "debt_to_asset_ratio": {
+      "category": "balance_sheet_leverage",
+      "formula": "TOTAL_LIABILITIES/TOTAL_ASSETS",
+      "inputs": [
+        "balance:TOTAL_LIABILITIES",
+        "balance:TOTAL_ASSETS"
+      ],
+      "atol": 1e-06,
+      "rtol": 0.0001
+    },
+    "net_operating_cash_flow_coverage": {
+      "category": "cash_earnings_quality",
+      "formula": "single-quarter NETCASH_OPERATE / single-quarter PARENT_NETPROFIT; cumulative difference for Q2/Q3/Q4; same latest visible report period across both inputs",
+      "inputs": [
+        "cash:NETCASH_OPERATE",
+        "income:PARENT_NETPROFIT"
+      ],
+      "atol": 1e-06,
+      "rtol": 0.0001
+    }
+  },
+  "input_windows": [
+    [
+      "2019-12-02",
+      "2020-01-31"
+    ],
+    [
+      "2023-03-01",
+      "2023-05-12"
+    ],
+    [
+      "2024-03-01",
+      "2024-05-10"
+    ]
+  ],
+  "output_windows": [
+    [
+      "2020-01-06",
+      "2020-01-23"
+    ],
+    [
+      "2023-04-17",
+      "2023-05-12"
+    ],
+    [
+      "2024-04-22",
+      "2024-05-10"
+    ]
+  ],
+  "financial_period_range": [
+    "2019-01-01",
+    "2024-03-31"
+  ],
+  "financial_visibility": "notice_date < Shanghai date cutoff; same-day date-only publication excluded; snapshot update dates reported, not a PIT certificate",
+  "price_basis": "exact decimal raw OHLC times independently captured native Sina cumulative price factors; no price quantization, recursive seed, or absolute-anchor fit; ratios invariant to common positive scale",
+  "missing_policy": "explicit full requested grid; no session compression, fill, per-security lookback truncation, or field substitution; zero denominators rejected; negative single-quarter profit is preserved with signed-denominator flag; financial stocks outside frozen universe",
+  "thresholds": {
+    "BIAS5": {
+      "atol": 0.01,
+      "rtol": 0.001
+    },
+    "CCI20": {
+      "atol": 0.1,
+      "rtol": 0.001
+    },
+    "PSY": {
+      "atol": 1e-06,
+      "rtol": 0
+    },
+    "quick_ratio": {
+      "atol": 1e-06,
+      "rtol": 0.0001
+    },
+    "debt_to_asset_ratio": {
+      "atol": 1e-06,
+      "rtol": 0.0001
+    },
+    "net_operating_cash_flow_coverage": {
+      "atol": 1e-06,
+      "rtol": 0.0001
+    }
+  },
+  "coverage_min": 0.95,
+  "numeric_pass_min": 0.95,
+  "minimum_panel_size": 10,
+  "rank_rule": {
+    "spearman_min": 0.98,
+    "pair_concordance_min": 0.97,
+    "top_k": 3,
+    "top_overlap_min": 1.0,
+    "bottom_overlap_min": 1.0,
+    "tie_break": "security ascending; Spearman average ties",
+    "all_eligible_panels_must_pass": true
+  },
+  "validation_layers": [
+    "real raw source hashes and calendar/units checks",
+    "independent Decimal/Fraction arithmetic oracle over every computed real cell",
+    "separate Sina/Tencent raw-price control with shared factors explicitly declared",
+    "official financial statement anchors where source bytes/pages exist; never counted as full 12-stock independent financial confirmation",
+    "paired and available-pool ranking; explicit requested denominators",
+    "wheel installed outside source tree and public-interface real-evidence replay"
+  ],
+  "official_definition": {
+    "url": "https://www.joinquant.com/help/api/help#name:factor_values",
+    "captured_date": "2026-10-11",
+    "sha256": "f8078eb107e090a545b915dac90651b3d62f3b171e3fdaf43adced8d1e2516db",
+    "note": "Reused official rendered catalog; public web retrieval on 2026-10-13 is region restricted. SDK technical_analysis is not substituted for main factor definitions."
+  },
+  "rejected_candidates": {
+    "current_ratio": "near-duplicate of quick_ratio; avoid padding",
+    "ARBR": "derived subtraction of two similar indicators; unnecessary family duplication",
+    "RSI": "recursive smoothing/seed unresolved in abbreviated main catalog",
+    "market_cap_or_price_level": "would reintroduce total-share/absolute-adjustment anchor dependency",
+    "turnover_or_adjusted_volume": "would reintroduce old share and quantity-adjustment gaps",
+    "TTM_growth_or_multiple_windows": "old slots/dependencies; no repeat precision search"
+  },
+  "proposed_JQ_reference": {
+    "authorization": "NOT_AUTHORIZED; do not execute",
+    "queries": [
+      {
+        "date": "2020-01-13",
+        "fields": [
+          "BIAS5",
+          "CCI20",
+          "PSY",
+          "quick_ratio",
+          "debt_to_asset_ratio",
+          "net_operating_cash_flow_coverage"
+        ],
+        "securities": [
+          "000002.XSHE",
+          "600519.XSHG",
+          "300124.XSHE",
+          "601012.XSHG",
+          "600276.XSHG",
+          "300750.XSHE",
+          "000333.XSHE",
+          "000858.XSHE",
+          "000651.XSHE",
+          "600887.XSHG",
+          "600309.XSHG",
+          "002415.XSHE"
+        ],
+        "count": 1,
+        "maximum_returned_values": 72
+      },
+      {
+        "date": "2023-04-25",
+        "fields": [
+          "BIAS5",
+          "CCI20",
+          "PSY"
+        ],
+        "securities": [
+          "000002.XSHE",
+          "600519.XSHG",
+          "300124.XSHE",
+          "601012.XSHG",
+          "600276.XSHG",
+          "300750.XSHE",
+          "000333.XSHE",
+          "000858.XSHE",
+          "000651.XSHE",
+          "600887.XSHG",
+          "600309.XSHG",
+          "002415.XSHE"
+        ],
+        "count": 1,
+        "maximum_returned_values": 36
+      },
+      {
+        "date": "2023-04-27",
+        "fields": [
+          "BIAS5",
+          "CCI20",
+          "PSY",
+          "quick_ratio",
+          "debt_to_asset_ratio",
+          "net_operating_cash_flow_coverage"
+        ],
+        "securities": [
+          "000002.XSHE",
+          "600519.XSHG",
+          "300124.XSHE",
+          "601012.XSHG",
+          "600276.XSHG",
+          "300750.XSHE",
+          "000333.XSHE",
+          "000858.XSHE",
+          "000651.XSHE",
+          "600887.XSHG",
+          "600309.XSHG",
+          "002415.XSHE"
+        ],
+        "count": 1,
+        "maximum_returned_values": 72
+      },
+      {
+        "date": "2024-05-06",
+        "fields": [
+          "BIAS5",
+          "CCI20",
+          "PSY",
+          "quick_ratio",
+          "debt_to_asset_ratio",
+          "net_operating_cash_flow_coverage"
+        ],
+        "securities": [
+          "000002.XSHE",
+          "600519.XSHG",
+          "300124.XSHE",
+          "601012.XSHG",
+          "600276.XSHG",
+          "300750.XSHE",
+          "000333.XSHE",
+          "000858.XSHE",
+          "000651.XSHE",
+          "600887.XSHG",
+          "600309.XSHG",
+          "002415.XSHE"
+        ],
+        "count": 1,
+        "maximum_returned_values": 72
+      }
+    ],
+    "maximum_returned_values": 252,
+    "minimum_calls": 4,
+    "necessity": "12-stock cross-sections for all six new categories, before/after actual split for price factors, and distinct disclosed financial periods; no input probes",
+    "old_budget_total_spend": 957,
+    "old_budget_remaining_frozen_unused": 43,
+    "new_values_consumed": 0,
+    "points_last_verified": 45,
+    "current_points": "not_rechecked",
+    "fee_status": "Not established for a new batch. Prior batch showed no points change; do not assume future free status. User confirmation needed for new returned-value quota; no authorization for fees or point deductions."
+  },
+  "production_eligible": false,
+  "jq_equivalent": false,
+  "historical_pit_certified": false
+}

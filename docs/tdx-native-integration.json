@@ -1,0 +1,180 @@
+{
+  "schema": "ad.tdx-native-integration.v1",
+  "baseline_commit": "de2ed4b1fa626454739a5764fff9e631cf64b80a",
+  "source_commit": "171359e2b96aae6ea2fc3d45334fbb7484385c34",
+  "source_chain": [
+    "171359e2b96aae6ea2fc3d45334fbb7484385c34"
+  ],
+  "integration_method": "Fast-forward the exact reviewed commit, then add review status and evidence binding only. All runtime modules, tests and public example stay byte-identical to the reviewed source.",
+  "source_mapping": {
+    "CHANGELOG.md": {
+      "source_sha256": "9d1a2b6094f7b329fa7735a077cab91f730c4e4739deb9b5cc287ddb1ac96dd0",
+      "integrated_sha256": "9d1a2b6094f7b329fa7735a077cab91f730c4e4739deb9b5cc287ddb1ac96dd0"
+    },
+    "README.md": {
+      "source_sha256": "67bbf5425a04d373040feb313c5341ded413728a4272bde7a4bfe07587d915e0",
+      "integrated_sha256": "67bbf5425a04d373040feb313c5341ded413728a4272bde7a4bfe07587d915e0"
+    },
+    "docs/sources.md": {
+      "source_sha256": "603105093706bb569c41a026ccc38dcd5ddc6be8912776b46354cde829925a51",
+      "integrated_sha256": "603105093706bb569c41a026ccc38dcd5ddc6be8912776b46354cde829925a51"
+    },
+    "docs/tdx-bars.md": {
+      "source_sha256": "909ebcc8c6298f6b0ab403dafc7c9681144f1ec86b0a5abe4c37dee97886a7f7",
+      "integrated_sha256": "b30160c7f4987259d126b02395d71f4ed1eb0fb171603464c4b3b7e5b3fcd76d"
+    },
+    "examples/tdx_native_read.py": {
+      "source_sha256": "0b766ba4c253e234221c60edf7eeabe0118643829852363f023fd2261599b550",
+      "integrated_sha256": "0b766ba4c253e234221c60edf7eeabe0118643829852363f023fd2261599b550"
+    },
+    "src/ashare_data/__init__.py": {
+      "source_sha256": "f53f1420bd52514af1f9870aed4d10526d8f600eb52f8a9e6cf05a0be92d3636",
+      "integrated_sha256": "f53f1420bd52514af1f9870aed4d10526d8f600eb52f8a9e6cf05a0be92d3636"
+    },
+    "src/ashare_data/tdx_bars.py": {
+      "source_sha256": "0e2217047a16ffc240f306d8e7fa702ff06ab5c06e6a544c08eede46b1e4a42c",
+      "integrated_sha256": "0e2217047a16ffc240f306d8e7fa702ff06ab5c06e6a544c08eede46b1e4a42c"
+    },
+    "src/ashare_data/tdx_bars_core.py": {
+      "source_sha256": "bc8615bcac0fa4260d44295b7e3050db442246206f13794982df5caa5616db43",
+      "integrated_sha256": "bc8615bcac0fa4260d44295b7e3050db442246206f13794982df5caa5616db43"
+    },
+    "src/ashare_data/tdx_bars_worker.py": {
+      "source_sha256": "7b18fd0d45e037ee21ed07b55289ca4b87843cd4865e428ba3afbc34bc534fb3",
+      "integrated_sha256": "7b18fd0d45e037ee21ed07b55289ca4b87843cd4865e428ba3afbc34bc534fb3"
+    },
+    "tests/test_tdx_bars.py": {
+      "source_sha256": "e8837f9784aa942fcf9df2a1687a0b4e2c7830a6d28684f8840106a5e0d83c28",
+      "integrated_sha256": "e8837f9784aa942fcf9df2a1687a0b4e2c7830a6d28684f8840106a5e0d83c28"
+    }
+  },
+  "baseline_files_byte_preserved": 308,
+  "independent_review": {
+    "completed": true,
+    "decision": "integrable_for_bounded_native_retrospective_market_data",
+    "blocking_implementation_findings": [],
+    "report": ".local-evidence/tdx-native-integration/tdx-review/TDX_REVIEW.md",
+    "report_sha256": "d3425e1e6a58af8e76150a5a0ae89512ab3c510dde7dea7e869f6bbe14b3cb5d",
+    "verdict": ".local-evidence/tdx-native-integration/tdx-review/TDX_REVIEW.json",
+    "verdict_sha256": "3ca35d5ee4aca56b006e7fb86e3f7c07d8d50bc7df1555705a6b9b0e8d1d6dc7",
+    "archive_sha256": "4e6d4a1637c1e72196d63dba57d2c43cd8bc129564324ce20e0a774e217c4ddd",
+    "original_review_records_unchanged": true
+  },
+  "public_apis": {
+    "TDXBarSource.fetch/get_price": "Explicit one-node bounded native 1m/5m retrospective capture using an already installed eltdx 3.0.3; no automatic install, probing, failover, adjustment or fill.",
+    "TDXBarView": "Hash-pinned offline retrospective reading; does not require the SDK. Requires mode=retrospective and explicit allow_partial when the requested count was not reached."
+  },
+  "observed_windows": [
+    {
+      "security": "000001.XSHE",
+      "rows": 23520,
+      "dates": 98,
+      "rows_per_observed_date": 240,
+      "first": "2026-05-20T09:31:00+08:00",
+      "last": "2026-10-13T15:00:00+08:00",
+      "missing_B27": [
+        "2024-03-04T09:58:00+08:00",
+        "2024-03-04T09:59:00+08:00",
+        "2024-03-04T10:00:00+08:00"
+      ],
+      "stop_reason": "remote_empty_page",
+      "complete_history": false,
+      "date_coverage_verified": false
+    },
+    {
+      "security": "600000.XSHG",
+      "rows": 23520,
+      "dates": 98,
+      "rows_per_observed_date": 240,
+      "first": "2026-05-20T09:31:00+08:00",
+      "last": "2026-10-13T15:00:00+08:00",
+      "missing_B27": [
+        "2024-03-04T09:58:00+08:00",
+        "2024-03-04T09:59:00+08:00",
+        "2024-03-04T10:00:00+08:00"
+      ],
+      "stop_reason": "remote_empty_page",
+      "complete_history": false,
+      "date_coverage_verified": false
+    }
+  ],
+  "limits": [
+    "B27 2024-03-04 target labels absent for both tested securities",
+    "Observed retention window applies only to this node, these two securities, these captures; not a permanent all-source limit",
+    "98 observed source dates do not certify complete trading-calendar or market coverage",
+    "No certified completed-bar interval or historical first availability; possible intraminute current label remains retrospective only",
+    "No independent exchange truth, server identity, complete TCP capture or independent request-context echo",
+    "Existing trusted eltdx SDK decode semantics and upstream quantity float precision retained",
+    "Only current macOS arm64 Python 3.12 environment exercised",
+    "241 external/private-evidence tests skipped; original 232 security-day/696-field gap not resolved by this change"
+  ],
+  "retained_boundaries": {
+    "B27_2024_03_04_labels_missing": true,
+    "two_securities_only": true,
+    "observed_dates_per_security": 98,
+    "rows_per_security": 23520,
+    "all_source_retention_limit_proven": false,
+    "complete_history": false,
+    "date_coverage_verified": false,
+    "completed_bar_certified": false,
+    "historical_pit": false,
+    "execution_admitted": false,
+    "bar_start": null,
+    "bar_end": null,
+    "historical_available_at": null,
+    "minute_blocked_gates": [
+      "G03",
+      "G04",
+      "G05",
+      "G06",
+      "G07",
+      "G08",
+      "G09",
+      "G10",
+      "G11"
+    ],
+    "minute_export_error": "MINUTE_GATES_BLOCKED",
+    "original_three_stock_two_day_real_backtest": "BLOCKED_PENDING_DATA",
+    "old_232_security_day_696_field_gap_filled": false,
+    "previous_F1_FinancialPIT_historical_and_minute_statuses_unchanged": true
+  },
+  "public_example": "examples/tdx_native_read.py",
+  "local_example_input": {
+    "directory": ".local-evidence/tdx-native-integration/tdx-review/evidence/contiguous-window/000001.XSHE",
+    "manifest_sha256": "3c1f74641eb209c5d6fcf6b42b875ab8bf63f743c21f25d8c67cf3996a7bae26",
+    "allow_partial": true,
+    "mode": "retrospective"
+  },
+  "local_evidence": {
+    "manifest": ".local-evidence/tdx-native-integration/manifest.json",
+    "manifest_sha256": "9c1674d628607d95ffebbd1f1232449539cb1df112c6496d5509384da73ccfa1",
+    "files_excluding_manifest": 1452,
+    "private_evidence_committed": false
+  },
+  "integration_validation": {
+    "status": "passed_in_isolated_source_and_installed_wheel",
+    "source_full_passed": 2703,
+    "source_full_skipped": 241,
+    "source_and_wheel_focused_tests_each": 149,
+    "source_and_wheel_independent_tests_each": 30,
+    "installed_wheel_legacy_combined_tests": 591,
+    "legacy_independent_tests_replayed": [
+      69,
+      72,
+      43
+    ],
+    "FinancialPIT_capture_test_passed_with_explicit_evidence": true,
+    "unique_current_1m_labels_recalculated": 47040,
+    "raw_row_occurrences_recalculated_including_repetitions": 69216,
+    "old_overlap_rows_equal": 6400,
+    "reviewer_live_requests_preserved": 6,
+    "integration_new_network_queries": 0,
+    "integration_new_JQ_queries": 0,
+    "wheel_identical_to_reviewed_wheel": true,
+    "wheel_sha256": "24161f86a8e6689738e5e4a89e33fffad2949f687a3acb364b80504202de8349",
+    "offline_example_works_without_SDK": true,
+    "ruff_passed": true,
+    "README_human_chapters": 5,
+    "actual_main_verification": "Post-fast-forward receipts are stored separately; this pre-merge record makes no claim about a future main run."
+  }
+}

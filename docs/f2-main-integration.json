@@ -1,0 +1,163 @@
+{
+  "schema": "ashare-data.f2.main-integration.v1",
+  "status": "bounded_research_integration",
+  "baseline_main": "f080aac3ec2e31c2acd44ec369b3aa505f19f257",
+  "reviewed_source": "ef5e6e44b2a568b0cb85bfa9fdf82130401eb00b",
+  "required_source_chain": [
+    "437fec6fcceff0c10a2f96441b6d37792b73c562 Add six-factor offline research view and frozen real-source batch",
+    "4db1386628f478e3acf02fdaf9cae0af7fabc68a Fix PIT-only factor routing and correct delayed disclosure evidence",
+    "8df625e9543112d43f5abdf6210b08f70bafc313 Add original-report inputs and attribution for F2 financial residuals",
+    "ef5e6e44b2a568b0cb85bfa9fdf82130401eb00b Reject F2 selection acceptance when missing values change available pools"
+  ],
+  "integration_method": "fast_forward_reviewed_four_commit_chain_then_documentation_only_integration_record",
+  "source_verification": {
+    "frozen_git_and_archived_source_files_byte_verified": 343,
+    "source_changed_files_from_baseline": 27,
+    "runtime_files_source_wheel_installed_byte_identical": 79,
+    "integration_runtime_changes": 0,
+    "documentation_addenda": [
+      "docs/f2-research.md",
+      "docs/f2-reference-gate-r4.md"
+    ],
+    "README_five_human_sections_preserved": true,
+    "author_mutable_HEAD_not_used": true
+  },
+  "public_API": {
+    "entry": "ashare_data.FactorResearchView.from_file(...).query(...)",
+    "definition": "f2_six_representative_factors.research.v1",
+    "mode": "dated_source_snapshot_research",
+    "financial_pit_adapter": "ashare_data.FinancialPIT; cash-profit ratio only; no snapshot fallback",
+    "fields": {
+      "BIAS5": {
+        "available": true,
+        "status": "bounded_research",
+        "original_frozen_practical_acceptance": false
+      },
+      "CCI20": {
+        "available": true,
+        "status": "bounded_research",
+        "original_frozen_practical_acceptance": true
+      },
+      "PSY": {
+        "available": true,
+        "status": "bounded_research",
+        "original_frozen_practical_acceptance": true
+      },
+      "quick_ratio": {
+        "available": true,
+        "status": "bounded_research",
+        "original_frozen_practical_acceptance": true
+      },
+      "debt_to_asset_ratio": {
+        "available": true,
+        "status": "bounded_research",
+        "original_frozen_practical_acceptance": true
+      },
+      "net_operating_cash_flow_coverage": {
+        "available": true,
+        "status": "bounded_research",
+        "original_frozen_practical_acceptance": false
+      }
+    },
+    "file_hash_verification_does_not_certify_historical_visibility": true
+  },
+  "validation": {
+    "full_source_pytest": {
+      "tests": 3000,
+      "skipped": 241,
+      "failures": 0,
+      "errors": 0,
+      "passed": 2759
+    },
+    "source_targeted_passed": 56,
+    "fresh_installed_wheel_targeted_passed": 56,
+    "independent_synthetic_cases_per_comparator": 16,
+    "reference_and_local_source_gates_correct": true,
+    "public_API_frozen_cells_replayed_each_environment": 3096,
+    "source_wheel_and_independent_review_output_parity": true,
+    "reference_outputs_byte_identical": true,
+    "reference_rank_panels": 21,
+    "source_control_panels": 129,
+    "public_example_source_and_wheel_identical": true,
+    "ruff": "passed"
+  },
+  "original_acceptance": {
+    "passed": 244,
+    "total": 252,
+    "outliers": 8,
+    "strict_binary64_equal_cells": 17,
+    "fully_strict_compatible_factors": 0,
+    "factor_results": {
+      "BIAS5": false,
+      "CCI20": true,
+      "PSY": true,
+      "quick_ratio": true,
+      "debt_to_asset_ratio": true,
+      "net_operating_cash_flow_coverage": false
+    }
+  },
+  "original_report_replacement_sensitivity_only": {
+    "passed": 248,
+    "total": 252,
+    "original_acceptance_not_rewritten": true,
+    "remaining_residuals": [
+      {
+        "security": "000002.XSHE",
+        "date": "2020-01-13",
+        "field": "BIAS5"
+      },
+      {
+        "security": "002415.XSHE",
+        "date": "2020-01-13",
+        "field": "BIAS5"
+      },
+      {
+        "security": "601012.XSHG",
+        "date": "2020-01-13",
+        "field": "BIAS5"
+      },
+      {
+        "security": "601012.XSHG",
+        "date": "2020-01-13",
+        "field": "CCI20"
+      }
+    ]
+  },
+  "limits": {
+    "global_JQ_equivalence": false,
+    "historical_PIT_certified": false,
+    "production_eligible": false,
+    "strict_financial_cases_remain": "visibility_unproven",
+    "full_historical_revision_chain_proven": false,
+    "independent_financial_samples": "five bounded original-report attachments; not full-market validation"
+  },
+  "local_evidence": {
+    "root": ".local-evidence/f2-r4-integration",
+    "manifest": "manifest.json",
+    "manifest_sha256": "1f2fb424d10622cca92aadc5893fed717d8d8c804d0df5b6a38e24b6b0b23fbf",
+    "manifest_files": 1248,
+    "private_raw_JQ_and_full_financial_evidence_distributed": false,
+    "review_R4_archive_sha256": "dacd280f6714d4dd2aeac5ccab5362fb590f6128f474c37a6f8627e816ba9091",
+    "review_R3_archive_sha256": "cc6e389713ba289d0fa3bc74350168ae7fedc1410156ea0583912f6dba6f9408"
+  },
+  "wheel": {
+    "sha256": "931bc6a13bb3dac143053ac97284136ff6385392bac113352cbadacfda2d088d",
+    "byte_identical_to_independently_reviewed_wheel": true,
+    "version": "0.9.1.dev13"
+  },
+  "query_accounting": {
+    "new_calls": 0,
+    "new_values": 0,
+    "browser_interactions": 0,
+    "historical_F2_values_unchanged": 288,
+    "historical_total_with_F1_957_unchanged": 1245,
+    "current_points_not_rechecked": true
+  },
+  "preservation": {
+    "old_evidence_files_verified": 1219,
+    "original_main_user_files": 7,
+    "AQ_and_Web_out_of_scope": true,
+    "next_day_runner_and_environment_pins_unchanged": true,
+    "prior_factor_failures_and_unsupported_statuses_not_promoted": true
+  }
+}

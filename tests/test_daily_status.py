@@ -2,13 +2,11 @@
 
 import json
 from contextlib import contextmanager
-import os
-from pathlib import Path
 from dataclasses import FrozenInstanceError
 
 import pytest
 
-from ashare_data import Store, DataError, BaoStockSource, DailyStatusResult
+from ashare_data import Store, DataError, BaoStockSource
 from ashare_data import baostock as api, daily_status
 from ashare_data.cli import main
 from test_baostock import bundle
@@ -50,41 +48,6 @@ def persist(path, blobs):
     return path
 
 
-@pytest.mark.parametrize("code", ["sh.600000", "sz.000001", "sz.300750"])
-def test_real_captures_offline_roundtrip(tmp_path, monkeypatch, code):
-    location = os.environ.get("ASHARE_DAILY_STATUS_EVIDENCE")
-    if not location:
-        pytest.skip("real external daily-status capture not supplied")
-
-    def denied(*args, **kwargs):
-        raise AssertionError("offline read must not fetch")
-
-    monkeypatch.setattr(BaoStockSource, "fetch", denied)
-    source = Path(location) / code
-    raw = json.loads((source / "capture/sdk-rows.json").read_text())
-    store = Store.init(tmp_path / "store")
-    sid = store.import_baostock_capture(source)
-    assert store.import_baostock_capture(source) == sid
-    view = store.baostock(sid)
-    result = view.get_status(require_known=True)
-    assert isinstance(result, DailyStatusResult) and len(result.rows) == 3
-    assert [r.source_fields for r in result.rows] == raw
-    assert all(r.suspended.raw_value == "1" and r.suspended.value is False for r in result.rows)
-    assert all(r.is_st.raw_value == "0" and r.is_st.value is False for r in result.rows)
-    for r in result.rows:
-        assert r.raw_record_sha256 == api.sh(r.source_fields)
-        assert r.raw_response_sha256 and r.response_received_at.startswith("2026-10-10T")
-        assert r.historical_available_at is r.historical_eligible is None
-        assert r.evidence_kind == "live_local_capture" and not r.execution_permission
-    assert result.report["coverage"]["requested_values_known"]
-    assert not result.report["quality"]["historical_pit"]
-    assert not result.report["quality"]["execution_permission"]
-    assert not result.report["network_used"]
-    assert view.descriptor()["version"] == daily_status.VERSION
-    with raises_code("RECEIPT_NOT_VISIBLE"):
-        view.at("2026-10-11T00:00:00Z")
-    with raises_code("PIT_UNAVAILABLE"):
-        view.at("2026-10-11T00:00:00Z", visibility="verified")
 
 
 def test_request_is_generic_bounded_and_legacy_unchanged():

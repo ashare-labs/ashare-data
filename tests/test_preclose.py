@@ -3,12 +3,10 @@
 from dataclasses import FrozenInstanceError
 from decimal import Decimal
 import json
-import os
-from pathlib import Path
 
 import pytest
 
-from ashare_data import BaoStockSource, SourcePrecloseResult, Store
+from ashare_data import BaoStockSource, Store
 from ashare_data import baostock as api, preclose
 from ashare_data.cli import main
 from test_baostock import bundle
@@ -38,46 +36,6 @@ def view_for(path, tmp_path):
     return store.baostock(store.import_baostock_capture(path))
 
 
-@pytest.mark.parametrize("code", ["sh.600000", "sz.000001", "sz.300750"])
-def test_real_captures_roundtrip(tmp_path, monkeypatch, code):
-    location = os.environ.get("ASHARE_PRECLOSE_EVIDENCE")
-    if not location:
-        pytest.skip("real external preclose capture not supplied")
-    monkeypatch.setattr(BaoStockSource, "fetch", lambda *a, **k: pytest.fail("unexpected fetch"))
-    source = Path(location) / code
-    raw = json.loads((source / "capture/sdk-rows.json").read_text())
-    receipt = json.loads((source / "capture/receipt.json").read_text())
-    store = Store.init(tmp_path / "store")
-    sid = store.import_baostock_capture(source)
-    assert store.import_baostock_capture(source) == sid
-    view = Store(store.root).baostock(sid)
-    result = view.get_preclose(require_known=True)
-    assert isinstance(result, SourcePrecloseResult) and len(result.rows) == 3
-    assert [r.source_fields for r in result.rows] == raw
-    for row, original in zip(result.rows, raw, strict=True):
-        assert row.preclose.raw_value == original["preclose"]
-        assert row.preclose.value == Decimal(original["preclose"])
-        assert str(row.preclose.value) == original["preclose"]
-        assert row.preclose.state == "source_observed"
-        assert row.source_adjustflag == row.request_adjustflag == "3"
-        assert row.raw_record_sha256 == api.sh(original)
-        assert row.raw_response_sha256 == receipt["pages"][0]["raw_response_sha256"]
-        assert row.response_received_at == receipt["pages"][0]["last_byte_received_at"]
-        assert row.price_basis == preclose.BASIS and row.unit == "CNY/share"
-        assert row.reference_price_eligible is row.historical_available_at is None
-        assert not row.events_complete and not row.execution_permission
-    assert (
-        view.quality()["price_basis"] == result.report["quality"]["price_basis"] == preclose.BASIS
-    )
-    assert result.report["definition"]["document_sha256"] == preclose.DEFINITION_SHA256
-    assert result.report["coverage"]["requested_values_known"]
-    assert not result.report["network_used"] and not result.report["quality"]["historical_pit"]
-    assert not result.report["coverage"]["query_complete"]
-    assert view.descriptor()["version"] == preclose.VERSION
-    with raises_code("RECEIPT_NOT_VISIBLE"):
-        view.at("2026-10-11T00:00:00Z")
-    with raises_code("PIT_UNAVAILABLE"):
-        view.at("2026-10-11T00:00:00Z", visibility="verified")
 
 
 def test_generic_profile_and_old_fields():

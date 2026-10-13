@@ -29,7 +29,7 @@ B26 的已冻结新浪原始 KLC 经原解码器重新解码，8,449 条记录�
 可复核脚本：`scripts/build_b26_premarket_binding.py` 从原独立交付复制证据，
 `scripts/verify_sina_premarket.cjs` 在无网络 VM 中重新解码并检查全部记录。
 它们均不接收聚宽输入。实际证据在
-`/Users/yinming/Documents/Codex/2026-10-11/task-6/b26-research/`，包含 binding、原字节、
+`evidence/b26-research/`，包含 binding、原字节、
 解码器、主公告、原生调用公共响应、回归日志及完整前后 diff。
 
 相关回归：134 passed, 3 skipped；其中新接口 20 项。跳过的是既有前收测试的

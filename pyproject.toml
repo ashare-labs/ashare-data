@@ -4,11 +4,15 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ashare-data"
-version = "0.9.1.dev10"
+version = "0.9.1.dev13"
 description = "A数达: direct A-share market data with optional local caching"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
-dependencies = ["duckdb==1.4.3", "pandas==2.3.3"]
+dependencies = [
+    "duckdb==1.4.3", "pandas==2.3.3",
+    "numpy==2.4.6; python_version < '3.12'",
+    "numpy==2.5.3; python_version >= '3.12'",
+]
 
 [project.scripts]
 ashare-data = "ashare_data.cli:main"
