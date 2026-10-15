@@ -146,6 +146,7 @@ def capture_query(
     clock=utc_now,
     monotonic=time.monotonic_ns,
     evidence_kind="live_local_capture",
+    allow_universe=False,
 ):
     """Do not call concurrently: pinned SDK uses a global default_socket.
 
@@ -156,13 +157,19 @@ def capture_query(
     """
     if request.get("method") not in METHODS:
         raise ValueError("unsupported request method")
-    if not 1 <= max_rows <= 5000 or not 1 <= max_pages <= 4:
+    if not 1 <= max_rows <= (50000 if allow_universe else 5000) or not 1 <= max_pages <= (
+        32 if allow_universe else 4
+    ):
         raise ValueError("research limits")
     if not isinstance(request.get("params"), dict):
         raise ValueError("explicit params required")
     method = request["method"]
     params = request["params"]
-    if method != "query_trade_dates" and not params.get("code"):
+    if (
+        method != "query_trade_dates"
+        and not params.get("code")
+        and not (allow_universe and method in {"query_all_stock", "query_stock_basic"})
+    ):
         raise ValueError("no universe queries")
     source_hashes = {p.name: bh(p.read_bytes()) for p in sorted(Path(__file__).parent.glob("*.py"))}
     clock_errors = []

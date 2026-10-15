@@ -66,3 +66,5 @@ API 的 `historical_pit`、`execution_permission` 始终为 false。
 真实离线验收可设置 `ASHARE_DAILY_RESEARCH_PACKAGE=/本地数据包`，不会访问网络。
 真实数据的覆盖矩阵与原文哈希在包内 `reports/coverage.json`、`binding.json`，
 按固定样本保留失败和限制，不以收益或完整性选择股票。
+
+预热长度由研究包的 `warmup_sessions` 声明，离线构建脚本读取 `data_requirements.warmup_open_sessions_before_start`；不再强制每个策略准备 120 日。至少保留一个前交易日、输出窗口和一个后继日，日期及数量须与来源日历一致。查询时 `history(count=N)` 仍检查当时实际可见的 N 条，不足则明确拒绝。120 日仍是上方示例的模型需求。

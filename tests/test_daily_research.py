@@ -38,6 +38,27 @@ def write_package(root, data):
     return DailyResearchView(root / "binding.json", expected_binding_sha256=digest(raw))
 
 
+def test_shorter_warmup_is_valid_and_history_still_checks_actual_requirement(tmp_path, data):
+    window = data["windows"][0]
+    window["sessions"] = window["sessions"][118:]
+    window["warmup_start"] = window["sessions"][0]
+    window["warmup_sessions"] = 2
+    view = write_package(tmp_path, data)
+    result = view.history("w", "000001.XSHE", as_of=window["start"] + "T09:00:00+08:00", count=2)
+    assert [r["date"] for r in result["rows"]] == window["sessions"][:2]
+    with pytest.raises(DataError) as error:
+        view.history("w", "000001.XSHE", as_of=window["start"] + "T09:00:00+08:00", count=3)
+    assert error.value.code == "DAILY_RESEARCH_WARMUP"
+
+
+@pytest.mark.parametrize("warmup", [0, True, 9999])
+def test_invalid_warmup_has_structured_failure(tmp_path, data, warmup):
+    data["windows"][0]["warmup_sessions"] = warmup
+    with pytest.raises(DataError) as error:
+        write_package(tmp_path, data)
+    assert error.value.code == "DAILY_RESEARCH_WARMUP"
+
+
 @pytest.fixture
 def data():
     # Explicitly synthetic session sequence for validation/clock tests only.

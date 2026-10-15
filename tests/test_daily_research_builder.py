@@ -45,3 +45,13 @@ def test_foreign_manifest_baseline_is_rejected_before_building(tmp_path, builder
     with pytest.raises(ValueError, match="baselines"):
         builder["build"](tmp_path)
     assert not (tmp_path / "binding.json").exists()
+
+
+def test_builder_honors_declared_warmup_and_never_silently_shortens_it(builder):
+    days = ["2020-01-02", "2020-01-03", "2020-01-06", "2020-01-07"]
+    assert builder["select_sessions"](days, days[2], days[2], 2) == (days[:2], [days[2]], days[3])
+    for count in (0, True, 3, 120):
+        with pytest.raises(ValueError):
+            builder["select_sessions"](days, days[2], days[2], count)
+    with pytest.raises(ValueError, match="successor"):
+        builder["select_sessions"](days, days[2], days[-1], 2)

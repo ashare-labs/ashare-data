@@ -103,6 +103,19 @@ def parse_tables(path, code):
     return p.tables
 
 
+def select_sessions(dates, start, end, warmup_count):
+    """Honor the strategy's history requirement without inventing prior sessions."""
+    check(type(warmup_count) is int and warmup_count >= 1,
+          "warmup_open_sessions_before_start must be a positive integer")
+    warm = [d for d in dates if d < start][-warmup_count:]
+    out = [d for d in dates if start <= d <= end]
+    following = next((d for d in dates if d > end), None)
+    check(len(warm) == warmup_count and out and out[0] == start and out[-1] == end
+          and following is not None and len(warm) + len(out) + 1 <= 1000,
+          "Calendar cannot supply requested warmup, output window and successor")
+    return warm, out, following
+
+
 def build(root, output="binding.json"):
     check(
         re.fullmatch(r"binding(?:-[a-z0-9-]+)?\.json", output),
@@ -116,8 +129,9 @@ def build(root, output="binding.json"):
         "Source validation failed: contract['baselines']['ad'] == BASELINE",
     )
     check(
-        contract["data_requirements"]["warmup_open_sessions_before_start"] >= 120,
-        "Source validation failed: contract['data_requirements']['warmup_open_sessions_before_start'] >= 120",
+        type(contract["data_requirements"]["warmup_open_sessions_before_start"]) is int
+        and contract["data_requirements"]["warmup_open_sessions_before_start"] >= 1,
+        "warmup_open_sessions_before_start must be a positive integer",
     )
     calendar = load(raw / "sina-calendar-decoded.json")
     check(
@@ -162,11 +176,10 @@ def build(root, output="binding.json"):
             all(((r["date"] in dates) == (r["is_open_hex"] == "31") for r in rows)),
             "Source validation failed: all(((r['date'] in dates) == (r['is_open_hex'] == '31') for r in rows))",
         )
-        warm = [d for d in dates if d < cw["start"]][
-            -contract["data_requirements"]["warmup_open_sessions_before_start"] :
-        ]
-        out = [d for d in dates if cw["start"] <= d <= cw["end"]]
-        following = next(d for d in dates if d > cw["end"])
+        warm, out, following = select_sessions(
+            dates, cw["start"], cw["end"],
+            contract["data_requirements"]["warmup_open_sessions_before_start"],
+        )
         check(
             rows[0]["date"] <= warm[0] and rows[-1]["date"] >= following,
             "Source validation failed: rows[0]['date'] <= warm[0] and rows[-1]['date'] >= following",

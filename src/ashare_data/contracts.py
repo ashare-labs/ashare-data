@@ -9,6 +9,7 @@ import json
 from datetime import datetime, time, timedelta
 
 from .model import DataError, TZ, canonical, day, digest, nonempty, require, symbol, timestamp
+from .query_policy import QueryLimits
 
 
 def label_time(value):
@@ -197,14 +198,17 @@ class CoverageContract:
             d += timedelta(days=1)
         return sorted(expected, key=lambda s: s["label"]), unknown
 
-    def assess(self, security, labels, start, end, *, count=None, as_of=None):
+    def assess(self, security, labels, start, end, *, count=None, as_of=None, query_limits=None):
         symbol(security)
+        limits = QueryLimits() if query_limits is None else query_limits
+        require(isinstance(limits, QueryLimits), "INVALID_REQUEST", "query_limits 须为 QueryLimits")
         cutoff = timestamp(as_of) if as_of is not None else None
         start, end = label_time(start), label_time(end)
         if count is None:
             slots, unknown = self._expected(security, start, end, cutoff)
         else:
-            require(type(count) is int and 0 < count <= 1000, "INVALID_COUNT", "无效 count")
+            require(type(count) is int and 0 < count <= limits.max_count,
+                    "INVALID_COUNT", "count 须为正整数且不超过 query_limits.max_count")
             slots, unknown = self._expected_tail(security, start, end, count, cutoff)
         if self._data["label_semantics"] != "verified":
             unknown.append({"code": "SESSION_SCOPE_UNKNOWN"})
@@ -223,6 +227,10 @@ class CoverageContract:
         unexpected = [t.isoformat() for t in sorted(present-expected)]
         duplicates = len(selected) != len(present)
         complete = not unknown and not missing and not unexpected and not duplicates
+        # Expected slots already require visible calendar and trading-state facts.
+        # Unknown portions do not invalidate a proven omission in another portion.
+        known_incomplete = self._data["label_semantics"] == "verified" and (
+            bool(missing) or (not unknown and bool(unexpected or duplicates)))
         empty_state = None
         if complete and not expected:
             calendars = [cal for d, cal in self._days.items() if start.date().isoformat() <= d <= end.date().isoformat()]
@@ -237,7 +245,8 @@ class CoverageContract:
                 "frequency": self.frequency, "trading_scope": self._data["trading_scope"],
                 "evidence_kind": self._data["evidence_kind"], "evidence": self._data["evidence"],
                 "status": "unknown" if unknown else empty_state or ("complete" if complete else "incomplete"),
-                "complete": complete, "grid_complete": complete, "trade_totals_verified": False,
+                "complete": complete, "grid_complete": complete, "known_incomplete": known_incomplete,
+                "trade_totals_verified": False,
                 "tradable": bool(expected) if not unknown else None,
                 "tradable_basis": "queried range contains declared trading slots; not current-time permission",
                 "trading_status": self.trading_status(security, cutoff) if cutoff else None,
@@ -347,7 +356,7 @@ class CoverageContract:
 
 def unknown_coverage():
     return {"status": "unknown", "complete": False, "grid_complete": False,
-            "trade_totals_verified": False, "expected_count": None,
+            "known_incomplete": False, "trade_totals_verified": False, "expected_count": None,
             "unknown": [{"code": "CALENDAR_UNKNOWN"}, {"code": "SESSION_SCOPE_UNKNOWN"}, {"code": "TRADING_STATUS_UNKNOWN"}],
             "meaning": "缺来源标签映射、版本化时段或证券状态，不能从返回根数推算全量覆盖"}
 

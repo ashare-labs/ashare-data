@@ -15,6 +15,12 @@ END = b"<![CDATA[]]>\n"
 HEADER = re.compile(rb"([0-9.]{7})\x01([0-9A-Z]{2})\x01([0-9]{10})")
 MAX_BYTES = 4 * 1024 * 1024
 METHODS = {
+    "query_all_stock": dict(
+        request="35",
+        response="36",
+        request_keys=["day"],
+        response_keys=["day", "fields"],
+    ),
     "query_stock_basic": dict(
         request="45",
         response="46",
@@ -52,6 +58,24 @@ METHODS = {
 # absent columns, whitespace, malformed JSON and other message types are not
 # evidence of an empty collection. Request identity is still checked separately.
 NATIVE_EMPTY_FIELDS = {
+    # Observed fourth terminal page after exactly 6000 dated memberships.
+    "query_all_stock": ["code", "tradeStatus", "code_name"],
+    # Observed terminal page after exactly 4000 daily rows (2026-10-14).
+    # This exception is limited to the maintenance daily schema, not arbitrary K-lines.
+    "query_history_k_data_plus": [
+        "date",
+        "code",
+        "open",
+        "high",
+        "low",
+        "close",
+        "preclose",
+        "volume",
+        "amount",
+        "adjustflag",
+        "tradestatus",
+        "isST",
+    ],
     "query_adjust_factor": [
         "code",
         "dividOperateDate",
@@ -205,6 +229,10 @@ def decode_response(raw):
             raise FrameError("native-empty response type/method is unverified")
         if names != NATIVE_EMPTY_FIELDS[method]:
             raise FrameError("native-empty response fields differ from verified schema")
+        if method == "query_history_k_data_plus" and (
+            echo.get("frequency") != "d" or echo.get("adjustflag") != "3"
+        ):
+            raise FrameError("native-empty daily profile requires raw daily request")
         record = []
     else:
         payload = json.loads(chunks[6])
@@ -301,7 +329,7 @@ def check_identity(request, sent, response, page_number, page_size=2000):
         unknown.append("row_date_field_absent")
     seen = set()
     for index, row in enumerate(rows):
-        if "code" in row and row["code"] != params.get("code"):
+        if "code" in row and params.get("code") and row["code"] != params["code"]:
             issues.append(f"row[{index}].code")
         if date_key and date_key in row:
             try:

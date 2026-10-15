@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import socket
+import sys
 import threading
 import time
 import urllib.error
@@ -58,10 +59,10 @@ class Transport:
     def __init__(self, *, cache=None, cache_mode="prefer", cache_ttl=300, timeout=15):
         require(cache_mode in {"prefer", "only", "refresh"}, "INVALID_REQUEST", "无效 cache_mode")
         require(cache is not None or cache_mode != "only", "INVALID_REQUEST", "only 模式须提供 cache 路径")
-        require(isinstance(cache_ttl, (int, float)) and 0 <= cache_ttl <= 86400,
-                "INVALID_REQUEST", "cache_ttl 须为 0..86400 秒")
-        require(isinstance(timeout, (int, float)) and 0 < timeout <= 60,
-                "INVALID_REQUEST", "timeout 须为 0..60 秒")
+        require(type(cache_ttl) in (int, float) and 0 <= cache_ttl <= sys.float_info.max,
+                "INVALID_REQUEST", "cache_ttl 须为有限非负秒数；不代表行情新鲜度")
+        require(type(timeout) in (int, float) and 0 < timeout <= threading.TIMEOUT_MAX,
+                "INVALID_REQUEST", "timeout 须为本机时间表示范围内的有限正秒数")
         self.root = Path(cache).expanduser() if cache is not None else None
         self.mode, self.ttl, self.timeout = cache_mode, cache_ttl, timeout
         self._frozen = None

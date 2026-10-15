@@ -236,7 +236,7 @@ class DailyResearchView:
             sessions = w["sessions"]
             require(
                 sessions == sorted(set(day(d) for d in sessions))
-                and 121 <= len(sessions) <= 1000
+                and 3 <= len(sessions) <= 1000
                 and w["id"] not in self._windows,
                 "DAILY_RESEARCH_CALENDAR",
                 "Invalid window calendar",
@@ -245,13 +245,13 @@ class DailyResearchView:
             warmup = w["warmup_sessions"]
             require(
                 type(warmup) is int
-                and warmup >= 120
+                and 1 <= warmup <= len(sessions) - 2
                 and sessions[warmup] == start
                 and sessions[-2] == end
                 and sessions[-1] == w["next_session"]
                 and sessions[0] == w["warmup_start"],
                 "DAILY_RESEARCH_WARMUP",
-                "Insufficient warmup or incorrect window boundary",
+                "At least one prior session and a successor are required; warmup must match the window",
             )
             for security in securities:
                 for label in sessions:

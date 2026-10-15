@@ -31,3 +31,17 @@ def published(store, bundle, requirements):
     report = store.validate([bid], requirements=requirements, policy="synthetic")
     sid = store.publish(report["id"])
     return store, bid, report, sid
+
+
+@pytest.fixture
+def synthetic_action_baseline(tmp_path, monkeypatch):
+    """Explicit test-only pin substitution; never loaded by production defaults."""
+    from ashare_data import action_scope
+    from synthetic_pilot import write_baselines
+
+    root = tmp_path / "synthetic-actions"
+    pins = write_baselines(root)
+    monkeypatch.setenv(action_scope.EVIDENCE_ENV, str(root))
+    monkeypatch.setattr(action_scope, "BASELINE_SHA256", pins["original"])
+    monkeypatch.setattr(action_scope, "REPLAN_SHA256", pins["replan"])
+    return root

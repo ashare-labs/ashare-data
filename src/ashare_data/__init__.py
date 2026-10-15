@@ -1,5 +1,6 @@
 """A数达: direct public market data with optional caching and advanced offline snapshots."""
 from .model import DataError
+from .query_policy import QueryLimits
 from .preclose import SourcePrecloseValue, SourcePrecloseRow, SourcePrecloseResult
 from .daily_status import DailyStatusFlag, DailyStatusRow, DailyStatusResult
 from .source_calendar import (SourceCalendarFlag, SourceCalendarRow, SourceCalendarResult,
@@ -42,7 +43,7 @@ from .m2_types import M2AD08Call, M2ConsumerBinding, M2ReadContext, M2Read, M2Do
 __all__ = ["BaoStockSource", "BaoStockView", "ResearchResult", "ResearchView", "Store", "DataError", "Client", "get_price", "get_security_info", "get_trade_days",
            "get_all_securities", "capabilities", "CoverageContract", "reconcile_turnover", "reconcile_sina_day",
            "D1Facts", "D1View", "D1OwnerReceipt", "D1PrevCloseCall", "BR1View", "BR1Receipt"]
-__all__ += ["BR1ListingContract", "BR1ListingProjection", "BR1ListingView"]
+__all__ += ["BR1ListingContract", "BR1ListingProjection", "BR1ListingView", "QueryLimits"]
 __version__ = "0.9.1.dev13"
 
 __all__ += ["M2View", "M2UseView", "M2AD08Call", "M2ConsumerBinding", "M2ReadContext", "M2Read", "M2Document"]

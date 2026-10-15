@@ -8,10 +8,12 @@ from decimal import Decimal
 from datetime import date, datetime
 from pathlib import Path
 
+from . import __version__
 from .model import DataError, require
 from .storage import Store
 from .live import Client, capabilities
 from .contracts import CoverageContract
+from .query_policy import QueryLimits
 
 
 def json_value(value):
@@ -30,11 +32,14 @@ def read_json(path):
 
 
 def parser():
-    p = argparse.ArgumentParser(prog="ashare-data", description="A数达：直接查询公开 A 股行情，支持可选缓存与高级离线快照")
+    p = argparse.ArgumentParser(prog="ashare-data", description="A数达：行情查询、本地日线维护与离线研究")
+    p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     p.add_argument("--store", help="高级离线快照目录；直接行情查询无需此参数")
     sub = p.add_subparsers(dest="command", required=True)
     from .zzshare_cli import add_parsers as add_zzshare_parsers
     add_zzshare_parsers(sub)
+    from .local_daily import add_parser as add_local_daily_parser
+    add_local_daily_parser(sub)
     for name in ("init", "capabilities", "snapshots", "recover"):
         sub.add_parser(name)
     price = sub.add_parser("price", help="直接从公开源获取行情，无需初始化")
@@ -131,6 +136,11 @@ def parser():
             rp.add_argument("--visibility", choices=["verified", "assumed", "received"], default="verified")
             for flag in ("complete", "fresh", "final", "tradable"):
                 rp.add_argument("--require-" + flag, action="store_true")
+    for query_parser in (price, rp):  # rp is the offline research-price parser.
+        query_parser.add_argument("--allow-partial", action="store_true", help="返回可用记录及逐证券缺口/错误")
+        query_parser.add_argument("--max-securities", type=int, default=10)
+        query_parser.add_argument("--max-count", type=int, default=1000)
+        query_parser.add_argument("--max-observation-rows", type=int, default=100000)
     bf = sub.add_parser("baostock-fetch", help="显式查询匿名免费源并封存请求证据")
     bf.add_argument("kind", choices=["daily", "daily_status", "daily_preclose", "minute", "basic", "calendar"])
     bf.add_argument("--frequency", choices=["daily", "5m", "15m", "30m", "60m"])
@@ -204,6 +214,10 @@ def parser():
 def main(argv=None):
     args = parser().parse_args(argv)
     try:
+        if args.command == "local-daily":
+            from .local_daily import command
+            print(json.dumps(command(args), ensure_ascii=False, indent=2))
+            return 0
         if args.command == "reconcile-files":
             from .turnover_diagnostics import MAX_BYTES, reconcile_sina_day
             def raw_file(name):
@@ -234,13 +248,14 @@ def main(argv=None):
             client = Client(cache=args.cache, cache_mode=args.cache_mode, timeout=args.timeout,
                             coverage_contract=CoverageContract(read_json(contract_path)) if contract_path else None)
             if args.command == "price":
+                client.query_limits = QueryLimits(args.max_securities, args.max_count, args.max_observation_rows)
                 frame = client.get_price(args.security[0] if len(args.security) == 1 else args.security,
                                          start_date=args.start, end_date=args.end, count=args.count,
                                          frequency=args.frequency, fields=args.fields,
                                          fq=None if args.fq == "none" else args.fq, strict=args.strict,
                                          as_of=args.as_of, visibility=args.visibility, require_complete=args.require_complete,
                                          require_fresh=args.require_fresh, require_final=args.require_final,
-                                         require_tradable=args.require_tradable)
+                                         require_tradable=args.require_tradable, allow_partial=args.allow_partial)
                 result = {"rows": (frame.reset_index() if frame.index.name == "time" else frame).to_dict("records"),
                           "metadata": frame.attrs}
             elif args.command == "live-coverage":
@@ -385,7 +400,9 @@ def main(argv=None):
                 result = view.get_price(args.security[0] if len(args.security) == 1 else args.security,
                     start_date=args.start, end_date=args.end, frequency=args.frequency, fields=args.fields, count=args.count,
                     require_complete=args.require_complete, require_fresh=args.require_fresh,
-                    require_final=args.require_final, require_tradable=args.require_tradable).to_dict()
+                    require_final=args.require_final, require_tradable=args.require_tradable,
+                    allow_partial=args.allow_partial,
+                    query_limits=QueryLimits(args.max_securities, args.max_count, args.max_observation_rows)).to_dict()
             elif args.command == "import":
                 result = {"batch_id": store.import_bundle(read_json(args.bundle))}
             elif args.command == "validate":

@@ -14,6 +14,9 @@ dependencies = [
     "numpy==2.5.3; python_version >= '3.12'",
 ]
 
+[project.optional-dependencies]
+local-data = ["openpyxl==3.1.5", "quickjs==1.19.4", "baostock==0.9.4"]
+
 [project.scripts]
 ashare-data = "ashare_data.cli:main"
 
@@ -41,3 +44,8 @@ exclude = ["tests/test_regression_gates.py"]
 # Source archives contain distributable project files only, including in Git worktrees.
 [tool.hatch.build.targets.sdist]
 include = ["/src", "/tests", "/examples", "/scripts", "/docs", "/README.md", "/CHANGELOG.md", "/pyproject.toml", "/uv.lock", "/.gitignore"]
+exclude = ["/docs/feasibility.md", "/docs/rc1-to-rc2.md", "/examples/local_probe.py", "/review/rc1", "/src/ashare_data/pilot_evidence", "/tests/fixtures/calendar_pilot"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ashare_data"]
+exclude = ["/src/ashare_data/pilot_evidence"]

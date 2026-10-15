@@ -93,3 +93,5 @@ ashare-data --store ./research-store research-recover
 公开结果是调用者可修改的独立副本。`.report`、`.data`、`.data.attrs` 和每次 `.to_dict()` 均不共享可变对象与固定视图；DataFrame 的 object 单元格也逐项深复制。构造 `ResearchResult(data, report)` 时同样脱离传入对象。修改这些副本只改变当前副本，后续查询、已有/新建兄弟 view、重新打开的同 ID 数据均不改变。消费者自己的缓存可以保存并修改返回值，但不能因此改写 A数达内部版本。
 
 `.at()` 只建立轻量查询上下文，仍共享未向外暴露的内部已验证记录；没有为每次调用重读磁盘或复制整个数据集。描述符、谱系、覆盖、质量及异常字典也隔离可变引用。旧正式 DataView 的 loaded/manifest 属性现在返回副本；构造器不保留传入元数据引用。此修复保持原有 manifest/parser/policy 版本和数据集 ID，因为解析、可见性与准入规则没有改变。
+
+固定版本 `get_price` 支持 `allow_partial=True` 和 `query_limits=QueryLimits(...)`。返回表只含可用原记录，`report.query_status`、`partial_result` 保留缺口或失败，语义与[行情 API](live-api.md#部分结果与本地预算)相同；不修改版本或发起网络请求。

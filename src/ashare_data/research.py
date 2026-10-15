@@ -23,6 +23,7 @@ from .live import Client, DEFAULT_FIELDS, FREQUENCIES, KLINE_URL, _bars, _decima
 from .model import DataError, TZ, canonical, digest, require, timestamp, validate_ohlc
 from .storage import identifier, immutable_write, now
 from .transport import MAX_BYTES, Transport
+from .query_policy import PARTIAL_ERRORS, QueryLimits
 
 VERSIONS = {
     "schema_version": 1,
@@ -715,9 +716,10 @@ class ResearchView:
         context._clock, context._visibility = clock, visibility
         return context
 
-    def _client(self):
+    def _client(self, query_limits=None):
         contract = self._manifest.get("coverage_contract")
         client = Client(
+            query_limits=query_limits,
             cache=self._root,
             cache_mode="only",
             coverage_contract=CoverageContract(contract) if contract else None,
@@ -798,16 +800,23 @@ class ResearchView:
         require_fresh=False,
         require_final=False,
         require_tradable=False,
+        allow_partial=False,
+        query_limits=None,
     ):
         flags = (require_complete, require_fresh, require_final, require_tradable)
         require(all(type(v) is bool for v in flags), "INVALID_REQUEST", "准入要求须为布尔值")
+        require(type(allow_partial) is bool, "INVALID_REQUEST", "allow_partial 须为布尔值")
+        require(not allow_partial or not any(flags), "INVALID_REQUEST", "部分结果不能同时请求准入保证")
+        require(query_limits is None or isinstance(query_limits, QueryLimits),
+                "INVALID_REQUEST", "query_limits 须为 QueryLimits")
+        limits = query_limits or QueryLimits()
         require(not require_final, "BAR_NOT_FINAL", "缺最终发布及修订水位证据")
         require(fq is None, "UNSUPPORTED_ADJUSTMENT", "只提供原价，不伪造因子")
         securities = [security] if isinstance(security, str) else security
         require(
-            isinstance(securities, (list, tuple)) and 0 < len(securities) <= 10,
+            isinstance(securities, (list, tuple)) and 0 < len(securities) <= limits.max_securities,
             "REQUEST_TOO_LARGE",
-            "只允许1..10个显式证券",
+            "证券数超过 query_limits.max_securities",
         )
         for code in securities:
             _security(code)
@@ -836,9 +845,9 @@ class ResearchView:
             "INVALID_REQUEST",
             "money和amount是别名，不可同传",
         )
-        records, provenance = [], []
+        records, provenance, query_status = [], [], []
         if self._manifest["source"] == "sina_public":
-            frame = self._client().get_price(
+            frame = self._client(limits).get_price(
                 security,
                 start_date=start_date,
                 end_date=end_date,
@@ -849,6 +858,7 @@ class ResearchView:
                 require_complete=require_complete,
                 require_fresh=require_fresh,
                 require_tradable=require_tradable,
+                allow_partial=allow_partial,
             )
             source_report = copy.deepcopy(frame.attrs)
             for item in source_report["provenance"]:
@@ -898,9 +908,9 @@ class ResearchView:
             if start_date is None and count is None:
                 count = 20
             require(
-                count is None or type(count) is int and 1 <= count <= 1000,
+                count is None or type(count) is int and 1 <= count <= limits.max_count,
                 "INVALID_COUNT",
-                "count须为1..1000",
+                "count须为正整数且不超过 query_limits.max_count",
             )
             end = (
                 _dt(end_date, end=True) if end_date is not None else self._clock or datetime.now(TZ)
@@ -913,43 +923,56 @@ class ResearchView:
             )
             require(start is None or start <= end, "INVALID_RANGE", "start不得晚于end")
             for code in securities:
-                chosen = [
-                    r
-                    for r in self._bao_visible(code)
-                    if (start is None or _dt(r["source_label"]) >= start)
-                    and _dt(r["source_label"]) <= end
-                ]
-                unique = {r["source_label"]: r for r in chosen}
-                chosen = [unique[k] for k in sorted(unique)]
-                if count:
-                    require(len(chosen) >= count, "COVERAGE_INCOMPLETE", "记录不足count；不补数")
-                    chosen = chosen[-count:]
-                require(chosen, "COVERAGE_INCOMPLETE", "范围内没有可见记录")
-                for row in chosen:
-                    records.append(
-                        self._record(code, row["source_label"], row["source_row"], wanted)
+                try:
+                    chosen = [
+                        r
+                        for r in self._bao_visible(code)
+                        if (start is None or _dt(r["source_label"]) >= start)
+                        and _dt(r["source_label"]) <= end
+                    ]
+                    unique = {r["source_label"]: r for r in chosen}
+                    chosen = [unique[k] for k in sorted(unique)]
+                    issues = []
+                    if count:
+                        if len(chosen) < count:
+                            issues.append({"code": "COVERAGE_INCOMPLETE", "requested_count": count,
+                                           "available_count": len(chosen)})
+                        require(allow_partial or len(chosen) >= count, "COVERAGE_INCOMPLETE", "记录不足count；不补数")
+                        chosen = chosen[-count:]
+                    require(chosen, "COVERAGE_INCOMPLETE", "范围内没有可见记录")
+                    selected = [self._record(code, row["source_label"], row["source_row"], wanted)
+                                for row in chosen]
+                    records.extend(selected)
+                    query_status.append({"security": code, "status": "partial" if issues else "ok",
+                                         "returned_count": len(selected), "issues": issues})
+                    provenance.append(
+                        {
+                            "security": code,
+                            "source_rows": [r["source_row"] for r in chosen],
+                            "records": chosen,
+                            "coverage_report": self.coverage(
+                                code,
+                                start_date or chosen[0]["source_label"],
+                                end_date or chosen[-1]["source_label"],
+                            ),
+                            "available_at": None,
+                            "response_completed_at": None,
+                        }
                     )
-                provenance.append(
-                    {
-                        "security": code,
-                        "source_rows": [r["source_row"] for r in chosen],
-                        "records": chosen,
-                        "coverage_report": self.coverage(
-                            code,
-                            start_date or chosen[0]["source_label"],
-                            end_date or chosen[-1]["source_label"],
-                        ),
-                        "available_at": None,
-                        "response_completed_at": None,
-                    }
-                )
+                except DataError as exc:
+                    if not allow_partial or exc.code not in PARTIAL_ERRORS:
+                        raise
+                    query_status.append({"security": code, "status": "unavailable",
+                                         "returned_count": 0, "error": exc.as_dict()})
             source_report = {
                 "source": "baostock_daily",
                 "visibility_level": self._visibility,
                 "as_of": self._clock.isoformat() if self._clock else None,
                 "available_at": None,
+                "query_status": query_status,
+                "partial_result": any(s["status"] != "ok" for s in query_status),
             }
-        result = pd.DataFrame(records).sort_values(["time", "code"], ignore_index=True)
+        result = pd.DataFrame(records, columns=["time", "code", *wanted]).sort_values(["time", "code"], ignore_index=True)
         if isinstance(security, str):
             result = result.drop(columns="code").set_index("time")
         report = {
@@ -963,6 +986,8 @@ class ResearchView:
             "bar_end": None,
             "interval_boundaries_verified": False,
             "research_only": True,
+            "allow_partial": allow_partial,
+            "query_limits": limits.to_dict(),
         }
         # ResearchResult owns the public boundary. Internal Bao rows may be
         # shared by sibling views, but no mutable reference escapes here.
