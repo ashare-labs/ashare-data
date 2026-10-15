@@ -40,6 +40,8 @@ def parser():
     add_zzshare_parsers(sub)
     from .local_daily import add_parser as add_local_daily_parser
     add_local_daily_parser(sub)
+    from .corporate_history_cli import add_parser as add_corporate_history_parser
+    add_corporate_history_parser(sub)
     for name in ("init", "capabilities", "snapshots", "recover"):
         sub.add_parser(name)
     price = sub.add_parser("price", help="直接从公开源获取行情，无需初始化")
@@ -214,6 +216,11 @@ def parser():
 def main(argv=None):
     args = parser().parse_args(argv)
     try:
+        if args.command == "corporate-history":
+            from .corporate_history_cli import command
+            result = command(args)
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return 2 if result.get("ready_for_declared_date_model") is False else 0
         if args.command == "local-daily":
             from .local_daily import command
             print(json.dumps(command(args), ensure_ascii=False, indent=2))

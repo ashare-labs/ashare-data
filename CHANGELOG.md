@@ -164,3 +164,9 @@ README整理为项目简介、安装指南、快速开始、使用指南、限�
 安装与公开测试在macOS arm64、Python 3.12验证。具体测试数、跳过项、真实快速开始及构建校验结果见本版GitHub Release。历史数据包、原始响应和私人验证证据不随源码或构建产物分发。
 
 这是0.x早期版本。源数据仍有覆盖、分钟标签、复权和历史可见性限制；研究结果不会授予交易执行或完整PIT保证。旧数据版本及消费者绑定需要继续使用原固定库版本，不会自动迁移到本版。
+
+### Corporate action and historical share evidence (candidate)
+
+- Add version-pinned `CorporateHistoryView` and `corporate-history` CLI: source lineage, event date roles, historical share observations, coverage and guarded AQ schedules.
+- Add bounded free-source capture, stock-detail planning and deterministic offline sealing. Preserve cash/stock/rights distinctions, source conflicts, corrections, receipt clocks and old-code boundaries.
+- Frozen validation scope is eight 2020–2025 stocks plus four special windows; this does not claim all-market corporate-action completeness, historical PIT or native account execution certification. See `docs/corporate-history.md`.

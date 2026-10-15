@@ -27,6 +27,7 @@ from .financial_pit import FinancialPIT
 from .f2 import FactorResearchView
 
 from .historical_market import HistoricalMarketView
+from .corporate_history import CorporateHistoryView
 from .baostock import BaoStockSource, BaoStockView
 from .zzshare import ZzshareSource, ZzshareView
 from .zzshare_types import ZzshareValue, SourceClaimedLimits, ZzshareDailyRow, ZzshareDailyResult
@@ -81,5 +82,6 @@ __all__ += ["FinancialPIT"]
 __all__ += ["FactorResearchView"]
 
 __all__ += ["HistoricalMarketView"]
+__all__ += ["CorporateHistoryView"]
 
 __all__ += ["MinuteEvidenceView", "seal_minute_evidence"]

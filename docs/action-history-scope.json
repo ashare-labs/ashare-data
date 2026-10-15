@@ -1,0 +1,20 @@
+{
+  "schema": "ad.action-history-scope.v1",
+  "selection": "Frozen before acquisition; reuse the eight existing daily-research securities and four previously identified counterexamples, not return-selected",
+  "securities": [
+    {"security":"000001.XSHE","start":"2020-01-01","end":"2025-12-31"},
+    {"security":"600000.XSHG","start":"2020-01-01","end":"2025-12-31"},
+    {"security":"600036.XSHG","start":"2020-01-01","end":"2025-12-31"},
+    {"security":"000651.XSHE","start":"2020-01-01","end":"2025-12-31"},
+    {"security":"600519.XSHG","start":"2020-01-01","end":"2025-12-31"},
+    {"security":"000333.XSHE","start":"2020-01-01","end":"2025-12-31"},
+    {"security":"000858.XSHE","start":"2020-01-01","end":"2025-12-31"},
+    {"security":"601318.XSHG","start":"2020-01-01","end":"2025-12-31"},
+    {"security":"000022.XSHE","start":"2018-05-01","end":"2018-06-08","case":"cash dividend during suspension"},
+    {"security":"000033.XSHE","start":"2016-04-01","end":"2017-06-02","case":"reorganization share conversion and delayed price adjustment"},
+    {"security":"601313.XSHG","start":"2017-12-01","end":"2018-03-30","case":"code change boundary; never forward-fill successor facts"},
+    {"security":"601012.XSHG","start":"2022-05-20","end":"2022-06-17","case":"capitalization share delivery"}
+  ],
+  "historical_pit": false,
+  "market_complete": false
+}
