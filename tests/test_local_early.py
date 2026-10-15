@@ -308,3 +308,76 @@ def test_installed_cli_route_is_readonly_and_includes_uncertainty(store, monkeyp
     output = command(args)
     assert output["rows"][0]["strict_usable"] is False
     assert "PIT" in output["limitations"]["scope"]
+
+
+def cli_args(store, action, *options):
+    import argparse
+    from ashare_data.local_daily import add_parser
+
+    parser = argparse.ArgumentParser()
+    add_parser(parser.add_subparsers(dest="command"))
+    return parser.parse_args(
+        ["local-daily", action, "--root", str(store.root), "--symbol", "000002.XSHE", *options]
+    )
+
+
+def test_early_cli_omitted_dates_include_both_authorized_boundaries(store, monkeypatch):
+    from ashare_data.local_daily import command
+
+    for stage, day in (("1990-1991", "1990-12-01"), ("2000-2009", "2009-12-31")):
+        jid = add_job(store, stage, "tencent", "sz000002", day, day)
+        j = dict(store.db.execute("SELECT * FROM jobs WHERE id=?", (jid,)).fetchone())
+        ingest_http(store, j, result([bar(day)]))
+    store.set_meta("end", "2026-10-14")
+    store.db.commit()
+    monkeypatch.setattr(LocalDailyStore, "writer", lambda self: pytest.fail("query tried to write"))
+
+    output = command(cli_args(store, "query-early"))
+
+    assert (output["start"], output["end"]) == ("1990-12-01", "2009-12-31")
+    assert [r["date"] for r in output["rows"]] == ["1990-12-01", "2009-12-31"]
+    assert all(r["strict_usable"] is False for r in output["rows"])
+
+
+@pytest.mark.parametrize(
+    "options,start,end",
+    [
+        (["--end", "1991-06-08"], "1990-12-01", "1991-06-08"),
+        (["--start", "1991-06-08"], "1991-06-08", "2009-12-31"),
+        (
+            ["--start", "1991-06-08", "--end", "1991-06-08"],
+            "1991-06-08",
+            "1991-06-08",
+        ),
+    ],
+)
+def test_early_cli_preserves_each_explicit_date(store, options, start, end):
+    from ashare_data.local_daily import command
+
+    ingest_http(store, job(store), result([bar()]))
+    output = command(cli_args(store, "query-early", *options))
+    assert (output["start"], output["end"]) == (start, end)
+    assert [r["date"] for r in output["rows"]] == ["1991-06-08"]
+
+
+def test_early_cli_does_not_replace_explicit_modern_start_with_early_default(store):
+    from ashare_data.local_daily import command
+
+    with pytest.raises(ValueError, match="pre-2010 interval"):
+        command(cli_args(store, "query-early", "--start", "2010-01-01"))
+
+
+@pytest.mark.parametrize("mode", ["single", "compatible"])
+def test_modern_cli_omitted_start_keeps_2010_boundary(store, monkeypatch, mode):
+    import pandas as pd
+    from ashare_data.local_daily import command
+
+    received = []
+
+    def get_price(self, security, start, end, source, **options):
+        received.append((security, start, end, source, options["mode"]))
+        return pd.DataFrame()
+
+    monkeypatch.setattr(LocalDailyStore, "get_price", get_price)
+    command(cli_args(store, "query", "--mode", mode, "--end", "2010-01-08"))
+    assert received == [("000002.XSHE", "2010-01-01", "2010-01-08", "auto", mode)]

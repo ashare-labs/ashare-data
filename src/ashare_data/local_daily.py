@@ -1166,7 +1166,23 @@ class LocalDailyStore:
 
 
 def add_parser(sub):
-    p = sub.add_parser("local-daily", help="批量本地日线维护、断点续取和覆盖报告")
+    p = sub.add_parser(
+        "local-daily",
+        help="批量本地日线维护、断点续取和覆盖报告",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "query-early 只读逐来源研究观察，不是完整可回测行情或全市场历史 PIT。\n"
+            "来源行按 (symbol,date,source) 计数；唯一证券日按 (symbol,date) 去重，仍不认证成交日。\n"
+            "2026-10-15 验收快照（非当前库实时统计）：7,348,840 HTTP 来源行，"
+            "3,654,381 唯一证券日，\n"
+            "164,076 个上海代理日历缺口。代理不是深圳早年/PT 完整日历；"
+            "缺口不等于已证实漏采。\n"
+            "未认证 BaoStock 停牌/成交声明不消除缺口；validation_unknown 仅在 --diagnostics 展示。\n"
+            "早期价格/股数/手数单位、证券身份阶段和复权依据仍有限制；"
+            "strict_usable=false，不自动缩放、复权或生成总收益。\n"
+            "范围、缺口归因和使用限制见 docs/local-early-history.md。"
+        ),
+    )
     p.add_argument(
         "action",
         choices=[
@@ -1184,8 +1200,12 @@ def add_parser(sub):
         ],
     )
     p.add_argument("--root", type=Path, default=DEFAULT_ROOT)
-    p.add_argument("--start", default="2010-01-01")
-    p.add_argument("--end", default=None)
+    p.add_argument(
+        "--start",
+        default=None,
+        help="起始日；query-early 默认 1990-12-01，其他操作默认 2010-01-01",
+    )
+    p.add_argument("--end", default=None, help="结束日；query-early 默认 2009-12-31")
     p.add_argument("--workers", type=int, default=3)
     p.add_argument("--interval", type=float, default=1.0)
     p.add_argument("--timeout", type=float, default=30)
@@ -1197,7 +1217,7 @@ def add_parser(sub):
     p.add_argument(
         "--diagnostics",
         action="store_true",
-        help="query-early: include unadmitted BaoStock diagnostics with validation status",
+        help="query-early: include unadmitted BaoStock and anomalous HTTP rows with validation status",
     )
     p.add_argument(
         "--mode",
@@ -1226,6 +1246,8 @@ def add_parser(sub):
 
 
 def command(args):
+    if getattr(args, "start", None) is None:
+        args.start = "1990-12-01" if args.action == "query-early" else "2010-01-01"
     mode = getattr(args, "mode", "single")
     aliases = getattr(args, "alias_capture", ())
     if args.action != "query" and (mode != "single" or aliases):

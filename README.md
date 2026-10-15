@@ -100,7 +100,8 @@ UV_PROJECT_ENVIRONMENT=.venv-local-data uv sync --locked --no-config --python 3.
 
 [2010 年前主板扩展](docs/local-early-history.md)使用 `local-daily query-early` 显式读取
 独立来源观察，保留早退证券、历史周末、单位和上市阶段不确定性。未认证的 BaoStock
-响应和异常 HTTP 行仅在 `--diagnostics` 中展示；不自动复权或宣称全市场历史 PIT。
+响应和异常 HTTP 行仅在 `--diagnostics` 中展示。来源行数与去重证券日数分别统计；
+代理日历缺口保留，全部行 `strict_usable=false`，不自动复权或承诺完整可回测、全市场历史 PIT。
 
 ### 缓存与固定版本
 
