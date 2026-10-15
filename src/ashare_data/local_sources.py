@@ -74,6 +74,7 @@ class PublicHTTP:
             return self._get(url, referer)
 
     def _get(self, url, referer=None):
+        self.history.cache_hit = False
         cache = (
             self.root
             / "raw"
@@ -93,6 +94,7 @@ class PublicHTTP:
                     raise ValueError("raw cache hash mismatch")
                 if hasattr(self.history, "receipts"):
                     self.history.receipts.append(saved)
+                self.history.cache_hit = True
                 return body, [saved]
         host = urllib.parse.urlsplit(url).netloc
         receipts = []
@@ -323,7 +325,7 @@ def sina_factors(http, symbol):
     return sorted(rows, key=lambda r: r["date"]), receipts
 
 
-def sohu_daily(http, symbol, start, end):
+def sohu_daily(http, symbol, start, end, *, invalid_rows=None):
     """Public history table: unadjusted CNY, rounded lots and ten-thousand CNY."""
     params = dict(
         code="cn_" + symbol[2:],
@@ -367,7 +369,24 @@ def sohu_daily(http, symbol, start, end):
                 is_st=None,
             )
         )
-    return validate_bars(rows, start, end), receipts
+    if invalid_rows is None:
+        return validate_bars(rows, start, end), receipts
+    # An explicit research caller may retain invalid rows separately. The
+    # standard collector remains strict; neither path repairs source values.
+    from collections import Counter
+
+    dates = Counter(row["date"] for row in rows)
+    if any(count != 1 for count in dates.values()):
+        raise ValueError("duplicate source dates: whole response retained for review")
+    valid = []
+    for row in rows:
+        try:
+            validate_bars([row], start, end)
+        except ValueError as error:
+            invalid_rows.append(dict(row=row, error=str(error)))
+        else:
+            valid.append(row)
+    return sorted(valid, key=lambda row: row["date"]), receipts
 
 
 def tencent_daily(http, symbol, start, end):

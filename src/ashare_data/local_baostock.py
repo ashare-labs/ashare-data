@@ -135,7 +135,14 @@ def publish_available(root):
 
 
 def collect(
-    root, requests, timeout=120, interval=1, publish_every=50, refresh=False, quarantine=None
+    root,
+    requests,
+    timeout=120,
+    interval=1,
+    publish_every=50,
+    refresh=False,
+    quarantine=None,
+    archive_only=False,
 ):
     root = Path(root)
     directory = root / "raw" / "baostock"
@@ -148,7 +155,8 @@ def collect(
         if digest(r) not in quarantine and not capture_path(root, r, refresh_day).exists()
     ]
     if not requests:
-        publish_available(root)
+        if not archive_only:
+            publish_available(root)
         return dict(
             outcome="complete_with_quarantines" if quarantine else "complete",
             completed=0,
@@ -278,10 +286,11 @@ def collect(
                 # does not discard other securities or hold the remaining batch hostage.
                 if complete:
                     state["completed"] += 1
-                if publish_every and index % publish_every == 0:
+                if not archive_only and publish_every and index % publish_every == 0:
                     publish_available(root)
                 time.sleep(interval)
-            publish_available(root)
+            if not archive_only:
+                publish_available(root)
             if outcome == "complete" and quarantine:
                 outcome = "complete_with_quarantines"
             return dict(

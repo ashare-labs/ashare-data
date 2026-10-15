@@ -98,6 +98,10 @@ UV_PROJECT_ENVIRONMENT=.venv-local-data uv sync --locked --no-config --python 3.
 并查询逐字段来源、状态证据与冲突；默认单源行为保持不变。旧代码归档可通过
 `--alias-capture` 接入同一查询，需原文校验和公告有效期，见[补齐查询说明](docs/local-daily.md#显式兼容补齐查询)。
 
+[2010 年前主板扩展](docs/local-early-history.md)使用 `local-daily query-early` 显式读取
+独立来源观察，保留早退证券、历史周末、单位和上市阶段不确定性。未认证的 BaoStock
+响应和异常 HTTP 行仅在 `--diagnostics` 中展示；不自动复权或宣称全市场历史 PIT。
+
 ### 缓存与固定版本
 
 临时缓存适合重复同一请求；`only` 模式不联网，缺失或损坏会报错：

@@ -1156,6 +1156,14 @@ class LocalDailyStore:
 
         return get_alias_price(self, security, capture, start, end)
 
+    def get_early_observations(
+        self, security, start="1990-12-01", end="2009-12-31", source=None, *, diagnostics=False
+    ):
+        """Read pre-2010 source observations and their unresolved historical basis."""
+        from .local_early import observations
+
+        return observations(self, security, start, end, source, diagnostics)
+
 
 def add_parser(sub):
     p = sub.add_parser("local-daily", help="批量本地日线维护、断点续取和覆盖报告")
@@ -1168,6 +1176,7 @@ def add_parser(sub):
             "status",
             "query",
             "query-alias",
+            "query-early",
             "universe",
             "factors",
             "import-bao",
@@ -1185,6 +1194,11 @@ def add_parser(sub):
     p.add_argument("--refresh-metadata", action="store_true")
     p.add_argument("--symbol", action="append")
     p.add_argument("--capture", type=Path, help="Explicit immutable capture for query-alias")
+    p.add_argument(
+        "--diagnostics",
+        action="store_true",
+        help="query-early: include unadmitted BaoStock diagnostics with validation status",
+    )
     p.add_argument(
         "--mode",
         choices=["single", "compatible"],
@@ -1216,7 +1230,16 @@ def command(args):
     aliases = getattr(args, "alias_capture", ())
     if args.action != "query" and (mode != "single" or aliases):
         raise ValueError("--mode / --alias-capture are query options")
-    readonly = args.action in ("status", "query", "query-alias", "universe", "factors")
+    if getattr(args, "diagnostics", False) and args.action != "query-early":
+        raise ValueError("--diagnostics is a query-early option")
+    readonly = args.action in (
+        "status",
+        "query",
+        "query-alias",
+        "query-early",
+        "universe",
+        "factors",
+    )
     store = LocalDailyStore(args.root, readonly=readonly)
     try:
         if args.action == "status":
@@ -1251,6 +1274,16 @@ def command(args):
             return store.get_alias_price(
                 args.symbol[0], args.capture, args.start, args.end
             ).to_dict("records")
+        if args.action == "query-early":
+            if not args.symbol or len(args.symbol) != 1:
+                raise ValueError("query-early needs one --symbol")
+            return store.get_early_observations(
+                args.symbol[0],
+                args.start,
+                args.end or "2009-12-31",
+                None if args.source == "auto" else args.source,
+                diagnostics=getattr(args, "diagnostics", False),
+            )
         with store.writer():
             if args.action == "import-bao":
                 from .local_baostock import import_captures
