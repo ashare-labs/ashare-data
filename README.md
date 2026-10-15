@@ -66,6 +66,7 @@ PY
 | 保存可重复读取的研究数据 | `Store.fetch_price()` → `Store.research(dataset_id)` | 显式采集，固定版本离线读取 |
 | 重开固定多股日频研究包 | `DailyResearchView(binding, expected_binding_sha256=...)` | [预热、时钟边界、来源与显式假设](docs/daily-research.md)；本地开发接口 |
 | 查询固定历史状态、证券池与行动证据 | `HistoricalMarketView` | [有界历史接口](docs/historical-market.md)；未知与同键冲突保留，事后证据不证明历史 PIT |
+| 查询公司行动与历史股份证据 | `CorporateHistoryView` / `ashare-data corporate-history` | [现金、送转、配股和股份口径](docs/corporate-history.md)；独立保留登记、派息、到账与可售日期，需自备固定证据包，缺失与冲突明确阻断 |
 | 有限范围的真实时钟观察 | `python -m ashare_data.daily_observation` / `phase_observation` / `intraday_observation` | [日线观察](docs/current-daily-observation.md)、[分阶段条件](docs/conditional-phase-contract.md)及[盘中观察](docs/intraday-clock-refresh.md)；依赖行动基线的阶段需另行提供[本地证据](docs/calendar-pilot-scope.md#本地证据与公开安装包)，缺失时阻断 |
 | 核对固定分钟来源与执行门禁 | `MinuteEvidenceView` | [分钟证据诊断](docs/minute-evidence.md)；当前九项门禁未满足，执行导出仍阻断 |
 | 查询 BaoStock 数据 | `BaoStockSource` / `Store.baostock(capture_id)` | 有界日线、5/15/30/60m、日状态、源前收和日历 |
@@ -153,6 +154,7 @@ zzshare 默认关闭，需要显式启用研究模式，见 [zzshare API](docs/z
 
 - 不承诺全市场、完整历史、完整分钟网格或最终定稿。新浪日线不提供成交额；未知字段保持缺失，不从其他源静默补齐。
 - 不提供完整复权因子、全市场公司行动覆盖或完整历史股票池。限定证据包可查询历史源股票池及已取得的行动，见[历史市场接口](docs/historical-market.md)。原始价、源 preclose 和复权前收含义不同，不能互相替代。
+- 公司行动导出供账户适配使用，不代替账户结算、税费或历史精确股份登记。股票到账与可售可以分日；AQ 原生账户接入须另行验证。真实采集与公告证据不随安装包分发。
 - 收到数据的时间不等于历史发布时间。研究输入齐全不代表 PIT 成立、当时可交易或获得执行准入；分钟标签也不能直接证明聚宽 14:55 的闭合 bar 语义。
 - 本项目不包含回测引擎、交易系统、HTTP 服务或 UI，也不是 `jqdatasdk` 的完整替代品。参数差异见 [聚宽兼容说明](docs/joinquant-compat.md)。
 - 公开数据源可能限流、停机或变更格式。来源及使用边界见 [数据来源](docs/sources.md)；自有源码尚未指定开源许可证，软件与行情数据的许可分开处理，见 [许可说明](docs/licensing.md)。
