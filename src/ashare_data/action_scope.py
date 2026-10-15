@@ -32,8 +32,24 @@ REPLAN_LAST_DAY = "2026-10-15"
 REPLAN_SHA256 = "15d766cd4f638322886af02904cf4d8908e295dd1dbc40107535237c2f288a04"
 
 
-def date_scope(replan=False):
+def date_scope(replan=False, *, extension=True):
+    if replan and extension:
+        from .action_extension import selection, load
+
+        if selection() is not None:
+            manifest, _ = load()
+            return manifest["from_day"], manifest["through_day"]
     return (REPLAN_FIRST_DAY, REPLAN_LAST_DAY) if replan else (FIRST_DAY, LAST_DAY)
+
+
+def baseline_identity(*, replan=False):
+    if replan:
+        from .action_extension import selection
+
+        chosen = selection()
+        if chosen is not None:
+            return chosen[1]
+    return REPLAN_SHA256 if replan else BASELINE_SHA256
 
 
 def catalog_url(code, day):
@@ -164,13 +180,18 @@ def cash_from_text(text, code, notice_date, *, first_day=FIRST_DAY):
     )
 
 
-def load_baseline(root=None, *, replan=False):
+def load_baseline(root=None, *, replan=False, extension=True):
     """Read separately held evidence; the public package contains no corpus.
 
     An explicit root selects one baseline directory. Otherwise the environment
     selects the family root, containing the original and replan directories.
     Location is configurable; the reviewed content hashes are not.
     """
+    if replan and extension and root is None:
+        from .action_extension import selection, load
+
+        if selection() is not None:
+            return load()
     if root is None:
         configured = os.environ.get(EVIDENCE_ENV)
         require(configured, "ACTION_BASELINE_REQUIRED", f"须显式设置 {EVIDENCE_ENV} 为本地证据目录")
@@ -178,7 +199,7 @@ def load_baseline(root=None, *, replan=False):
         if replan:
             root = root / "replan-20261014-15"
     root = Path(root).expanduser()
-    first_day, last_day = date_scope(replan)
+    first_day, last_day = date_scope(replan, extension=False)
     expected_sha = REPLAN_SHA256 if replan else BASELINE_SHA256
     require((root / "manifest.json").is_file(), "ACTION_BASELINE_MISSING", "缺少本地审阅基线清单")
     raw = (root / "manifest.json").read_bytes()
@@ -451,7 +472,7 @@ def assess_security(code, day, sources, bodies, inventory, *, replan=False):
         "实施公告与独立分红表不一致",
     )
     proof = dict(
-        baseline_sha256=REPLAN_SHA256 if replan else BASELINE_SHA256,
+        baseline_sha256=baseline_identity(replan=replan),
         security=code + ".XSHG",
         day=day,
         sources=hashes,
@@ -493,13 +514,15 @@ def assess_security(code, day, sources, bodies, inventory, *, replan=False):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, help="所选基线目录；省略时读取 ASHARE_PILOT_EVIDENCE")
-    parser.add_argument("--replan", action="store_true", help="校验后续 14/15 范围及同目录族的原基线")
+    parser.add_argument(
+        "--replan", action="store_true", help="校验后续 14/15 范围及同目录族的原基线"
+    )
     args = parser.parse_args()
     manifest, _ = load_baseline(args.root, replan=args.replan)
     print(
         json.dumps(
             dict(
-                baseline_sha256=REPLAN_SHA256 if args.replan else BASELINE_SHA256,
+                baseline_sha256=baseline_identity(replan=args.replan),
                 completed_at=manifest["completed_at"],
                 from_day=manifest["from_day"],
                 through_day=manifest["through_day"],
