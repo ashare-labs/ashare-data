@@ -21,6 +21,7 @@ from .model import DataError, TZ, canonical, day as parse_day, require, timestam
 from .storage import immutable_write
 
 SCHEMA = "ad-current-daily-observation.v1"
+CLOSE_SCHEMA = "ad-current-daily-observation.v2"
 WINDOW = time(17, 45)
 
 
@@ -136,7 +137,7 @@ def read(root, capture_id, *, _seen=None, _cache=None):
         "包未被原采集尝试绑定",
     )
     require(
-        packet["schema"] == SCHEMA and packet["execution_permission"] is False,
+        packet["schema"] in {SCHEMA, CLOSE_SCHEMA} and packet["execution_permission"] is False,
         "OBSERVATION_CORRUPT",
         "观测不能变为执行许可",
     )
@@ -155,7 +156,8 @@ def read(root, capture_id, *, _seen=None, _cache=None):
         start <= end <= now()
         and start.astimezone(TZ).date() == observed_day
         and end.astimezone(TZ).date() == observed_day
-        and start.astimezone(TZ).time() >= WINDOW,
+        and start.astimezone(TZ).time()
+        >= (time(15) if packet["schema"] == CLOSE_SCHEMA else WINDOW),
         "OBSERVATION_CLOCK",
         "真实观测时钟不在声明交易日晚间",
     )
@@ -212,7 +214,12 @@ def read(root, capture_id, *, _seen=None, _cache=None):
             "OBSERVATION_CORRUPT",
             "证券或频率来源不同",
         )
-        source_rows = json.loads(bodies[item["source"]["sha256"]])
+        if packet["schema"] == CLOSE_SCHEMA:
+            from .live import _bars
+
+            source_rows = _bars(bodies[item["source"]["sha256"]], 240)
+        else:
+            source_rows = json.loads(bodies[item["source"]["sha256"]])
         rows = [r for r in source_rows if r["day"] <= packet["signal_day"]][-120:]
         require(
             rows == item["rows"]
@@ -275,11 +282,24 @@ def read(root, capture_id, *, _seen=None, _cache=None):
         "OBSERVATION_CORRUPT",
         "修订派生语义与原始比较数据不同",
     )
+    if packet["schema"] == CLOSE_SCHEMA:
+        from .close_confirmation import verify
+
+        require(
+            attempt.get("close_confirmation") == packet.get("close_confirmation"),
+            "OBSERVATION_CLOSE_PROOF",
+            "收盘证据须绑定原采集尝试",
+        )
+        verify(root, packet)
+    else:
+        require(
+            "close_confirmation" not in packet, "OBSERVATION_CLOSE_PROOF", "旧契约不能冒充收盘确认"
+        )
     _cache[capture_id] = packet
     return packet
 
 
-def capture(root, *, securities, signal_day):
+def capture(root, *, securities, signal_day, confirmed_close=False):
     """Collect today's data only. Failure/unfinished attempts remain inspectable."""
     root = Path(root)
     parsed = date.fromisoformat(parse_day(signal_day))
@@ -312,9 +332,11 @@ def capture(root, *, securities, signal_day):
                 "只记录实际当天；历史补采或未来日期不能冒充实时观测",
             )
             require(
-                started.astimezone(TZ).time() >= WINDOW,
+                started.astimezone(TZ).time() >= (time(15) if confirmed_close else WINDOW),
                 "OBSERVATION_WAIT_PUBLICATION",
-                "本任务17:45后观察；这不是源最终发布保证",
+                "须在15:00收盘后确认实际数据就绪"
+                if confirmed_close
+                else "旧入口17:45后观察；这不是源最终发布保证",
             )
             priors = [
                 (p.stem, read(root, p.stem)) for p in sorted((root / "packets").glob("*.json"))
@@ -328,11 +350,18 @@ def capture(root, *, securities, signal_day):
             client = Client(cache=root / "http-cache", cache_mode="refresh", timeout=12)
             values = {}
             for security in sorted(securities):
-                frame = client.get_price(
-                    security, frequency="daily", end_date=signal_day, count=120
-                )
-                provenance = frame.attrs["provenance"][0]
-                rows = provenance["source_rows"]
+                if confirmed_close:
+                    from .close_confirmation import daily_candidate
+
+                    rows, provenance = daily_candidate(client, security, signal_day)
+                    finality = "CLOSED_PROVISIONAL"
+                else:
+                    frame = client.get_price(
+                        security, frequency="daily", end_date=signal_day, count=120
+                    )
+                    provenance = frame.attrs["provenance"][0]
+                    rows = provenance["source_rows"]
+                    finality = frame.attrs["finality"]
                 require(
                     len(rows) == 120 and rows[-1]["day"] == signal_day,
                     "OBSERVATION_WAIT_LATEST",
@@ -342,7 +371,7 @@ def capture(root, *, securities, signal_day):
                     "rows": rows,
                     "source": _source(root, provenance),
                     "source_available_at": None,
-                    "finality": frame.attrs["finality"],
+                    "finality": finality,
                     "trading_state": None,
                     "corporate_action_coverage": None,
                 }
@@ -364,7 +393,7 @@ def capture(root, *, securities, signal_day):
                 "当日及下一开市日须有源日历证据",
             )
             packet = {
-                "schema": SCHEMA,
+                "schema": CLOSE_SCHEMA if confirmed_close else SCHEMA,
                 "attempt_id": attempt_id,
                 "comparison_captures": basis,
                 "comparison_sha256": sha(manifest),
@@ -403,6 +432,15 @@ def capture(root, *, securities, signal_day):
             previous = _revisions(packet, priors)
             packet["revisions"] = previous
             packet["signal_ready"] = not previous
+            if confirmed_close:
+                from .close_confirmation import collect, verify
+
+                proof = attempt["close_confirmation"] = {}
+                collect(root, client, values, signal_day, proof)
+                packet["close_confirmation"] = proof
+                packet["completed_at"] = now().isoformat()
+                atomic(attempt_path, attempt)
+                verify(root, packet)
             data = canonical(packet)
             cap = sha(data)
             immutable_write(root / "packets" / (cap + ".json"), data)
@@ -465,12 +503,22 @@ def main():
     fetch = sub.add_parser("capture")
     fetch.add_argument("--day", required=True)
     fetch.add_argument("--securities", nargs="+", required=True)
+    fetch.add_argument(
+        "--confirmed-close",
+        action="store_true",
+        help="After 15:00, require SSE ended phase and identical fresh daily reads",
+    )
     view = sub.add_parser("read")
     view.add_argument("--capture", required=True)
     sub.add_parser("recover")
     args = parser.parse_args()
     if args.command == "capture":
-        result = capture(args.root, signal_day=args.day, securities=args.securities)
+        result = capture(
+            args.root,
+            signal_day=args.day,
+            securities=args.securities,
+            confirmed_close=args.confirmed_close,
+        )
         print(json.dumps(result, ensure_ascii=False, indent=2))
         raise SystemExit(0 if result["status"] == "observed" else 2)
     result = recover(args.root) if args.command == "recover" else read(args.root, args.capture)
