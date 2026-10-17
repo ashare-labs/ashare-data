@@ -27,6 +27,16 @@ assert _profile_bytes() and _policy()
 print(json.dumps({'version': ashare_data.__version__, 'runtime': code_identity(), 'parser': source_identity()}))
 """
 
+CATALOG_IMPORT = """
+import json
+import ashare_data.factors.catalog as factor_catalog
+print(json.dumps({
+    'module': factor_catalog.__name__,
+    'libraries': list(factor_catalog.libraries().index),
+    'joinquant_fields': len(factor_catalog.catalog('joinquant')),
+}))
+"""
+
 
 def run(wheel, *, offline=False, cache=None, full=False):
     project = Path(__file__).resolve().parents[1]
@@ -107,6 +117,23 @@ def run(wheel, *, offline=False, cache=None, full=False):
         )
         capabilities = command([str(root / "venv/bin/ashare-data"), "capabilities"], root)
         assert json.loads(capabilities)["version"] == installed["version"]
+        catalog = json.loads(command([str(executable), "-I", "-c", CATALOG_IMPORT], root))
+        assert catalog == {
+            "module": "ashare_data.factors.catalog",
+            "libraries": ["joinquant", "alpha191"],
+            "joinquant_fields": 19,
+        }
+        amount_comparison = json.loads(
+            command([str(executable), "-I", str(project / "examples/amount_comparison.py")], root)
+        )
+        assert amount_comparison["input_kind"] == "synthetic"
+        assert amount_comparison["strict_arithmetic_compatible"] is False
+        assert amount_comparison["direct_source_interval_compatible"] is False
+        assert amount_comparison["composite_model_compatible"] is True
+        assert amount_comparison["summary_all_compatible"] is True
+        assert amount_comparison["summary_sample_count"] == 1
+        assert amount_comparison["source_error_bound_certified"] is False
+        assert amount_comparison["production_eligible"] is False
         result = {
             "wheel": Path(wheel).name,
             "isolated_import_confirmed": True,
@@ -119,6 +146,8 @@ def run(wheel, *, offline=False, cache=None, full=False):
             "fresh_empty_cache": cache is None,
             "golden": json.loads(golden),
             "capabilities": json.loads(capabilities),
+            "catalog_import": catalog,
+            "amount_comparison": amount_comparison,
         }
         if full:
             validation = root / "validation"

@@ -17,7 +17,7 @@ from ashare_data.factors.joinquant.amount_inputs import InputUnavailable, RESEAR
 
 
 from ashare_data.factors.joinquant.amount import bounded_prediction, round_milliyuan_even
-from amount_comparison_helpers import compare_reference
+from ashare_data.factors.joinquant.amount_comparison import compare_reference
 
 
 def series(count):

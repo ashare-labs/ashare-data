@@ -10,6 +10,13 @@ from ashare_data.factors.catalog import catalog, libraries
 from ashare_data.factors.alpha191 import Alpha191, coverage
 
 
+def test_catalog_module_import_provides_discovery_functions():
+    import ashare_data.factors.catalog as factor_catalog
+
+    assert list(factor_catalog.libraries().index) == ["joinquant", "alpha191"]
+    assert len(factor_catalog.catalog("joinquant")) == 19
+
+
 def test_two_source_libraries_and_named_field_accounting():
     lib = libraries()
     assert list(lib.index) == ["joinquant", "alpha191"]

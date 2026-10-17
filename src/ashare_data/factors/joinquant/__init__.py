@@ -19,6 +19,11 @@ from .source_factors import (
     roc120_native_candidate,
 )
 from .amount import bounded_prediction
+from .amount_comparison import (
+    compare_reference,
+    compare_composite_reference,
+    summarize_composite_comparisons,
+)
 from .panel import (
     DEFINITION as BATCH_RESEARCH_DEFINITION,
     MODE as BATCH_RESEARCH_MODE,
@@ -37,6 +42,9 @@ __all__ = [
     "financial_factor_candidate",
     "verify_pack_files",
     "bounded_prediction",
+    "compare_reference",
+    "compare_composite_reference",
+    "summarize_composite_comparisons",
     "SHARE_MODE",
     "net_profit_growth_candidate",
     "share_metrics",

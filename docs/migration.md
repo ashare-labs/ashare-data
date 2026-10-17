@@ -2,6 +2,8 @@
 
 这是明确不兼容的开发版迁移，基于 `fd162770815900eb86502574a9b51dfbbbb4800d`。旧模块没有永久别名，候选尚未推送或发布。
 
+`0.10.0.dev2` 修复通用 TVMA6 比较的交付入口和 catalog 模块遮蔽：金额比较位于 `ashare_data.factors.joinquant.amount_comparison`，并从 `ashare_data.factors.joinquant` 导出；目录模块使用 `import ashare_data.factors.catalog as factor_catalog`，函数使用 `from ashare_data.factors.catalog import catalog, libraries`。包版本和 runtime identity 更新，既有有限事实/条件/可移植研究的 owner、schema 和 policy 版本没有重写。
+
 ## 迁移顺序
 
 1. 保留冻结环境、账户、数据及回执。为新版建立独立虚拟环境和输出目录，不原地安装到旧运行包。
@@ -93,7 +95,7 @@ AQ 的冻结旧 AD 核心和另行固定的新读取端使用不同版本，不�
 | `ashare_data.f1_pv_semantic_contract` | `ashare_data.factors.joinquant.price_volume` |
 | `ashare_data.f1_remaining` | `ashare_data.factors.joinquant.source_factors` |
 | `ashare_data.f1_tvma6_bounded` | `ashare_data.factors.joinquant.amount` |
-| `ashare_data.f1_tvma6_composite` | Removed historical validation; arithmetic/comparison extracted into financials, factors or scripts |
+| `ashare_data.f1_tvma6_composite` | `ashare_data.factors.joinquant.amount_comparison`；通用比较与汇总保留，旧模块名不提供兼容层 |
 | `ashare_data.f1_vroc6_snapshot` | Removed historical validation; arithmetic/comparison extracted into financials, factors or scripts |
 | `ashare_data.f2` | `ashare_data.factors.joinquant.research_view` |
 | `ashare_data.f2_sources` | `ashare_data.providers.factor_research_inputs` |

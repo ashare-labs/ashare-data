@@ -8,8 +8,11 @@ import pytest
 from ashare_data.financials.validation import AcceptanceError
 from ashare_data.factors.joinquant.amount_inputs import RESEARCH_ROLE
 from ashare_data.factors.joinquant.amount import bounded_prediction
-from amount_comparison_helpers import compare_reference
-from amount_comparison_helpers import compare_composite_reference, summarize_composite_comparisons
+from ashare_data.factors.joinquant import (
+    compare_reference,
+    compare_composite_reference,
+    summarize_composite_comparisons,
+)
 
 
 def prediction(amounts):

@@ -1,4 +1,4 @@
-"""Versioned TVMA6 comparison semantics; the frozen v1 formula is unchanged.
+"""TVMA6 source intervals, rounded-output comparisons and comparison summaries.
 
 A serialized rounded output is compared with the image of the latent-mean
 interval under the rounding/serialization operations. Its direct distance from

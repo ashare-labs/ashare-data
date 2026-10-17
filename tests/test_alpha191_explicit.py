@@ -15,7 +15,7 @@ from ashare_data.factors.alpha191 import (
     coverage,
 )
 from ashare_data.factors.alpha191._engine import DOMAIN, MISSING, OK, WARMUP
-from ashare_data.factors import catalog
+from ashare_data.factors.catalog import catalog
 from test_alpha191 import sample, rank
 
 IDS = [36, 54, 127, 146, 165, 166, 181, 183]
