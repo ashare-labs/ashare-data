@@ -314,7 +314,12 @@ def parser():
         ],
     )
     portable.add_argument(
-        "--request", required=True, help="严格JSON请求文件；schema见portable-api.md"
+        "--request",
+        required=True,
+        help=(
+            "严格JSON请求文件；schema见 docs/portable-research.md#cli"
+            " 与 docs/portable-components.md#cli"
+        ),
     )
     li = sub.add_parser("listing-import", help="离线封存固定审阅的上市年份证据包")
     li.add_argument("directory")

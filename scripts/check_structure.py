@@ -87,6 +87,27 @@ def check(root):
                 errors.append(f"{relative}: {exc}")
                 continue
             for node in ast.walk(tree):
+                if (
+                    isinstance(node, ast.keyword)
+                    and node.arg in {"help", "description", "epilog"}
+                    and isinstance(node.value, ast.Constant)
+                    and isinstance(node.value.value, str)
+                ):
+                    for link in re.findall(
+                        r"[A-Za-z0-9_./-]+\.md(?:#[\w-]+)?", node.value.value
+                    ):
+                        name, _, anchor = link.partition("#")
+                        target = root / name
+                        if "/" not in name and not target.is_file():
+                            target = root / "docs" / name
+                        if not target.is_file():
+                            errors.append(
+                                f"{relative}:{node.lineno}: missing CLI help document {link}"
+                            )
+                        elif anchor and anchor not in headings(target.read_text()):
+                            errors.append(
+                                f"{relative}:{node.lineno}: missing CLI help heading {link}"
+                            )
                 modules = (
                     [alias.name for alias in node.names]
                     if isinstance(node, ast.Import)
