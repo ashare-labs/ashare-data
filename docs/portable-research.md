@@ -104,7 +104,7 @@ Envelope引用Plan/Owner，排除自己的envelope_sha256。外部独审、后�
 来源包绑定原官方manifest、相关facts/events及其原文、两份01-02已封存公告、规则原文、独审报告和新expansion-annex。
 01-20具体修订仅新增商品期货ETF当日回转，不将普通A股变T+0；w2该日只用于后继挂牌。事实原件不改旧application_window，扩窗通过独立附录与新假设声明。
 
-A-EQ/A-NORMAL/A-AD08/A-VIS各为`portable.a-*.v1`，每个窗口内容hash独立。旧7月事件改为本次有限建模域外，
+A-EQ/A-NORMAL/A-AD08/A-VIS各为`portable.a-*.v1`，每个窗口内容hash独立。来源中的7月事件在有限建模域外，
 不假定已退出。已知登记进入价基/可能持有/后继域，即使支付在域外仍拒绝；已知事件关键日期未知也拒绝。
 初始零仓/旧权益、期末可持股；不推演期后无限权益。不消费amount，不用close×volume伪造。
 

@@ -1,6 +1,7 @@
 """Offline maintenance contracts; no real market data is distributed."""
 
 import json
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
@@ -532,6 +533,48 @@ def test_source_contract_units_and_validation():
     with pytest.raises(ValueError):
         validate_bars([rows[0], rows[0]], "2010-01-04", "2010-01-04")
     assert rows[0]["tradestatus"] is None
+
+
+@pytest.mark.parametrize("symbol,secid", [("sh600000", "1.600000"), ("sz000001", "0.000001")])
+def test_eastmoney_request_preserves_native_protocol_fields(symbol, secid):
+    class HTTP:
+        def get(self, url, referer):
+            parsed = urlsplit(url)
+            assert (parsed.scheme, parsed.netloc, parsed.path) == (
+                "https",
+                "push2his.eastmoney.com",
+                "/api/qt/stock/kline/get",
+            )
+            # These are provider protocol identifiers, not Python module names.
+            assert parse_qs(parsed.query) == {
+                "secid": [secid],
+                "klt": ["101"],
+                "fqt": ["0"],
+                "beg": ["20241008"],
+                "end": ["20241009"],
+                "fields1": ["f1,f2,f3,f4,f5,f6"],
+                "fields2": ["f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61"],
+            }
+            assert referer == "https://quote.eastmoney.com/"
+            return json.dumps(
+                {
+                    "rc": 0,
+                    "data": {
+                        "code": symbol[2:],
+                        "klines": ["2024-10-08,10,10.5,11,9,123,123000,0,0,0,0"],
+                    },
+                }
+            ).encode(), [{"fixture": "native-protocol"}]
+
+    rows, receipts = eastmoney(HTTP(), symbol, "2024-10-08", "2024-10-09")
+    assert rows[0]["date"] == "2024-10-08"
+    assert (rows[0]["open"], rows[0]["close"], rows[0]["volume"], rows[0]["amount"]) == (
+        "10",
+        "10.5",
+        "12300",
+        "123000",
+    )
+    assert receipts == [{"fixture": "native-protocol"}]
 
 
 def test_gap_slices_reuse_exact_snapshot_without_sharing_mutable_rows(monkeypatch):

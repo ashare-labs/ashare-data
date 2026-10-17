@@ -283,7 +283,7 @@ assert set(FORMULAS) | set(AMBIGUOUS) == set(range(1, 192))
 # Opt-in definitions for the eight underspecified printed expressions. These
 # are explicit research interpretations, never a claim of a unique GTJA reading.
 # The original public.v1 registry and its blocking behavior remain available.
-# See docs/alpha191-definitions.md and sources.json for each decision's basis.
+# See docs/alpha191.md and sources.json for each decision's basis.
 EXPLICIT_FORMULAS = {
     36: "R(SUM(CORR(R(V), R(P), 6), 2))",
     54: "-R(STD(ABS(C - O), 10) + C - O + CORR(C, O, 10))",

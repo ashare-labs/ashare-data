@@ -1180,14 +1180,12 @@ def add_parser(sub):
         epilog=(
             "query-early 只读逐来源研究观察，不是完整可回测行情或全市场历史 PIT。\n"
             "来源行按 (symbol,date,source) 计数；唯一证券日按 (symbol,date) 去重，仍不认证成交日。\n"
-            "2026-10-15 验收快照（非当前库实时统计）：7,348,840 HTTP 来源行，"
-            "3,654,381 唯一证券日，\n"
-            "164,076 个上海代理日历缺口。代理不是深圳早年/PT 完整日历；"
+            "当前数量与缺口请读取指定本地库的本次报告。上海代理不是深圳早年/PT 完整日历；"
             "缺口不等于已证实漏采。\n"
             "未认证 BaoStock 停牌/成交声明不消除缺口；validation_unknown 仅在 --diagnostics 展示。\n"
             "早期价格/股数/手数单位、证券身份阶段和复权依据仍有限制；"
             "strict_usable=false，不自动缩放、复权或生成总收益。\n"
-            "范围、缺口归因和使用限制见 docs/local-early-history.md。"
+            "范围、缺口归因和使用限制见 docs/local-daily.md#早期历史。"
         ),
     )
     p.add_argument(

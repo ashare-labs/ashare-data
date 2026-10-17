@@ -1,7 +1,8 @@
-"""Bounded free-source capture for the frozen twelve-security experiment.
+"""Bounded factor-panel capture for explicitly supplied securities and windows.
 
 No JoinQuant, credentials, retries, overwrites, or execution of response scripts.
-The caller explicitly enables network access; cached evidence is reused first.
+Invoking this tool starts public acquisition; cached evidence is reused first.
+Financial statement dates retain the documented bounded recipe.
 """
 
 import argparse
@@ -97,12 +98,7 @@ def run(root, scope, reuse):
                 (raw / (name + ".receipt.json")).write_text(json.dumps(receipt, indent=2) + "\n")
                 return {"name": name, "status": "reused"}
         started = datetime.now(timezone.utc).isoformat()
-        environment = {
-            **os.environ,
-            "https_proxy": "http://127.0.0.1:7897",
-            "http_proxy": "http://127.0.0.1:7897",
-            "all_proxy": "socks5://127.0.0.1:7897",
-        }
+        environment = dict(os.environ)
         process = subprocess.run(
             [
                 "curl",

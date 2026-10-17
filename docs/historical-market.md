@@ -1,4 +1,6 @@
-# 有界历史状态、证券池及公司行动
+# 历史市场状态、股票池与分钟证据
+
+## 历史状态与股票池
 
 `HistoricalMarketView` 是 `DailyExecutionView` 的离线证据伴随接口。它读取调用者固定
 SHA256 的便携包，不联网、不写账本、不复权、不隐式合并旧数据包。支持
@@ -21,7 +23,7 @@ actions = v.corporate_actions(["000651.XSHE", "300750.XSHE"],
 修改而不改变已加载视图；加载后不重新读取磁盘。外部固定哈希验证数据所有者版本，
 不是交易所真实性签名。结构化公告摘录仍需按绑定原文和页码独立审核。
 
-## 事实与时间
+### 事实与时间
 
 状态字段沿用 `{value, status, source_refs, historical_available_at, reason}` 形态，额外保留
 原始值。`source_observed` 为取得提供方的历史源记录，`document_extracted` 为原文摘录，
@@ -39,7 +41,7 @@ actions = v.corporate_actions(["000651.XSHE", "300750.XSHE"],
 单位人民币元/股，`reference_price` 是档案 `preclose` 原价/除权日参考基准；不以昨收替换
 除息参考价。没有生成前/后复权价或宣称与 JQ 复权等价。
 
-## 限价和分钟消费者
+### 限价和分钟消费者
 
 `source_claimed_limits` 原样保存档案的 `pre_close/up_limit/down_limit`、来源及与规则模型
 的比较。该档案作者披露过按 ST 状态补算及按行情高点修订的过程，因此它不是逐日交易所
@@ -80,7 +82,7 @@ upper = check["state"]["upper_limit"]
 
 现金支付日期需要区分代派和公司自派；现金权益金额与除息价格扣减分别保留，不根据某一事件推广到账模型。
 
-## 历史证券池和主数据
+### 历史证券池和主数据
 
 `universe` 读取当日历史源行；不会先与今日/当前主数据求交，因此保留后来退市的证券。
 公开接口的1,000行截断通过固定提交、代码续页及 COUNT 精确核对。`source_query_complete`
@@ -112,7 +114,7 @@ upper = check["state"]["upper_limit"]
 `delisted` 的来源报告状态，但其他日期仍为 `unknown`，持续上市及交易资格未认证。
 摘牌安排原文、档案的退出日期和事后实际执行回执的区别都保留在证券事件证据中。
 
-## 分红送转
+### 分红送转
 
 `cash_per_share` 为每旧股合资格股东的税前毛现金；`bonus_per_share` 为送股，
 `transfer_per_share` 为资本公积转增，币种 CNY。null 与明确0分开。
@@ -129,7 +131,7 @@ upper = check["state"]["upper_limit"]
 返回 `complete=False/absence_proved=False`，空事件列表只是未取得匹配事件，不证明无行动。
 新接口没有激活旧 snapshot 中仍为 UNSUPPORTED 的通用复权/行动存储入口。
 
-## 离线构建
+### 离线构建
 
 ```sh
 python scripts/build_historical_market.py SOURCE_ROOT NEW_PACKAGE_ROOT
@@ -138,3 +140,13 @@ python scripts/build_historical_market.py SOURCE_ROOT NEW_PACKAGE_ROOT
 构建器验证原始 HTTP 回执、时钟、明确档案提交、精确 SQL、证券日期、重复、分页及计数。不会联网、重试或换源；已有目标目录拒绝覆盖。新包包含 scope、curation、原文和回执，由调用者固定 binding 摘要后重开。
 
 实际证券、日期、事件数量及未证实字段以本次包的 coverage/lineage 为准。不能将历史固定样本的行数当作当前全市场覆盖；真实数据不进入源码或 wheel。
+
+## 分钟证据
+
+`MinuteEvidenceView(binding, expected_binding_sha256=...)` 只读固定来源包，复用历史市场的哈希、回执、路径、状态和限价校验。`seal_minute_evidence` 封存明确输入；原始响应、发行人证据及交付包由调用方另行保存。
+
+公开查询包括 `state`、`bars`、`calendars`、`label_coverage`、`corporate_actions` 和 `admission_report`。先看字段 status、source_quality、缺失原因及 ready_for_execution；来源行本身不表示可交给引擎。
+
+`visibility="posthoc"` 明示事后研究；received 要求 knowledge_at 不早于实际采集完成；verified 对未获证实的历史可见性拒绝。源分钟标签不推断 interval_start/end；未知边界时 `require_intervals=True` 拒绝。源量额单位声明与独立认证分开，源 preclose 不自动成为公司行动后的限价参考价。
+
+状态未知、单位未确认、历史股票池/行动覆盖不足和时间边界未证实会保留在门禁报告。`export_backtest()` 当前仍拒绝 `MINUTE_GATES_BLOCKED`，软件测试通过不关闭这些事实缺口。旧一次性采集/续包脚本与验收计数不属于当前分发；当前运行结果需对新输入重新核验。

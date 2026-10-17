@@ -1,8 +1,10 @@
 # 0.10 功能布局迁移
 
-这是明确不兼容的开发版迁移，基于 `fd162770815900eb86502574a9b51dfbbbb4800d`。旧模块没有永久别名，候选尚未推送或发布。
+这是明确不兼容的开发版迁移，基于 `fd162770815900eb86502574a9b51dfbbbb4800d`。旧模块没有永久别名；固定旧运行环境和原件后，在独立环境迁移。
 
 `0.10.0.dev2` 修复通用 TVMA6 比较的交付入口和 catalog 模块遮蔽：金额比较位于 `ashare_data.factors.joinquant.amount_comparison`，并从 `ashare_data.factors.joinquant` 导出；目录模块使用 `import ashare_data.factors.catalog as factor_catalog`，函数使用 `from ashare_data.factors.catalog import catalog, libraries`。包版本和 runtime identity 更新，既有有限事实/条件/可移植研究的 owner、schema 和 policy 版本没有重写。
+
+`0.10.0.dev3` 合并任务指南并修复 Eastmoney 原生 fields1 参数。包版本/runtime identity 更新；有限事实、条件、可移植研究的 owner/schema/policy 不因文档整理而改写。文档旧路径的对应任务见 README 使用指南。
 
 ## 迁移顺序
 
@@ -30,7 +32,7 @@
 | ad.f1-small-pack.v1 | ad.financial-ledger.v1 |
 | ad.f1* / ad.f2* / m2.* | ad.factor-panel* / ad.factor-research* / portable.* |
 
-JoinQuant 来源字段使用明确因子名；ATR6 和 ATR14 独立列入目录，共 19 项。公式、缺失和可见性限制仍保留，不认证供应商逐值等价或历史 PIT。旧确认/观察 API 退出运行包，可复用算术保留在领域模块，通用比较位于 scripts。
+JoinQuant 来源字段使用明确因子名；ATR6 和 ATR14 独立列入目录，共 19 项。公式、缺失和可见性限制仍保留，不认证供应商逐值等价或历史 PIT。旧确认/观察 API 退出运行包，可复用算术与金额比较保留在领域模块，文件面板比较入口位于 scripts。
 
 ## 发布树和生成链
 

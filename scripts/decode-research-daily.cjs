@@ -1,4 +1,5 @@
 // Reproduce bounded projections from a pinned pure KLC decoder. Never execute responses.
+// Offline Node tool owned by AD daily research; dependencies and invocation: docs/development.md.
 const fs = require('node:fs');
 const vm = require('node:vm');
 const crypto = require('node:crypto');

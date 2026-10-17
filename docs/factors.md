@@ -33,12 +33,6 @@ print(factor_catalog.catalog("joinquant"))
 
 运行 `python examples/amount_comparison.py` 可离线查看合成边界例：参考值 `700000004.167` 不满足原始算术界限或直接来源区间，但满足舍入/序列化复合模型。该示例只使用程序内的六个整数金额。
 
-## 开发工具链
+## 输入与开发工具
 
-1. `capture_factor_panel.py` / `capture_factor_research.py` 读取显式 `--scope`，将公开源响应和回执写入调用方 `--evidence-root`。这些命令会联网，测试不会执行采集。
-2. `decode-factor-panel.cjs` 接收归档根、固定 decoder 文件和 scope；核对解码器身份，保存派生文件。
-3. `compute_factor_panel.py` / `compute_factor_research.py` 读取归档原件生成输入与面板。scope 旁的 `.sha256` 是调用方本次预先固定的摘要，不使用仓库内实验范围。
-4. `verify_factor_panel.py --dataset ... --panel ... --output ...` 提供独立运算形式核对；`verify_factor_research.py` 核查显式源和报告锚点。
-5. `compare_factor_reference.py --scope ... --local ... --reference ... --output ...` 只比较本地文件；scope 的 queries 指定 date/securities/fields，另给 thresholds、coverage_min、numeric_pass_min、minimum_panel_size、rank_rule。面板为 `{"rows":[{"security":...,"date":...,"field":...,"value":...}]}`，缺值显式 null。
-
-比较既检查共同可用证券的数值与排名，也独立检查各侧可选股票池的 top/bottom 变化；完美的共同池相关性不能掩盖缺失候选造成的替换。工具不访问 JQ、不重写输入，不继承旧样本的通过率。最小用例见 `tests/test_factor_selection.py`。
+采集、固定解码、计算、比较的分工、命令和依赖见 [开发指南](development.md#其他工具与生成链)。比较既检查共同证券的数值/排名，也检查两侧可选股票池的 top/bottom 变化；共同池相关性不能掩盖缺失候选造成的替换。最小用例见 `tests/test_factor_selection.py`。

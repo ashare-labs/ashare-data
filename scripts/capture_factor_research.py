@@ -115,12 +115,7 @@ def run(root, scope_path, reuse, *, allow_public_network):
             return {"name": name, "status": "reused"}
         if not allow_public_network:
             raise ValueError("public network explicitly disabled: " + name)
-        env = {
-            **os.environ,
-            "https_proxy": "http://127.0.0.1:7897",
-            "http_proxy": "http://127.0.0.1:7897",
-            "all_proxy": "socks5://127.0.0.1:7897",
-        }
+        env = dict(os.environ)
         started = datetime.now(timezone.utc).isoformat()
         proc = subprocess.run(
             [

@@ -1,4 +1,5 @@
 // Captured response envelopes are data; only the hash-pinned existing decoder runs.
+// Offline Node tool owned by AD factor inputs; dependencies and invocation: docs/development.md.
 const fs = require('node:fs');
 const vm = require('node:vm');
 const crypto = require('node:crypto');
