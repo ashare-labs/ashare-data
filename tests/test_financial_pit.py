@@ -8,8 +8,8 @@ import json
 import pytest
 
 from ashare_data import FinancialPIT
-from ashare_data.f1_acceptance import AcceptanceError
-from ashare_data.f1_financial import RESEARCH_MODE
+from ashare_data.financials.validation import AcceptanceError
+from ashare_data.financials.ledger import RESEARCH_MODE
 
 
 def make_pack():
@@ -50,7 +50,7 @@ def make_pack():
                         "replaces_in_this_pack": None,
                     }
                 )
-    return {"schema": "ad.f1-small-pack.v1", "reports": reports, "observations": observations}
+    return {"schema": "ad.financial-ledger.v1", "reports": reports, "observations": observations}
 
 
 def query(p=None, **kwargs):

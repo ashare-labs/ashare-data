@@ -7,7 +7,8 @@ import json
 import pytest
 
 from ashare_data import BaoStockSource, Store
-from ashare_data import baostock as api, preclose
+from ashare_data.providers import baostock as api
+from ashare_data.reference import previous_close as preclose
 from ashare_data.cli import main
 from test_baostock import bundle
 from test_daily_status import persist, raises_code, resign_receipt
@@ -34,8 +35,6 @@ def captured(tmp_path, monkeypatch, rows=None, *, start="2020-01-02", end="2020-
 def view_for(path, tmp_path):
     store = Store.init(tmp_path / "store")
     return store.baostock(store.import_baostock_capture(path))
-
-
 
 
 def test_generic_profile_and_old_fields():

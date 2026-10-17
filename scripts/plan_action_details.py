@@ -11,8 +11,8 @@ import json
 from pathlib import Path
 from urllib.parse import urlencode
 
-from ashare_data.corporate_history import intersects
-from ashare_data.corporate_history_sources import parse_sina_actions
+from ashare_data.corporate_actions.history import intersects
+from ashare_data.corporate_actions.sources import parse_sina_actions
 
 
 def plan(captures, scope):
@@ -58,7 +58,7 @@ def plan(captures, scope):
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("captures", type=Path)
-    p.add_argument("--scope", type=Path, default=Path("docs/action-history-scope.json"))
+    p.add_argument("--scope", type=Path, required=True)
     args = p.parse_args()
     print(
         json.dumps(

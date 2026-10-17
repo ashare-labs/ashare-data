@@ -1,71 +1,166 @@
 """A数达: direct public market data with optional caching and advanced offline snapshots."""
-from .model import DataError
-from .query_policy import QueryLimits
-from .preclose import SourcePrecloseValue, SourcePrecloseRow, SourcePrecloseResult
-from .daily_status import DailyStatusFlag, DailyStatusRow, DailyStatusResult
-from .source_calendar import (SourceCalendarFlag, SourceCalendarRow, SourceCalendarResult,
-                              SourceCalendarLink, SourceCalendarLinksResult)
-from .listing_fact import ListingFactView, ListingFactDescriptor, ListingFactEvidence, ListingYearFact
-from .contracts import CoverageContract
-from .reconciliation import reconcile_turnover
-from .turnover_diagnostics import reconcile_sina_day
-from .storage import Store
-from .research import ResearchResult, ResearchView
-from .research_preflight import (ResearchInputRef, ResearchSecurityInputs, ResearchInputFact,
-                                 ResearchInputRow, ResearchPreflightResult)
-from .jq_observations import JQObservationInput, JQObservationRead, JQObservationView
-from .jq_queries import JQQueryView
-from .tdx_points import TDXPointInput, TDXPointView
-from .tdx_bars import TDXBarSource, TDXBarView
-from .minute_session import TDXMinuteSessionView, TDXSessionSource
-from .calendar_binding import BoundedCalendarView
-from .independent_queries import IndependentQueryView
-from .premarket_reference import PremarketReferenceView
-from .daily_research import DailyResearchView
-from .daily_execution import DailyExecutionView
-from .financial_pit import FinancialPIT
-from .f2 import FactorResearchView
 
-from .historical_market import HistoricalMarketView
-from .corporate_history import CorporateHistoryView
-from .baostock import BaoStockSource, BaoStockView
-from .zzshare import ZzshareSource, ZzshareView
-from .zzshare_types import ZzshareValue, SourceClaimedLimits, ZzshareDailyRow, ZzshareDailyResult
-from .d1 import D1Facts, D1View
-from .d1_types import D1OwnerReceipt, D1PrevCloseCall, Evidence, FactRecord
-from .br1 import BR1View, BR1Receipt
-from .br1_listing import BR1ListingContract, BR1ListingProjection, BR1ListingView
-from .live import Client, capabilities, get_all_securities, get_price, get_security_info, get_trade_days
-from .minute_evidence import MinuteEvidenceView, seal_minute_evidence
+from ashare_data.core.model import DataError
+from ashare_data.core.query_limits import QueryLimits
+from ashare_data.reference.previous_close import (
+    SourcePrecloseValue,
+    SourcePrecloseRow,
+    SourcePrecloseResult,
+)
+from ashare_data.reference.daily_status import DailyStatusFlag, DailyStatusRow, DailyStatusResult
+from ashare_data.reference.calendar import (
+    SourceCalendarFlag,
+    SourceCalendarRow,
+    SourceCalendarResult,
+    SourceCalendarLink,
+    SourceCalendarLinksResult,
+)
+from ashare_data.reference.listing import (
+    ListingFactView,
+    ListingFactDescriptor,
+    ListingFactEvidence,
+    ListingYearFact,
+)
+from ashare_data.core.coverage import CoverageContract
+from ashare_data.market.turnover import reconcile_turnover
+from ashare_data.market.turnover_diagnostics import reconcile_sina_day
+from ashare_data.storage.immutable import Store
+from ashare_data.research.datasets import ResearchResult, ResearchView
+from ashare_data.research.preflight import (
+    ResearchInputRef,
+    ResearchSecurityInputs,
+    ResearchInputFact,
+    ResearchInputRow,
+    ResearchPreflightResult,
+)
+from ashare_data.providers.joinquant_observations import (
+    JQObservationInput,
+    JQObservationRead,
+    JQObservationView,
+)
+from ashare_data.providers.joinquant_queries import JQQueryView
+from ashare_data.providers.tdx_points import TDXPointInput, TDXPointView
+from ashare_data.providers.tdx_bars import TDXBarSource, TDXBarView
+from ashare_data.market.minute_session import TDXMinuteSessionView, TDXSessionSource
+from ashare_data.reference.bounded_calendar import BoundedCalendarView
+from ashare_data.research.independent_queries import IndependentQueryView
+from ashare_data.reference.premarket import PremarketReferenceView
+from ashare_data.research.daily import DailyResearchView
+from ashare_data.research.execution_inputs import DailyExecutionView
+from ashare_data.financials.pit import FinancialPIT
+from ashare_data.factors.joinquant.research_view import FactorResearchView
 
-from .m2 import M2View, M2UseView
-from .m2_types import M2AD08Call, M2ConsumerBinding, M2ReadContext, M2Read, M2Document
+from ashare_data.reference.historical_market import HistoricalMarketView
+from ashare_data.corporate_actions.history import CorporateHistoryView
+from ashare_data.providers.baostock import BaoStockSource, BaoStockView
+from ashare_data.providers.zzshare import ZzshareSource, ZzshareView
+from ashare_data.providers.zzshare_types import (
+    ZzshareValue,
+    SourceClaimedLimits,
+    ZzshareDailyRow,
+    ZzshareDailyResult,
+)
+from ashare_data.research.finite_facts import FiniteFacts, FiniteFactsView
+from ashare_data.research.fact_types import FactReceipt, PreviousCloseCall, Evidence, FactRecord
+from ashare_data.research.conditional import ConditionalView, ConditionalReceipt
+from ashare_data.research.conditional_listing import (
+    ConditionalListingContract,
+    ConditionalListingProjection,
+    ConditionalListingView,
+)
+from ashare_data.market.client import (
+    Client,
+    capabilities,
+    get_all_securities,
+    get_price,
+    get_security_info,
+    get_trade_days,
+)
+from ashare_data.market.minute_evidence import MinuteEvidenceView, seal_minute_evidence
 
-__all__ = ["BaoStockSource", "BaoStockView", "ResearchResult", "ResearchView", "Store", "DataError", "Client", "get_price", "get_security_info", "get_trade_days",
-           "get_all_securities", "capabilities", "CoverageContract", "reconcile_turnover", "reconcile_sina_day",
-           "D1Facts", "D1View", "D1OwnerReceipt", "D1PrevCloseCall", "BR1View", "BR1Receipt"]
-__all__ += ["BR1ListingContract", "BR1ListingProjection", "BR1ListingView", "QueryLimits"]
-__version__ = "0.9.1.dev13"
+from ashare_data.research.portable import PortableView, PortableUseView
+from ashare_data.research.portable_types import (
+    AdjustedHistoryCall,
+    PortableConsumerBinding,
+    PortableReadContext,
+    PortableRead,
+    PortableDocument,
+)
 
-__all__ += ["M2View", "M2UseView", "M2AD08Call", "M2ConsumerBinding", "M2ReadContext", "M2Read", "M2Document"]
+__all__ = [
+    "BaoStockSource",
+    "BaoStockView",
+    "ResearchResult",
+    "ResearchView",
+    "Store",
+    "DataError",
+    "Client",
+    "get_price",
+    "get_security_info",
+    "get_trade_days",
+    "get_all_securities",
+    "capabilities",
+    "CoverageContract",
+    "reconcile_turnover",
+    "reconcile_sina_day",
+    "FiniteFacts",
+    "FiniteFactsView",
+    "FactReceipt",
+    "PreviousCloseCall",
+    "ConditionalView",
+    "ConditionalReceipt",
+]
+__all__ += [
+    "ConditionalListingContract",
+    "ConditionalListingProjection",
+    "ConditionalListingView",
+    "QueryLimits",
+]
+__version__ = "0.10.0.dev1"
+
+__all__ += [
+    "PortableView",
+    "PortableUseView",
+    "AdjustedHistoryCall",
+    "PortableConsumerBinding",
+    "PortableReadContext",
+    "PortableRead",
+    "PortableDocument",
+]
 
 
 __all__ += ["ListingFactView", "ListingFactDescriptor", "ListingFactEvidence", "ListingYearFact"]
 
 __all__ += ["Evidence", "FactRecord"]
-__all__ += ["SourceCalendarFlag", "SourceCalendarRow", "SourceCalendarResult",
-            "SourceCalendarLink", "SourceCalendarLinksResult"]
+__all__ += [
+    "SourceCalendarFlag",
+    "SourceCalendarRow",
+    "SourceCalendarResult",
+    "SourceCalendarLink",
+    "SourceCalendarLinksResult",
+]
 
 
 __all__ += ["DailyStatusFlag", "DailyStatusRow", "DailyStatusResult"]
 
 __all__ += ["SourcePrecloseValue", "SourcePrecloseRow", "SourcePrecloseResult"]
 
-__all__ += ["ZzshareSource", "ZzshareView", "ZzshareValue", "SourceClaimedLimits",
-            "ZzshareDailyRow", "ZzshareDailyResult"]
+__all__ += [
+    "ZzshareSource",
+    "ZzshareView",
+    "ZzshareValue",
+    "SourceClaimedLimits",
+    "ZzshareDailyRow",
+    "ZzshareDailyResult",
+]
 
-__all__ += ["ResearchInputRef", "ResearchSecurityInputs", "ResearchInputFact",
-            "ResearchInputRow", "ResearchPreflightResult"]
+__all__ += [
+    "ResearchInputRef",
+    "ResearchSecurityInputs",
+    "ResearchInputFact",
+    "ResearchInputRow",
+    "ResearchPreflightResult",
+]
 
 __all__ += ["JQObservationInput", "JQObservationRead", "JQObservationView"]
 __all__ += ["JQQueryView"]

@@ -1,6 +1,6 @@
 # 逐证券、日期、用途的研究输入盘点
 
-Preflight把用户显式绑定的本地不可变版本转成有证据的研究值和缺口。没有采集、默认选源、换源、跨日历capture拼接、事实回填或执行授权。`research_values_complete=True`只表示下表要求的研究字段有来源值，停牌/ST为True或preclose为零也仍是已知来源值；不表示可以买卖、PIT成立或满足M2/INITIALIZE要求。
+Preflight把用户显式绑定的本地不可变版本转成有证据的研究值和缺口。没有采集、默认选源、换源、跨日历capture拼接、事实回填或执行授权。`research_values_complete=True`只表示下表要求的研究字段有来源值，停牌/ST为True或preclose为零也仍是已知来源值；不表示可以买卖、PIT成立或满足PORTABLE/INITIALIZE要求。
 
 ## Python和CLI契约
 

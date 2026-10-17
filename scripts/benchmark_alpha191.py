@@ -12,7 +12,7 @@ import time
 import numpy as np
 import pandas as pd
 
-from ashare_data.alpha191 import Alpha191, VERSION, VERSIONS
+from ashare_data.factors.alpha191 import Alpha191, VERSION, VERSIONS
 
 
 def main():

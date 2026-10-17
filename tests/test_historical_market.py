@@ -6,8 +6,8 @@ import hashlib
 import pytest
 
 from ashare_data import DataError, HistoricalMarketView
-from ashare_data.historical_market import DATA_SCHEMA, SCHEMA, ordinary_limits
-from ashare_data.model import canonical
+from ashare_data.reference.historical_market import DATA_SCHEMA, SCHEMA, ordinary_limits
+from ashare_data.core.model import canonical
 
 
 def fact(value, status="source_observed"):

@@ -4,10 +4,6 @@
 SHA256 的便携包，不联网、不写账本、不复权、不隐式合并旧数据包。支持
 `.XSHG`、`.XSHE`，本接口另支持北交所 `.XBSE`；不改变旧接口的代码范围。
 
-冻结提交 `720ff0a4c9ed0c73870b76240a3692e8d484d838` 的完整历史与分钟诊断链已完成
-独立有界验收，F1～F4 及五组原生空报文问题均已闭合；[本地整合记录](historical-minute-integration.json)
-绑定来源、独审与组合验证。旧 232 证券日／696 字段缺口和严格 PIT 未证实状态保持不变。
-
 ```python
 from ashare_data import HistoricalMarketView
 
@@ -82,11 +78,7 @@ upper = check["state"]["upper_limit"]
 不得用新模型值悄悄改写旧的不可变 binding，也不得把此单笔日状态检查等同于
 `DailyExecutionView` 的整窗/行动准入。
 
-独审修复包的格力 `payment_date=2022-04-08` 仅适用于中登深圳代派现金；公司自行派发
-持有人不共享该日期，`company_self_payment_date=None` 明确保留未知。每旧合资格股毛现金
-1 元及公告除息扣减 0.936124 元保持原证据值。修复配方
-`scripts/repair_historical_review_batch.py SOURCE_ROOT NEW_STAGING NEW_DESTINATION`
-仅改已冻结批次的 curation 并生成新 binding；原包及全部原始回执不变。
+现金支付日期需要区分代派和公司自派；现金权益金额与除息价格扣减分别保留，不根据某一事件推广到账模型。
 
 ## 历史证券池和主数据
 
@@ -137,20 +129,12 @@ upper = check["state"]["upper_limit"]
 返回 `complete=False/absence_proved=False`，空事件列表只是未取得匹配事件，不证明无行动。
 新接口没有激活旧 snapshot 中仍为 UNSUPPORTED 的通用复权/行动存储入口。
 
-## 离线构建和本批范围
+## 离线构建
 
 ```sh
-PYTHONPATH=src python scripts/build_historical_market.py SOURCE_ROOT NEW_PACKAGE_ROOT
-PYTHONPATH=src python scripts/verify_historical_market.py NEW_PACKAGE_ROOT/binding.json --sha256 SHA
+python scripts/build_historical_market.py SOURCE_ROOT NEW_PACKAGE_ROOT
 ```
 
-构建器验证原始HTTP回执、时钟、固定档案提交、精确SQL、证券日期、重复、分页及计数。
-没有重试/换源/联网。已有目标目录直接拒绝覆盖；输出源包包含 scope、curation、原文和
-回执，可作为下一次同字节重建的 SOURCE_ROOT。目录标签和PDF落款冲突保留原值。
+构建器验证原始 HTTP 回执、时钟、明确档案提交、精确 SQL、证券日期、重复、分页及计数。不会联网、重试或换源；已有目标目录拒绝覆盖。新包包含 scope、curation、原文和回执，由调用者固定 binding 摘要后重开。
 
-本批为10证券、9有界面板（保留初选北交所日期并追加经原文确认的实际IPO窗口）、
-412个自然日网格状态、5个历史池日期、2项分红送转和4项证券事件。
-历史池取齐2,505/3,607/3,882/3,885条源记录，共13,879条；2024日期为源零行。
-32个证券日取得日状态，17个源限价声明与适用模型冲突。原2024沪股232证券日、
-696个ST/上下限字段缺口仍未解决，不以新包替换原失败样本；北交所日状态/前收仍不足。
-具体数字属于本次固定证据包，不能推广至其他包或全市场。真实数据不进入源码仓或wheel。
+实际证券、日期、事件数量及未证实字段以本次包的 coverage/lineage 为准。不能将历史固定样本的行数当作当前全市场覆盖；真实数据不进入源码或 wheel。

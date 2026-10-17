@@ -15,32 +15,89 @@ def fixture_source(tmp_path, *, case="fixture", security="000001.XSHE", paused=F
     events = []
 
     def add(kind, time="10:00:00", **payload):
-        events.append(dict(case_id=case, run_tag="synthetic-" + case, seq=len(events) + 1,
-                           kind=kind, time="2024-03-04 " + time, **payload))
+        events.append(
+            dict(
+                case_id=case,
+                run_tag="synthetic-" + case,
+                seq=len(events) + 1,
+                kind=kind,
+                time="2024-03-04 " + time,
+                **payload,
+            )
+        )
 
-    add("identity", settings=dict(symbol=security, start_date="2024-03-04", end_date="2024-03-04",
-                                 use_real_price=True, frequency="minute"))
+    add(
+        "identity",
+        settings=dict(
+            symbol=security,
+            start_date="2024-03-04",
+            end_date="2024-03-04",
+            use_real_price=True,
+            frequency="minute",
+        ),
+    )
     add("snapshot", orders=[{"price": "FORBIDDEN_REFERENCE_RESULT"}], trades=[{"filled": 1234567}])
-    current = dict(last_price=12.5, day_open=12.4, high_limit=13.6, low_limit=11.2,
-                   paused=paused, is_st=False)
+    current = dict(
+        last_price=12.5, day_open=12.4, high_limit=13.6, low_limit=11.2, paused=paused, is_st=False
+    )
     add("current_data", data=current, symbol=security, label="test")
-    bar = dict(index="2024-03-04 10:00:00", open=12.4, close=12.5, high=12.6, low=12.3,
-               volume=0 if paused else 500, money=0 if paused else 6220.01)
+    bar = dict(
+        index="2024-03-04 10:00:00",
+        open=12.4,
+        close=12.5,
+        high=12.6,
+        low=12.3,
+        volume=0 if paused else 500,
+        money=0 if paused else 6220.01,
+    )
     add("market_bars", symbol=security, label="test", frequency="1m", fq=None, rows=[bar])
     add("current_data", time="10:01:00", data=current, symbol=security, label="test")
-    add("market_bars", time="10:01:00", symbol=security, label="test", frequency="1m", fq=None, rows=[bar])
-    add("daily_market", time="15:30:00", frequency="daily", fq=None,
-        rows=[dict(bar, index="2024-03-04 00:00:00", volume=0 if paused else 990000,
-                   high_limit=13.6, low_limit=11.2, paused=float(paused))])
-    add("call_auction_data", time="09:28:00", source="get_call_auction",
-        rows=[dict(code=security, time="2024-03-04 09:25:00", current=12.4, volume=100, money=1240.01)])
+    add(
+        "market_bars",
+        time="10:01:00",
+        symbol=security,
+        label="test",
+        frequency="1m",
+        fq=None,
+        rows=[bar],
+    )
+    add(
+        "daily_market",
+        time="15:30:00",
+        frequency="daily",
+        fq=None,
+        rows=[
+            dict(
+                bar,
+                index="2024-03-04 00:00:00",
+                volume=0 if paused else 990000,
+                high_limit=13.6,
+                low_limit=11.2,
+                paused=float(paused),
+            )
+        ],
+    )
+    add(
+        "call_auction_data",
+        time="09:28:00",
+        source="get_call_auction",
+        rows=[
+            dict(code=security, time="2024-03-04 09:25:00", current=12.4, volume=100, money=1240.01)
+        ],
+    )
     script = root / "jq.py"
     script.write_text("# synthetic fixture, not a real JQ run\n")
     path = root / "events.jsonl"
     path.write_text("".join(json.dumps(e) + "\n" for e in events))
-    return JQObservationInput(case, security, "2024-03-04", str(path),
-                              hashlib.sha256(path.read_bytes()).hexdigest(), str(script),
-                              hashlib.sha256(script.read_bytes()).hexdigest())
+    return JQObservationInput(
+        case,
+        security,
+        "2024-03-04",
+        str(path),
+        hashlib.sha256(path.read_bytes()).hexdigest(),
+        str(script),
+        hashlib.sha256(script.read_bytes()).hexdigest(),
+    )
 
 
 def publish(store, source):
@@ -54,6 +111,7 @@ def read(view, clock="10:00", *, kind="current", **kwargs):
 
 def rewrite(source, fn):
     from pathlib import Path
+
     path = Path(source.events_path)
     events = [json.loads(line) for line in path.read_text().splitlines()]
     fn(events)
@@ -76,7 +134,9 @@ def test_market_only_exact_decimal_and_reopen(store, tmp_path):
     raw = (store.root / "jq_observations" / (view.dataset_id + ".json")).read_text()
     assert "FORBIDDEN_REFERENCE_RESULT" not in raw and "1234567" not in raw
     assert Store(store.root).jq_observations(view.dataset_id).describe() == view.describe()
-    assert store.import_jq_observations([source], source_kind="synthetic_fixture") == view.dataset_id
+    assert (
+        store.import_jq_observations([source], source_kind="synthetic_fixture") == view.dataset_id
+    )
 
 
 def test_visibility_not_label_or_full_day_volume(store, tmp_path):
@@ -100,8 +160,12 @@ def test_no_forward_fill_no_quote_to_bar_conversion(store, tmp_path):
     view = publish(store, fixture_source(tmp_path))
     assert read(view, "10:02").to_dict()["reason"] == "NO_SOURCE_OBSERVATION"
     assert read(view, "09:00", kind="minute").rows == ()
-    assert read(view, kind="minute", start="2024-03-04T09:30:00+08:00",
-                end="2024-03-04T09:30:00+08:00").rows == ()
+    assert (
+        read(
+            view, kind="minute", start="2024-03-04T09:30:00+08:00", end="2024-03-04T09:30:00+08:00"
+        ).rows
+        == ()
+    )
     assert read(view, role="matching").rows[0]["kind"] == "current"
 
 
@@ -141,20 +205,23 @@ def test_deterministic_union_keeps_source_provenance(store, tmp_path):
     assert len(read(store.jq_observations(first)).rows[0]["source_refs"]) == 2
 
 
-@pytest.mark.parametrize("change,code", [
-    (lambda e: e[3]["rows"][0].update(close=100), "JQ_SCHEMA"),
-    (lambda e: e[2]["data"].update(target_fill=100), "JQ_SCHEMA"),
-    (lambda e: e[3].update(orders=[]), "JQ_SCHEMA"),
-    (lambda e: e[3].update(fq="pre"), "JQ_SCHEMA"),
-    (lambda e: e[3]["rows"][0].update(index="2024-03-04 10:02:00"), "JQ_VISIBILITY"),
-    (lambda e: e[4].update(seq=20), "JQ_SCHEMA"),
-    (lambda e: e[0]["settings"].update(symbol="000002.XSHE"), "JQ_SCOPE"),
-    (lambda e: e[5]["rows"][0].update(money=999), "JQ_CONFLICT"),
-    (lambda e: e[6].update(time="2024-03-04 10:00:00"), "JQ_VISIBILITY"),
-    (lambda e: e[3]["rows"][0].update(index="2024-03-04 09:59:30"), "JQ_SCHEMA"),
-    (lambda e: e[6]["rows"][0].update(index="2024-03-04 01:00:00"), "JQ_SCHEMA"),
-    (lambda e: e[3]["rows"][0].update(money=1e-100), "JQ_SCHEMA"),
-])
+@pytest.mark.parametrize(
+    "change,code",
+    [
+        (lambda e: e[3]["rows"][0].update(close=100), "JQ_SCHEMA"),
+        (lambda e: e[2]["data"].update(target_fill=100), "JQ_SCHEMA"),
+        (lambda e: e[3].update(orders=[]), "JQ_SCHEMA"),
+        (lambda e: e[3].update(fq="pre"), "JQ_SCHEMA"),
+        (lambda e: e[3]["rows"][0].update(index="2024-03-04 10:02:00"), "JQ_VISIBILITY"),
+        (lambda e: e[4].update(seq=20), "JQ_SCHEMA"),
+        (lambda e: e[0]["settings"].update(symbol="000002.XSHE"), "JQ_SCOPE"),
+        (lambda e: e[5]["rows"][0].update(money=999), "JQ_CONFLICT"),
+        (lambda e: e[6].update(time="2024-03-04 10:00:00"), "JQ_VISIBILITY"),
+        (lambda e: e[3]["rows"][0].update(index="2024-03-04 09:59:30"), "JQ_SCHEMA"),
+        (lambda e: e[6]["rows"][0].update(index="2024-03-04 01:00:00"), "JQ_SCHEMA"),
+        (lambda e: e[3]["rows"][0].update(money=1e-100), "JQ_SCHEMA"),
+    ],
+)
 def test_reject_bad_or_conflicting_sources(store, tmp_path, change, code):
     source = rewrite(fixture_source(tmp_path), change)
     with pytest.raises(DataError) as caught:
@@ -169,7 +236,10 @@ def test_source_hash_scope_and_role_fail_closed(store, tmp_path):
         publish(store, replace(source, events_sha256="0" * 64))
     assert caught.value.code == "JQ_SOURCE_HASH"
     view = publish(store, source)
-    for kwargs in [dict(kind="daily", role="matching"), dict(kind="minute", role="engine_capacity")]:
+    for kwargs in [
+        dict(kind="daily", role="matching"),
+        dict(kind="minute", role="engine_capacity"),
+    ]:
         with pytest.raises(DataError) as caught:
             read(view, **kwargs)
         assert caught.value.code == "JQ_ROLE"
@@ -195,6 +265,7 @@ def range_source(tmp_path, *, end_date="2024-03-05"):
                 if event["kind"] == "daily_market":
                     event["rows"][0]["paused"] = 1
             events.append(event)
+
     return replace(rewrite(source, extend), session_end_date=end_date)
 
 
@@ -203,8 +274,9 @@ def test_bounded_multi_day_visibility_and_prior_close(store, tmp_path):
     assert view.describe()["schema"] == "ad.jq-sparse-observations.v2"
     prior = "2024-03-04T00:00:00+08:00"
     clock = "2024-03-05T09:00:00+08:00"
-    value = view.read("000001.XSHE", kind="daily", role="initialization", as_of=clock,
-                      start=prior, end=prior)
+    value = view.read(
+        "000001.XSHE", kind="daily", role="initialization", as_of=clock, start=prior, end=prior
+    )
     assert len(value.rows) == 1
     assert value.rows[0]["values"] == {"close": "12.5"}
     assert value.rows[0]["available_at"] == "2024-03-04T15:30:00+08:00"
@@ -215,21 +287,35 @@ def test_bounded_multi_day_visibility_and_prior_close(store, tmp_path):
     capacity = view.read("000001.XSHE", kind="daily", role="engine_capacity", as_of=clock)
     assert capacity.rows[0]["values"] == {"volume": "0"}
     assert capacity.rows[0]["source_label_at"].startswith("2024-03-05")
-    second = view.read("000001.XSHE", kind="minute", as_of="2024-03-05T10:00:00+08:00",
-                       start="2024-03-05T00:00:00+08:00")
+    second = view.read(
+        "000001.XSHE",
+        kind="minute",
+        as_of="2024-03-05T10:00:00+08:00",
+        start="2024-03-05T00:00:00+08:00",
+    )
     assert second.rows[0]["quality"] == "source_filled_suspended"
     assert read(view, kind="minute").rows[0]["quality"] == "source_observed"
     assert view.bootstrap("000001.XSHE", "2024-03-05")["unknown"]["previous_session"] is None
 
 
-@pytest.mark.parametrize("bounds", [{}, {"start": "2024-03-04T00:00:00+08:00"},
-                                  {"start": "2024-03-05T00:00:00+08:00",
-                                   "end": "2024-03-05T00:00:00+08:00"}])
+@pytest.mark.parametrize(
+    "bounds",
+    [
+        {},
+        {"start": "2024-03-04T00:00:00+08:00"},
+        {"start": "2024-03-05T00:00:00+08:00", "end": "2024-03-05T00:00:00+08:00"},
+    ],
+)
 def test_initialization_requires_exact_prior_label(store, tmp_path, bounds):
     view = publish(store, range_source(tmp_path))
     with pytest.raises(DataError) as caught:
-        view.read("000001.XSHE", kind="daily", role="initialization",
-                  as_of="2024-03-05T09:00:00+08:00", **bounds)
+        view.read(
+            "000001.XSHE",
+            kind="daily",
+            role="initialization",
+            as_of="2024-03-05T09:00:00+08:00",
+            **bounds,
+        )
     assert caught.value.code == "JQ_ROLE"
 
 
@@ -254,6 +340,11 @@ def test_single_day_product_still_uses_v1_contract(store, tmp_path):
     assert view.describe()["schema"] == "ad.jq-sparse-observations.v1"
     assert "initialization" not in view.describe()["read_roles"]
     with pytest.raises(DataError) as caught:
-        read(view, kind="daily", role="initialization",
-             start="2024-03-01T00:00:00+08:00", end="2024-03-01T00:00:00+08:00")
+        read(
+            view,
+            kind="daily",
+            role="initialization",
+            start="2024-03-01T00:00:00+08:00",
+            end="2024-03-01T00:00:00+08:00",
+        )
     assert caught.value.code == "JQ_ROLE"

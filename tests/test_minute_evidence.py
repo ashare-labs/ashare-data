@@ -9,9 +9,9 @@ from urllib.parse import urlencode
 import pytest
 
 from ashare_data import DataError, MinuteEvidenceView, seal_minute_evidence
-from ashare_data.historical_market import DATA_SCHEMA, SCHEMA
-from ashare_data.live import KLINE_URL
-from ashare_data.model import canonical, digest
+from ashare_data.reference.historical_market import DATA_SCHEMA, SCHEMA
+from ashare_data.market.client import KLINE_URL
+from ashare_data.core.model import canonical, digest
 
 
 @contextmanager

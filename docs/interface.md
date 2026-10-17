@@ -44,7 +44,7 @@ store.recover()
 错误为 `DataError(code, message, details)`，CLI 错误输出到 stderr 并退出 2。
 calendar 日期范围首尾均包含；sessions 交易时段为半开区间。
 
-聚宽风格 SDK 是单独的 `ashare_data.compat.JQStyle`，绑定 Snapshot 后使用；未来回测上下文
+聚宽风格 SDK 是单独的 `ashare_data.providers.joinquant_style.JQStyle`，绑定 Snapshot 后使用；未来回测上下文
 负责策略时钟、账户、订单及 history，SDK 本身不引入这些状态。
 
 安全边界：单本机发布写入者、非对抗式本地文件系统。内容 hash 检测篡改但不是数字签名；
@@ -81,7 +81,7 @@ Store.capabilities 是静态接口能力，真实覆盖必须查询固定快照�
 ## 导入 bundle v1
 
 必填顶层键 `schema_version=1, source, bars`；可选 `calendar, instrument_sets`。
-未知顶层键拒绝。输入示例见 `examples/fixtures/golden.json`，源特有字段可以留在 source 及 bar 中。
+未知顶层键拒绝。输入示例见 `tests/fixtures/snapshots/golden.json`，源特有字段可以留在 source 及 bar 中。
 每次最多 100000 行；CLI JSON 文件最多 64 MiB；查询最多 100 标的、2000000 个自然分钟×标的槽。
 必须明确选择批次；不会自动把旧批次拼入新快照。
 

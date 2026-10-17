@@ -13,7 +13,7 @@ import urllib.error
 import pytest
 
 from ashare_data import DataError, Store, ZzshareSource
-from ashare_data import zzshare as api
+from ashare_data.providers import zzshare as api
 from ashare_data.cli import main
 
 
@@ -120,8 +120,6 @@ def test_disabled_before_any_io(store, monkeypatch):
     assert ZzshareSource.capabilities()["default_enabled"] is False
     assert store.baostock_snapshots() == []
     assert store.snapshots() == []
-
-
 
 
 def test_precision_and_detached_results(store, tmp_path):

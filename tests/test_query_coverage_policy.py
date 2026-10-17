@@ -5,8 +5,9 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
-from ashare_data import Client, CoverageContract, DataError, QueryLimits, Store, transport
-from ashare_data.research import save_client
+from ashare_data import Client, CoverageContract, DataError, QueryLimits, Store
+from ashare_data.providers import http as transport
+from ashare_data.research.datasets import save_client
 import test_data_contracts as helpers
 
 clock = helpers.clock
@@ -25,8 +26,9 @@ def frozen_query(tmp_path, monkeypatch, mode, *, semantics="verified"):
 
     monkeypatch.setattr(transport, "public_read", public_read)
     limits = QueryLimits(max_count=1500)
-    client = Client(cache=tmp_path / "cache", coverage_contract=CoverageContract(facts),
-                    query_limits=limits)
+    client = Client(
+        cache=tmp_path / "cache", coverage_contract=CoverageContract(facts), query_limits=limits
+    )
     client.get_price(SEC, frequency="1m", count=2, end_date="2026-09-30 09:32")
     if mode == "sealed":
         store = Store.init(tmp_path / "store")
@@ -43,12 +45,16 @@ def frozen_query(tmp_path, monkeypatch, mode, *, semantics="verified"):
             result = view.get_price(SEC, frequency="1m", **kwargs)
             return result, result.attrs
 
-    monkeypatch.setattr(transport, "public_read", lambda *_: pytest.fail("frozen read used network"))
+    monkeypatch.setattr(
+        transport, "public_read", lambda *_: pytest.fail("frozen read used network")
+    )
     return read, calls
 
 
 @pytest.mark.parametrize("mode", ["direct", "sealed"])
-def test_explicit_count_budget_reaches_coverage_without_skipping_it(clock, tmp_path, monkeypatch, mode):
+def test_explicit_count_budget_reaches_coverage_without_skipping_it(
+    clock, tmp_path, monkeypatch, mode
+):
     read, calls = frozen_query(tmp_path, monkeypatch, mode)
     frame, report = read(count=1500, end_date="2026-09-30 09:35", allow_partial=True)
     assert len(frame) == 2 and frame.volume.tolist() == [100, 100]
@@ -67,7 +73,11 @@ def test_explicit_count_budget_reaches_coverage_without_skipping_it(clock, tmp_p
 @pytest.mark.parametrize("mode", ["direct", "sealed"])
 @pytest.mark.parametrize("allow_partial", [False, True])
 def test_known_coverage_gaps_reach_status_and_still_fail_complete_gate(
-    clock, tmp_path, monkeypatch, mode, allow_partial,
+    clock,
+    tmp_path,
+    monkeypatch,
+    mode,
+    allow_partial,
 ):
     read, _ = frozen_query(tmp_path, monkeypatch, mode)
     request = dict(start_date="2026-09-30 09:31", end_date="2026-09-30 09:35")
@@ -77,8 +87,13 @@ def test_known_coverage_gaps_reach_status_and_still_fail_complete_gate(
     assert state["status"] == "partial" and state["returned_count"] == 2
     proof = report["provenance"][0]["coverage_report"]
     assert proof["status"] == "incomplete" and len(proof["missing"]) == 3
-    assert state["issues"] == [{"code": "COVERAGE_INCOMPLETE",
-                                "reason": "declared_coverage_incomplete", "coverage_report": proof}]
+    assert state["issues"] == [
+        {
+            "code": "COVERAGE_INCOMPLETE",
+            "reason": "declared_coverage_incomplete",
+            "coverage_report": proof,
+        }
+    ]
     with pytest.raises(DataError) as exc:
         read(**request, require_complete=True)
     assert exc.value.code == "COVERAGE_INCOMPLETE"
@@ -92,7 +107,9 @@ def test_unknown_coverage_is_not_a_new_research_gate(clock, tmp_path, monkeypatc
     request = dict(start_date="2026-09-30 09:31", end_date="2026-09-30 09:32")
     frame, report = read(**request, allow_partial=True)
     assert len(frame) == 2 and not report["partial_result"]
-    assert report["query_status"] == [{"security": SEC, "status": "ok", "returned_count": 2, "issues": []}]
+    assert report["query_status"] == [
+        {"security": SEC, "status": "ok", "returned_count": 2, "issues": []}
+    ]
     proof = report["provenance"][0]["coverage_report"]
     assert proof["status"] == ("complete" if semantics == "verified" else "unknown")
     if semantics == "unverified":
@@ -103,8 +120,12 @@ def test_unknown_coverage_is_not_a_new_research_gate(clock, tmp_path, monkeypatc
 
 def test_direct_assessor_keeps_default_budget_and_accepts_explicit_budget():
     contract = CoverageContract(helpers.profile())
-    args = (SEC, ["2026-09-30 09:31:00", "2026-09-30 09:32:00"],
-            "2026-09-30 09:31", "2026-09-30 09:35")
+    args = (
+        SEC,
+        ["2026-09-30 09:31:00", "2026-09-30 09:32:00"],
+        "2026-09-30 09:31",
+        "2026-09-30 09:35",
+    )
     with pytest.raises(DataError) as exc:
         contract.assess(*args, count=1001)
     assert exc.value.code == "INVALID_COUNT"

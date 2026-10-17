@@ -6,7 +6,7 @@ import json
 import pytest
 
 from ashare_data import DataError, PremarketReferenceView
-from ashare_data.premarket_reference import POLICY, ROLE
+from ashare_data.reference.premarket import POLICY, ROLE
 
 
 def write(root, name, value):
@@ -163,7 +163,7 @@ def test_nonadjacent_calendar_refused(delivery):
 
 @pytest.fixture
 def capitalization_delivery(delivery):
-    from ashare_data.premarket_reference import CAPITALIZATION_POLICY
+    from ashare_data.reference.premarket import CAPITALIZATION_POLICY
 
     root, b = delivery
     fact = json.loads((root / "fact.json").read_text())

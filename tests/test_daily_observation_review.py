@@ -5,8 +5,9 @@ import json
 
 import pytest
 
-from ashare_data import DataError, daily_observation as observation
-from ashare_data.model import canonical
+from ashare_data import DataError
+from ashare_data.observations import daily as observation
+from ashare_data.core.model import canonical
 
 from test_daily_observation import capture, upstream as source_fixture
 

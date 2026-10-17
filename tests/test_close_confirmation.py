@@ -5,8 +5,10 @@ import json
 
 import pytest
 
-from ashare_data import daily_observation as obs, phase_observation as phase, transport
-from ashare_data.model import DataError, canonical
+from ashare_data.observations import daily as obs
+from ashare_data.observations import phases as phase
+from ashare_data.providers import http as transport
+from ashare_data.core.model import DataError, canonical
 from test_daily_observation import SECURITIES, upstream  # noqa: F401
 
 

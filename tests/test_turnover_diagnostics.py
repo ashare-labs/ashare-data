@@ -8,7 +8,7 @@ import pytest
 
 from ashare_data import DataError, reconcile_sina_day
 from ashare_data.cli import main
-from ashare_data.model import digest
+from ashare_data.core.model import digest
 
 DAY = "2026-10-08"
 SEC = "600000.XSHG"

@@ -9,8 +9,9 @@ from decimal import Decimal
 import pytest
 
 from ashare_data import Client, DataError, Store
-from ashare_data.model import canonical, digest
-from ashare_data import research, transport
+from ashare_data.core.model import canonical, digest
+from ashare_data.research import datasets as research
+from ashare_data.providers import http as transport
 
 FIELDS = [
     "date",

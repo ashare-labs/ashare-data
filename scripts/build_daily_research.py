@@ -15,11 +15,10 @@ import json
 from pathlib import Path
 import re
 
-from ashare_data import DataError
-from ashare_data.daily_research import DailyResearchView, ROLE, SCHEMA
+from ashare_data import DataError, __version__
+from ashare_data.research.daily import DailyResearchView, ROLE, SCHEMA
 
 COMMIT = "c9e9soth3s4j6kcq06p3f7nvt88pi319"
-BASELINE = "090a623dcc27f3a086696989ea15aa1cb529b0de"
 
 
 def sha(raw):
@@ -105,28 +104,40 @@ def parse_tables(path, code):
 
 def select_sessions(dates, start, end, warmup_count):
     """Honor the strategy's history requirement without inventing prior sessions."""
-    check(type(warmup_count) is int and warmup_count >= 1,
-          "warmup_open_sessions_before_start must be a positive integer")
+    check(
+        type(warmup_count) is int and warmup_count >= 1,
+        "warmup_open_sessions_before_start must be a positive integer",
+    )
     warm = [d for d in dates if d < start][-warmup_count:]
     out = [d for d in dates if start <= d <= end]
     following = next((d for d in dates if d > end), None)
-    check(len(warm) == warmup_count and out and out[0] == start and out[-1] == end
-          and following is not None and len(warm) + len(out) + 1 <= 1000,
-          "Calendar cannot supply requested warmup, output window and successor")
+    check(
+        len(warm) == warmup_count
+        and out
+        and out[0] == start
+        and out[-1] == end
+        and following is not None
+        and len(warm) + len(out) + 1 <= 1000,
+        "Calendar cannot supply requested warmup, output window and successor",
+    )
     return warm, out, following
 
 
-def build(root, output="binding.json"):
+def build(root, output="binding.json", *, expected_source_commit):
     check(
         re.fullmatch(r"binding(?:-[a-z0-9-]+)?\.json", output),
         "Output must be binding.json or binding-<label>.json inside the package",
+    )
+    check(
+        re.fullmatch(r"[0-9a-f]{40}", expected_source_commit or ""),
+        "Explicit source baseline commit required",
     )
     raw, derived = root / "raw", root / "derived"
     contract = load(root / "strategy-manifest.json")
     facts = load(root / "facts.json")
     check(
-        contract["baselines"]["ad"] == BASELINE,
-        "Source validation failed: contract['baselines']['ad'] == BASELINE",
+        contract["baselines"]["ad"] == expected_source_commit,
+        "Source validation failed: contract['baselines']['ad'] == expected_source_commit",
     )
     check(
         type(contract["data_requirements"]["warmup_open_sessions_before_start"]) is int
@@ -177,7 +188,9 @@ def build(root, output="binding.json"):
             "Source validation failed: all(((r['date'] in dates) == (r['is_open_hex'] == '31') for r in rows))",
         )
         warm, out, following = select_sessions(
-            dates, cw["start"], cw["end"],
+            dates,
+            cw["start"],
+            cw["end"],
             contract["data_requirements"]["warmup_open_sessions_before_start"],
         )
         check(
@@ -573,7 +586,9 @@ def build(root, output="binding.json"):
         historical_pit=False,
         execution_permission=False,
         data=name,
-        producer=dict(name="ashare-data", version="0.9.1.dev11", baseline=BASELINE),
+        producer=dict(
+            name="ashare-data", version=__version__, source_baseline=expected_source_commit
+        ),
         files=[ref(p, root) for p in files],
     )
     content = encode(binding)
@@ -589,9 +604,12 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("root", type=Path)
     p.add_argument("--output", default="binding.json")
+    p.add_argument("--source-commit", required=True)
     args = p.parse_args()
     try:
-        digest, quality = build(args.root.resolve(), args.output)
+        digest, quality = build(
+            args.root.resolve(), args.output, expected_source_commit=args.source_commit
+        )
     except (ValueError, KeyError, DataError) as exc:
         raise SystemExit(f"Package rejected: {exc}") from exc
     print(

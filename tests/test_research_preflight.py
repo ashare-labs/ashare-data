@@ -1,4 +1,5 @@
 """Purpose-scoped source inventory, explicit inputs and independently observable gaps."""
+
 from dataclasses import FrozenInstanceError, replace
 from datetime import date, datetime
 import hashlib
@@ -7,11 +8,17 @@ import shutil
 
 import pytest
 
-from ashare_data import (Store, DataError, ResearchInputRef, ResearchSecurityInputs,
-                        ResearchPreflightResult, BaoStockSource)
-from ashare_data import baostock as api
+from ashare_data import (
+    Store,
+    DataError,
+    ResearchInputRef,
+    ResearchSecurityInputs,
+    ResearchPreflightResult,
+    BaoStockSource,
+)
+from ashare_data.providers import baostock as api
 from ashare_data.cli import main
-from ashare_data.model import digest
+from ashare_data.core.model import digest
 from test_baostock import bundle
 from test_daily_status import persist, raises_code
 from test_source_calendar import captured as calendar_capture
@@ -25,10 +32,14 @@ def capture(tmp_path, monkeypatch, role, *, symbol="600519.XSHG", rows=None):
     code = req["params"]["code"]
     data = []
     for i in range(5):
-        day = f"2024-01-0{4+i}"
-        data.append([day, code, "10", "12", "9", "11", "100", "1100.2300", "3", "1"]
-                    if role == "price" else [day, code, "1", "0", "3"] if role == "status"
-                    else [day, code, "10.1250", "3"])
+        day = f"2024-01-0{4 + i}"
+        data.append(
+            [day, code, "10", "12", "9", "11", "100", "1100.2300", "3", "1"]
+            if role == "price"
+            else [day, code, "1", "0", "3"]
+            if role == "status"
+            else [day, code, "10.1250", "3"]
+        )
     with monkeypatch.context() as patch:
         patch.setattr(api, "FIELDS", req["params"]["fields"])
         patch.setattr(api, "request", lambda *a, **k: req)
@@ -41,15 +52,20 @@ def ready(tmp_path, monkeypatch):
     calroot = tmp_path / "calendar"
     calroot.mkdir()
     store, cid, _ = calendar_capture(calroot, monkeypatch, flags=("1",) * 5, start="2024-01-04")
-    refs = {role: ResearchInputRef("baostock", store.import_baostock_capture(
-        capture(tmp_path / role, monkeypatch, role))) for role in ("price", "status", "preclose")}
+    refs = {
+        role: ResearchInputRef(
+            "baostock", store.import_baostock_capture(capture(tmp_path / role, monkeypatch, role))
+        )
+        for role in ("price", "status", "preclose")
+    }
     return store, ResearchSecurityInputs("600519.XSHG", **refs), ResearchInputRef("baostock", cid)
 
 
 def run(ready, **kwargs):
     store, binding, calendar = ready
-    return store.preflight_research(**dict(inputs=[binding], calendar=calendar,
-                                          trading_dates=["2024-01-06"], **kwargs))
+    return store.preflight_research(
+        **dict(inputs=[binding], calendar=calendar, trading_dates=["2024-01-06"], **kwargs)
+    )
 
 
 def facts(row):
@@ -57,8 +73,11 @@ def facts(row):
 
 
 def hashes(root):
-    return {str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest()
-            for p in root.rglob('*') if p.is_file()}
+    return {
+        str(p.relative_to(root)): hashlib.sha256(p.read_bytes()).hexdigest()
+        for p in root.rglob("*")
+        if p.is_file()
+    }
 
 
 def test_full_research_values_are_not_execution_admission(ready, monkeypatch):
@@ -68,7 +87,11 @@ def test_full_research_values_are_not_execution_admission(ready, monkeypatch):
     result = run(ready, require_complete=True)
     assert isinstance(result, ResearchPreflightResult) and result.research_values_complete
     assert [r.trade_date for r in result.rows] == [date(2024, 1, d) for d in (5, 6, 7)]
-    assert [r.role for r in result.rows] == ["prior_day_research", "anchor_day_research", "successor_metadata"]
+    assert [r.role for r in result.rows] == [
+        "prior_day_research",
+        "anchor_day_research",
+        "successor_metadata",
+    ]
     prior, anchor, successor = map(facts, result.rows)
     assert prior["close"].value == "11" and "open" not in prior and "close" not in successor
     assert anchor["amount"].value == "1100.2300" and anchor["amount"].unit == "CNY"
@@ -112,43 +135,92 @@ def test_nested_isolation_reopen_and_relocation(ready, tmp_path):
     assert result.to_dict() == original == run(ready).to_dict()
     moved = tmp_path / "moved"
     shutil.copytree(store.root, moved)
-    moved_binding = replace(binding, **{r: replace(getattr(binding, r), store_path=str(moved))
-                                        for r in ("price", "status", "preclose")})
-    shifted = Store(moved).preflight_research(inputs=[moved_binding],
-        calendar=replace(calendar, store_path=str(moved)), trading_dates=[date(2024, 1, 6)])
+    moved_binding = replace(
+        binding,
+        **{
+            r: replace(getattr(binding, r), store_path=str(moved))
+            for r in ("price", "status", "preclose")
+        },
+    )
+    shifted = Store(moved).preflight_research(
+        inputs=[moved_binding],
+        calendar=replace(calendar, store_path=str(moved)),
+        trading_dates=[date(2024, 1, 6)],
+    )
     assert shifted.to_dict() == original
 
 
-@pytest.mark.parametrize("dates", [None, "2024-01-06", [], ["2024-01-06"] * 2,
-    ["2024-01-06"] * 32, [True], [1], [None], [datetime(2024, 1, 6)], ["20240106"],
-    ["2024-1-06"], ["2024-02-30"], ["2024-W01-6"], ["2024-01-01", "2024-02-01"]])
+@pytest.mark.parametrize(
+    "dates",
+    [
+        None,
+        "2024-01-06",
+        [],
+        ["2024-01-06"] * 2,
+        ["2024-01-06"] * 32,
+        [True],
+        [1],
+        [None],
+        [datetime(2024, 1, 6)],
+        ["20240106"],
+        ["2024-1-06"],
+        ["2024-02-30"],
+        ["2024-W01-6"],
+        ["2024-01-01", "2024-02-01"],
+    ],
+)
 def test_invalid_dates_before_source_access(tmp_path, dates):
     store = Store.init(tmp_path / "empty")
     with raises_code("PREFLIGHT_ARGUMENT"):
-        store.preflight_research(inputs=[ResearchSecurityInputs("600519.XSHG")],
-                                 calendar=None, trading_dates=dates)
+        store.preflight_research(
+            inputs=[ResearchSecurityInputs("600519.XSHG")], calendar=None, trading_dates=dates
+        )
 
 
-@pytest.mark.parametrize("inputs", [None, [], (), [True], ["600519.XSHG"],
-    [ResearchSecurityInputs("600519.XSHG")] * 2,
-    [ResearchSecurityInputs("600519.XSHG")] * 11,
-    [ResearchSecurityInputs("sh.600519")], [ResearchSecurityInputs("６００５１９.XSHG")],
-    [ResearchSecurityInputs(None)], [ResearchSecurityInputs(True)]])
+@pytest.mark.parametrize(
+    "inputs",
+    [
+        None,
+        [],
+        (),
+        [True],
+        ["600519.XSHG"],
+        [ResearchSecurityInputs("600519.XSHG")] * 2,
+        [ResearchSecurityInputs("600519.XSHG")] * 11,
+        [ResearchSecurityInputs("sh.600519")],
+        [ResearchSecurityInputs("６００５１９.XSHG")],
+        [ResearchSecurityInputs(None)],
+        [ResearchSecurityInputs(True)],
+    ],
+)
 def test_invalid_bindings(tmp_path, inputs):
     store = Store.init(tmp_path / "empty")
     with raises_code("PREFLIGHT_ARGUMENT"):
         store.preflight_research(inputs=inputs, calendar=None, trading_dates=["2024-01-06"])
 
 
-@pytest.mark.parametrize("ref", [True, {}, ResearchInputRef([], "a" * 64),
-    ResearchInputRef("latest", "a" * 64), ResearchInputRef("baostock", "A" * 64),
-    ResearchInputRef("baostock", "a" * 63), ResearchInputRef("baostock", None),
-    ResearchInputRef("baostock", "a" * 64, ""), ResearchInputRef("baostock", "a" * 64, True)])
+@pytest.mark.parametrize(
+    "ref",
+    [
+        True,
+        {},
+        ResearchInputRef([], "a" * 64),
+        ResearchInputRef("latest", "a" * 64),
+        ResearchInputRef("baostock", "A" * 64),
+        ResearchInputRef("baostock", "a" * 63),
+        ResearchInputRef("baostock", None),
+        ResearchInputRef("baostock", "a" * 64, ""),
+        ResearchInputRef("baostock", "a" * 64, True),
+    ],
+)
 def test_invalid_ref_types(tmp_path, ref):
     store = Store.init(tmp_path / "empty")
     with raises_code("PREFLIGHT_ARGUMENT"):
-        store.preflight_research(inputs=[ResearchSecurityInputs("600519.XSHG", price=ref)],
-                                 calendar=None, trading_dates=["2024-01-06"])
+        store.preflight_research(
+            inputs=[ResearchSecurityInputs("600519.XSHG", price=ref)],
+            calendar=None,
+            trading_dates=["2024-01-06"],
+        )
 
 
 @pytest.mark.parametrize("strict", [None, 0, 1, "false"])
@@ -159,8 +231,9 @@ def test_strict_type(ready, strict):
 
 def test_missing_all_sources_and_strict_gap(tmp_path):
     store = Store.init(tmp_path / "empty")
-    args = dict(inputs=[ResearchSecurityInputs("600519.XSHG")], calendar=None,
-                trading_dates=["2024-01-06"])
+    args = dict(
+        inputs=[ResearchSecurityInputs("600519.XSHG")], calendar=None, trading_dates=["2024-01-06"]
+    )
     result = store.preflight_research(**args)
     assert [r.trade_date for r in result.rows] == [None, date(2024, 1, 6), None]
     assert not result.research_values_complete and not result.sources
@@ -171,8 +244,13 @@ def test_missing_all_sources_and_strict_gap(tmp_path):
     assert caught.value.details == result.to_dict()
 
 
-@pytest.mark.parametrize("anchor,reason", [("2024-01-04", "SOURCE_CALENDAR_BOUNDARY_UNKNOWN"),
-                                         ("2024-01-09", "SOURCE_CALENDAR_OUT_OF_SCOPE")])
+@pytest.mark.parametrize(
+    "anchor,reason",
+    [
+        ("2024-01-04", "SOURCE_CALENDAR_BOUNDARY_UNKNOWN"),
+        ("2024-01-09", "SOURCE_CALENDAR_OUT_OF_SCOPE"),
+    ],
+)
 def test_calendar_gap_never_guesses_neighbours(ready, anchor, reason):
     store, binding, calendar = ready
     result = store.preflight_research(inputs=[binding], calendar=calendar, trading_dates=[anchor])
@@ -184,25 +262,46 @@ def test_calendar_gap_never_guesses_neighbours(ready, anchor, reason):
 def test_wrong_security_and_kind_are_hard_errors(ready):
     store, binding, calendar = ready
     with raises_code("PREFLIGHT_BINDING_MISMATCH"):
-        store.preflight_research(inputs=[replace(binding, security="000001.XSHE")],
-                                 calendar=calendar, trading_dates=["2024-01-06"])
+        store.preflight_research(
+            inputs=[replace(binding, security="000001.XSHE")],
+            calendar=calendar,
+            trading_dates=["2024-01-06"],
+        )
     with raises_code("PREFLIGHT_BINDING_MISMATCH"):
-        store.preflight_research(inputs=[replace(binding, status=calendar)],
-                                 calendar=calendar, trading_dates=["2024-01-06"])
+        store.preflight_research(
+            inputs=[replace(binding, status=calendar)],
+            calendar=calendar,
+            trading_dates=["2024-01-06"],
+        )
     with raises_code("QUERY_KIND_MISMATCH"):
-        store.preflight_research(inputs=[binding], calendar=binding.status, trading_dates=["2024-01-06"])
+        store.preflight_research(
+            inputs=[binding], calendar=binding.status, trading_dates=["2024-01-06"]
+        )
 
 
 def test_unknown_status_keeps_independent_flag_and_zero_reference(ready, tmp_path, monkeypatch):
     store, binding, calendar = ready
-    statuses = [[f"2024-01-0{d}", "sh.600519", "1", "?" if d == 6 else "0", "3"] for d in range(4, 9)]
-    status = ResearchInputRef("baostock", store.import_baostock_capture(
-        capture(tmp_path / "unknown-status", monkeypatch, "status", rows=statuses)))
+    statuses = [
+        [f"2024-01-0{d}", "sh.600519", "1", "?" if d == 6 else "0", "3"] for d in range(4, 9)
+    ]
+    status = ResearchInputRef(
+        "baostock",
+        store.import_baostock_capture(
+            capture(tmp_path / "unknown-status", monkeypatch, "status", rows=statuses)
+        ),
+    )
     zeros = [[f"2024-01-0{d}", "sh.600519", "0", "3"] for d in range(4, 9)]
-    preclose = ResearchInputRef("baostock", store.import_baostock_capture(
-        capture(tmp_path / "zero-preclose", monkeypatch, "preclose", rows=zeros)))
-    result = store.preflight_research(inputs=[replace(binding, status=status, preclose=preclose)],
-                                     calendar=calendar, trading_dates=["2024-01-06"])
+    preclose = ResearchInputRef(
+        "baostock",
+        store.import_baostock_capture(
+            capture(tmp_path / "zero-preclose", monkeypatch, "preclose", rows=zeros)
+        ),
+    )
+    result = store.preflight_research(
+        inputs=[replace(binding, status=status, preclose=preclose)],
+        calendar=calendar,
+        trading_dates=["2024-01-06"],
+    )
     anchor = facts(result.rows[1])
     assert anchor["suspended"].value is False
     assert anchor["is_st"].value is None and anchor["is_st"].reason == "unsupported_enum"
@@ -211,14 +310,20 @@ def test_unknown_status_keeps_independent_flag_and_zero_reference(ready, tmp_pat
     assert not result.research_values_complete
 
 
-@pytest.mark.parametrize("role,field", [("price", "close"), ("status", "is_st"),
-                                      ("preclose", "source_preclose")])
+@pytest.mark.parametrize(
+    "role,field", [("price", "close"), ("status", "is_st"), ("preclose", "source_preclose")]
+)
 def test_empty_success_is_unknown_not_zero_or_closed(ready, tmp_path, monkeypatch, role, field):
     store, binding, calendar = ready
-    ref = ResearchInputRef("baostock", store.import_baostock_capture(
-        capture(tmp_path / ("empty-" + role), monkeypatch, role, rows=[])))
-    result = store.preflight_research(inputs=[replace(binding, **{role: ref})],
-                                     calendar=calendar, trading_dates=["2024-01-06"])
+    ref = ResearchInputRef(
+        "baostock",
+        store.import_baostock_capture(
+            capture(tmp_path / ("empty-" + role), monkeypatch, role, rows=[])
+        ),
+    )
+    result = store.preflight_research(
+        inputs=[replace(binding, **{role: ref})], calendar=calendar, trading_dates=["2024-01-06"]
+    )
     value = facts(result.rows[1])[field]
     assert value.state == "unknown" and value.value is None
     assert value.reason in {"DATE_NOT_CAPTURED", "row_missing_unknown"}
@@ -231,35 +336,51 @@ def test_empty_or_closed_calendar_preserves_anchor_unknowns(ready, tmp_path, mon
     store, binding, _ = ready
     path = tmp_path / "other-cal"
     path.mkdir()
-    other, cid, _ = calendar_capture(path, monkeypatch, flags=("1", "1", "0", "1", "1"),
-                                     start="2024-01-04", empty=empty)
-    result = store.preflight_research(inputs=[binding],
-        calendar=ResearchInputRef("baostock", cid, str(other.root)), trading_dates=["2024-01-06"])
+    other, cid, _ = calendar_capture(
+        path, monkeypatch, flags=("1", "1", "0", "1", "1"), start="2024-01-04", empty=empty
+    )
+    result = store.preflight_research(
+        inputs=[binding],
+        calendar=ResearchInputRef("baostock", cid, str(other.root)),
+        trading_dates=["2024-01-06"],
+    )
     anchor = facts(result.rows[1])
     assert anchor["calendar_open"].value is (None if empty else False)
-    assert anchor["calendar_relation"].reason == ("SOURCE_CALENDAR_UNKNOWN" if empty else
-                                                 "SOURCE_CALENDAR_NOT_OPEN")
+    assert anchor["calendar_relation"].reason == (
+        "SOURCE_CALENDAR_UNKNOWN" if empty else "SOURCE_CALENDAR_NOT_OPEN"
+    )
     assert not result.research_values_complete
 
 
 def test_multiple_anchors_and_symbols_keep_input_order(ready, tmp_path, monkeypatch):
     store, first, calendar = ready
-    refs = {r: ResearchInputRef("baostock", store.import_baostock_capture(
-        capture(tmp_path / ("second-" + r), monkeypatch, r, symbol="000002.XSHE")))
-        for r in ("price", "status", "preclose")}
+    refs = {
+        r: ResearchInputRef(
+            "baostock",
+            store.import_baostock_capture(
+                capture(tmp_path / ("second-" + r), monkeypatch, r, symbol="000002.XSHE")
+            ),
+        )
+        for r in ("price", "status", "preclose")
+    }
     second = ResearchSecurityInputs("000002.XSHE", **refs)
-    result = store.preflight_research(inputs=[second, first], calendar=calendar,
-                                     trading_dates=["2024-01-07", "2024-01-05"])
+    result = store.preflight_research(
+        inputs=[second, first], calendar=calendar, trading_dates=["2024-01-07", "2024-01-05"]
+    )
     assert [(r.anchor_date.isoformat(), r.security) for r in result.rows[::3]] == [
-        (d, s) for d in ("2024-01-07", "2024-01-05") for s in ("000002.XSHE", "600519.XSHG")]
+        (d, s) for d in ("2024-01-07", "2024-01-05") for s in ("000002.XSHE", "600519.XSHG")
+    ]
     assert result.research_values_complete
 
 
 def test_tampering_and_missing_id_do_not_become_gap_reports(ready):
     store, binding, calendar = ready
     with raises_code("BAOSTOCK_NOT_PUBLISHED"):
-        store.preflight_research(inputs=[binding], calendar=replace(calendar, version_id="0" * 64),
-                                 trading_dates=["2024-01-06"])
+        store.preflight_research(
+            inputs=[binding],
+            calendar=replace(calendar, version_id="0" * 64),
+            trading_dates=["2024-01-06"],
+        )
     path = next((store.root / "baostock-objects").iterdir())
     path.chmod(0o600)
     path.write_bytes(b"tampered")
@@ -269,15 +390,21 @@ def test_tampering_and_missing_id_do_not_become_gap_reports(ready):
 
 def test_json_cli_and_extra_arguments_rejected(ready, tmp_path, capsys):
     store, binding, calendar = ready
-    request = {"inputs": [binding.to_dict()], "calendar": calendar.to_dict(),
-               "trading_dates": ["2024-01-06"]}
+    request = {
+        "inputs": [binding.to_dict()],
+        "calendar": calendar.to_dict(),
+        "trading_dates": ["2024-01-06"],
+    }
     path = tmp_path / "request.json"
     path.write_text(json.dumps(request))
     args = ["--store", str(store.root), "research-preflight", "--request", str(path)]
     assert main(args + ["--require-complete"]) == 0
     assert json.loads(capsys.readouterr().out) == run(ready).to_dict()
-    for where, key in [(request, "as_of"), (request["inputs"][0], "execution_permission"),
-                       (request["calendar"], "fallback")]:
+    for where, key in [
+        (request, "as_of"),
+        (request["inputs"][0], "execution_permission"),
+        (request["calendar"], "fallback"),
+    ]:
         where[key] = True
         path.write_text(json.dumps(request))
         assert main(args) == 2
@@ -285,18 +412,23 @@ def test_json_cli_and_extra_arguments_rejected(ready, tmp_path, capsys):
         where.pop(key)
 
 
-
-
 @pytest.mark.parametrize("slot", ["calendar", "price", "status", "preclose"])
-@pytest.mark.parametrize("bad_path,code", [
-    ("a\0b", "PREFLIGHT_ARGUMENT"),
-    ("a\ud800b", "PREFLIGHT_ARGUMENT"),
-    ("x" * 10000, "PREFLIGHT_SOURCE_IO_ERROR"),
-], ids=["nul", "unencodable", "too-long"])
+@pytest.mark.parametrize(
+    "bad_path,code",
+    [
+        ("a\0b", "PREFLIGHT_ARGUMENT"),
+        ("a\ud800b", "PREFLIGHT_ARGUMENT"),
+        ("x" * 10000, "PREFLIGHT_SOURCE_IO_ERROR"),
+    ],
+    ids=["nul", "unencodable", "too-long"],
+)
 def test_path_errors_match_library_and_cli(ready, tmp_path, capsys, slot, bad_path, code):
     store, binding, calendar = ready
-    request = {"inputs": [binding.to_dict()], "calendar": calendar.to_dict(),
-               "trading_dates": ["2024-01-06"]}
+    request = {
+        "inputs": [binding.to_dict()],
+        "calendar": calendar.to_dict(),
+        "trading_dates": ["2024-01-06"],
+    }
     target = request["calendar"] if slot == "calendar" else request["inputs"][0][slot]
     target["store_path"] = bad_path
     before = hashes(store.root)

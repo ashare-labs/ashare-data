@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from ashare_data.alpha191 import Alpha191, Alpha191Stream, STATUS, VERSION, coverage
-from ashare_data.alpha191._engine import (
+from ashare_data.factors.alpha191 import Alpha191, Alpha191Stream, STATUS, VERSION, coverage
+from ashare_data.factors.alpha191._engine import (
     DOMAIN,
     EXCLUDED,
     MISSING,
@@ -18,7 +18,7 @@ from ashare_data.alpha191._engine import (
     Engine,
     panel,
 )
-from ashare_data.alpha191._formulas import AMBIGUOUS
+from ashare_data.factors.alpha191._formulas import AMBIGUOUS
 
 
 def sample(n=640, s=5):
@@ -153,10 +153,11 @@ def test_registry_and_dependency_inventory_cover_all_191():
             assert r.report.loc[name, "valid_cells"] > 0, name
     assert not np.isinf(r.values.to_numpy()).any()
     assert np.array_equal(r.values.notna().to_numpy(), r.status.to_numpy() == OK)
-    src = json.loads(files("ashare_data.alpha191").joinpath("sources.json").read_text())
+    src = json.loads(files("ashare_data.factors.alpha191").joinpath("sources.json").read_text())
     assert len(src["factors"]) == 191 and len(src["commit"]) == 40
     assert (
-        "Apache License" in files("ashare_data.alpha191").joinpath("LICENSE.dolphindb").read_text()
+        "Apache License"
+        in files("ashare_data.factors.alpha191").joinpath("LICENSE.dolphindb").read_text()
     )
 
 

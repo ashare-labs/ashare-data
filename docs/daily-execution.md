@@ -77,11 +77,7 @@ engine = v.read_window(
 登记日和除权日必须是相邻交易日。支付超出输出窗、配股或其他未支持行动均精确拒绝。
 日内税务、排队成交、停牌中途恢复和流动性均不由本数据接口证明。
 
-本地交付的补充包有 1,456 条输出窗状态：2020 / 2022 的 992 条 ST 与交易标志来自固定公共档案；
-2024 深市 232 条 ST 为有日期锚点与官方更名历史支持的推导；沪市 232 条 ST 及相应限价保持未知。
-因此两窗可按显式研究模型消费，2024 全窗模拟仍拒绝，三窗信号研究仍可用。
-`quality()` 返回来源等级计数和核验摘要；具体证据/边界以消费的 binding 为准，
-不能把这些本地包数字用于任意其他补充包。
+`quality()` 返回当前输入包的来源等级与缺口，不能从旧样本数量推断本次覆盖。
 
 离线构建：`scripts/build_daily_execution.py RESEARCH_BINDING SUPPLEMENT_ROOT --research-sha256 HASH`。
 只读已捕获来源，验证查询身份、边界、重复、字段、前收、名称查询分页、日历差异及限价点；
@@ -91,7 +87,7 @@ engine = v.read_window(
 现有研究接口保持兼容；读取示例见 `examples/daily_execution.py`。
 
 
-## 只在实际用途检查执行字段（dev13）
+## 按实际用途检查执行字段
 
 `preflight_orders(window, requests, purpose=..., accepted_assumptions=..., cash_credit_policy=...)`
 接收真实拟提交的 `[{"security": ..., "date": ..., "side": "BUY"|"SELL"}]`。
@@ -115,14 +111,6 @@ engine = v.read_window(
 
 ## 交付引用验证
 
-交付修订只修正来源指针和文件路径，不改变绑定数据、运行门禁或 dev13 wheel。
-`scripts/verify_order_impact.py` 从固定最小订单文件重放，以证券和除权日唯一查找原始
-研究/执行 actions，再验证现金、登记/支付日、送转与除权扣减后生成 JSON 指针。
-禁止把窗口过滤后的列表下标用于完整研究包。`scripts/execution_delivery_refs.py`
-检查三份包的机器交接/消费契约路径、HANDOFF 本地链接和 JSON 指针，核对事件身份
-与缺口明细；路径相对于各包根目录。原始失败响应不是已交付文件承诺。
+`scripts/execution_delivery_refs.py` 核对显式本地交付根目录中的机器交接、消费契约、链接和 JSON 指针，检查事件身份与缺口明细。指针必须以完整源数组为基准，不能使用窗口过滤后的列表下标。该工具只属于开发交付校验，不进入运行 wheel。
 
-`scripts/revise_execution_delivery.py --source <原跟进包> --output <不存在的新目录>
---research <研究包> --execution <执行补充包> --commit <修复提交>` 生成新修订，
-拒绝覆盖旧包。传入同样参数给 verification 中的副本也可重现；运行期需要已安装的
-原 dev13 API 或设置对应 PYTHONPATH。旧包、两个数据 binding 和 wheel 均保留。
+旧批次的修订/订单验收脚本已退出发布树。需要新交付时生成新目录、新绑定和本次验证结果，不覆盖已冻结材料。

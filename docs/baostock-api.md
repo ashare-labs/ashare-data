@@ -1,6 +1,6 @@
 # BaoStock API
 
-BaoStock 是显式选择的独立数据通道。默认 `get_price()` 仍使用新浪，两者不会自动回退或拼接。需要官方 `baostock==0.9.4` SDK；安装命令见 [README](../README.md#可选数据源与研究检查)。本库校验 SDK 的固定源码指纹，不捆绑 SDK，也不读取账号或密钥。
+BaoStock 是显式选择的独立数据通道。默认 `get_price()` 仍使用新浪，两者不会自动回退或拼接。需要官方 `baostock==0.9.4` SDK；安装命令见 [README](../README.md#安装指南)。本库校验 SDK 的固定源码指纹，不捆绑 SDK，也不读取账号或密钥。
 
 ## 采集与固定读取
 
@@ -40,15 +40,13 @@ print(Store(path).baostock(capture_id).get_price().data)  # 离线重开
 
 底层 `capture_query` 的 `query_dividend_data`（type14）和 `query_adjust_factor`（type16）
 允许已核实格式的原生空数据段：服务端成功码、完整且已核实的字段列表、长度、终止符、CRC、
-请求身份及终止分页均须通过。5 个真实空集合报文和 10 个非空对照保存在
-本地忽略的真实验证材料目录（不随软件分发），含原始请求/响应 SHA256、原回执指纹及原 SDK 行。
+请求身份及终止分页均须通过。公开回归使用最小协议输入，实际请求/响应与回执在仓库外。
 
 成功空查询沿用 `complete_empty_unknown`，仅表示该参数范围内查询完整返回零行。
 缺失/异常字段仍判无效报文，错误码仍判 `provider_error_response`，接收不完整仍判传输失败。
 `complete_history`、`confirmed_no_events`、`strict_admitted` 均保持 false，历史可见时点保持 null。
 此修复不扩大公开 `BaoStockSource` 接口，也不改变压缩 type96 的外层完整性未知状态。
-旧回执不原地重写；`scripts/verify_baostock_native_empty.py` 用已保存原文离线重放 pinned SDK，
-另存新回执，并明确区分原采集时间、此次离线重放时间和未知的历史市场可见时间。
+原采集时间、离线重放时间和历史可见时间分别保留，重放不修改旧回执。
 
 ## 日线、分钟与截止时间
 

@@ -1,4 +1,5 @@
 """Bounded calendar contracts. Synthetic dates never count as actual source coverage."""
+
 import json
 from dataclasses import FrozenInstanceError
 from datetime import date, datetime, timedelta
@@ -6,7 +7,7 @@ from datetime import date, datetime, timedelta
 import pytest
 
 from ashare_data import Store, BaoStockSource, SourceCalendarResult
-from ashare_data import baostock as api
+from ashare_data.providers import baostock as api
 from ashare_data.cli import main
 from test_baostock import bundle
 from test_daily_status import persist, raises_code, resign_receipt
@@ -14,15 +15,28 @@ from test_daily_status import persist, raises_code, resign_receipt
 LEGACY_ID = "bc5099a071aae74b8b84750224113600bac6c3aed9598561478554578c22b3b7"
 
 
-def captured(tmp_path, monkeypatch, flags=("1", "1", "0", "1", "0", "1", "0"), *,
-             start="2024-01-05", rows=None, empty=False, clock=None):
+def captured(
+    tmp_path,
+    monkeypatch,
+    flags=("1", "1", "0", "1", "0", "1", "0"),
+    *,
+    start="2024-01-05",
+    rows=None,
+    empty=False,
+    clock=None,
+):
     first = date.fromisoformat(start)
     end = (first + timedelta(days=len(flags) - 1)).isoformat()
-    data = ([[ (first + timedelta(days=i)).isoformat(), flag] for i, flag in enumerate(flags)]
-            if rows is None else rows)
+    data = (
+        [[(first + timedelta(days=i)).isoformat(), flag] for i, flag in enumerate(flags)]
+        if rows is None
+        else rows
+    )
     original = api.request
     with monkeypatch.context() as patch:
-        patch.setattr(api, "request", lambda *args, **kwargs: original("calendar", None, start, end))
+        patch.setattr(
+            api, "request", lambda *args, **kwargs: original("calendar", None, start, end)
+        )
         blobs, _ = bundle(tmp_path, "calendar", rows=[] if empty else data, clock=clock)
     path = persist(tmp_path / "export", blobs)
     store = Store.init(tmp_path / "store")
@@ -46,12 +60,23 @@ def test_generic_rows_links_and_old_trade_days_unchanged(tmp_path, monkeypatch):
         (date(2024, 1, 6), date(2024, 1, 8), date(2024, 1, 10)),
         (date(2024, 1, 5), date(2024, 1, 6), date(2024, 1, 8)),
     ]
-    assert [r.calendar_date for r in links.rows[0].evidence_rows] == [date(2024, 1, i) for i in range(6, 11)]
-    assert [r.is_open.value for r in links.rows[0].evidence_rows] == [True, False, True, False, True]
+    assert [r.calendar_date for r in links.rows[0].evidence_rows] == [
+        date(2024, 1, i) for i in range(6, 11)
+    ]
+    assert [r.is_open.value for r in links.rows[0].evidence_rows] == [
+        True,
+        False,
+        True,
+        False,
+        True,
+    ]
     assert links.rows[0].execution_permission is False
     expected = [r.calendar_date.isoformat() for r in result.rows if r.is_open.value]
     assert list(view.get_trade_days().data["calendar_date"]) == expected
-    assert Store(store.root).baostock(sid).get_calendar_links(trading_dates=["2024-01-08"]).rows[0] == links.rows[0]
+    assert (
+        Store(store.root).baostock(sid).get_calendar_links(trading_dates=["2024-01-08"]).rows[0]
+        == links.rows[0]
+    )
 
 
 def test_synthetic_long_closure_no_weekday_inference(tmp_path, monkeypatch):
@@ -64,13 +89,16 @@ def test_synthetic_long_closure_no_weekday_inference(tmp_path, monkeypatch):
     assert all(r.evidence_kind == "offline_test_only" for r in link.evidence_rows)
 
 
-@pytest.mark.parametrize("anchor,code", [
-    ("2024-01-05", "SOURCE_CALENDAR_BOUNDARY_UNKNOWN"),
-    ("2024-01-10", "SOURCE_CALENDAR_BOUNDARY_UNKNOWN"),
-    ("2024-01-07", "SOURCE_CALENDAR_NOT_OPEN"),
-    ("2024-01-04", "SOURCE_CALENDAR_OUT_OF_SCOPE"),
-    ("2024-01-12", "SOURCE_CALENDAR_OUT_OF_SCOPE"),
-])
+@pytest.mark.parametrize(
+    "anchor,code",
+    [
+        ("2024-01-05", "SOURCE_CALENDAR_BOUNDARY_UNKNOWN"),
+        ("2024-01-10", "SOURCE_CALENDAR_BOUNDARY_UNKNOWN"),
+        ("2024-01-07", "SOURCE_CALENDAR_NOT_OPEN"),
+        ("2024-01-04", "SOURCE_CALENDAR_OUT_OF_SCOPE"),
+        ("2024-01-12", "SOURCE_CALENDAR_OUT_OF_SCOPE"),
+    ],
+)
 def test_boundaries_and_closed_anchors(tmp_path, monkeypatch, anchor, code):
     store, sid, _ = captured(tmp_path, monkeypatch)
     with raises_code(code):
@@ -79,10 +107,25 @@ def test_boundaries_and_closed_anchors(tmp_path, monkeypatch, anchor, code):
         store.baostock(sid).get_calendar_links(trading_dates=["2024-01-08", anchor])
 
 
-@pytest.mark.parametrize("days", [None, "2024-01-08", [], (), ["2024-01-08"] * 2,
-                                ["2024-01-08"] * 32, [True], [1], ["20240108"],
-                                ["2024-1-8"], ["2024-02-30"], [datetime(2024, 1, 8)],
-                                ["2024-01-08T00:00:00+08:00"], {"2024-01-08"}])
+@pytest.mark.parametrize(
+    "days",
+    [
+        None,
+        "2024-01-08",
+        [],
+        (),
+        ["2024-01-08"] * 2,
+        ["2024-01-08"] * 32,
+        [True],
+        [1],
+        ["20240108"],
+        ["2024-1-8"],
+        ["2024-02-30"],
+        [datetime(2024, 1, 8)],
+        ["2024-01-08T00:00:00+08:00"],
+        {"2024-01-08"},
+    ],
+)
 def test_argument_contract(tmp_path, monkeypatch, days):
     store, sid, _ = captured(tmp_path, monkeypatch)
     with raises_code("INVALID_ARGUMENT"):
@@ -96,8 +139,9 @@ def test_strict_bool(tmp_path, monkeypatch, strict):
         store.baostock(sid).get_calendar(require_known=strict)
 
 
-@pytest.mark.parametrize("start,flags", [("0001-01-01", ("1", "1", "1")),
-                                        ("9999-12-29", ("1", "1", "1"))])
+@pytest.mark.parametrize(
+    "start,flags", [("0001-01-01", ("1", "1", "1")), ("9999-12-29", ("1", "1", "1"))]
+)
 def test_date_extremes(tmp_path, monkeypatch, start, flags):
     store, sid, _ = captured(tmp_path, monkeypatch, flags, start=start)
     rows = store.baostock(sid).get_calendar(require_known=True).rows
@@ -124,15 +168,18 @@ def test_empty_success_remains_unknown(tmp_path, monkeypatch):
         view.get_calendar_links(trading_dates=["2024-01-08"])
 
 
-@pytest.mark.parametrize("rows,code", [
-    ([["2024-01-05", "1"]], "SOURCE_SCHEMA_ERROR"),
-    # Protocol identity validation rejects duplicates/out-of-range before row projection.
-    ([["2024-01-05", "1"], ["2024-01-05", "0"]], "SOURCE_REQUEST_FAILED"),
-    ([["2024-01-04", "1"]], "SOURCE_REQUEST_FAILED"),
-    ([["2024-01-05", ""]], "SOURCE_SCHEMA_ERROR"),
-    ([["2024-01-05", "2"]], "SOURCE_SCHEMA_ERROR"),
-    ([["2024-01-05", "true"]], "SOURCE_SCHEMA_ERROR"),
-])
+@pytest.mark.parametrize(
+    "rows,code",
+    [
+        ([["2024-01-05", "1"]], "SOURCE_SCHEMA_ERROR"),
+        # Protocol identity validation rejects duplicates/out-of-range before row projection.
+        ([["2024-01-05", "1"], ["2024-01-05", "0"]], "SOURCE_REQUEST_FAILED"),
+        ([["2024-01-04", "1"]], "SOURCE_REQUEST_FAILED"),
+        ([["2024-01-05", ""]], "SOURCE_SCHEMA_ERROR"),
+        ([["2024-01-05", "2"]], "SOURCE_SCHEMA_ERROR"),
+        ([["2024-01-05", "true"]], "SOURCE_SCHEMA_ERROR"),
+    ],
+)
 def test_invalid_calendar_is_not_repaired(tmp_path, monkeypatch, rows, code):
     store, sid, _ = captured(tmp_path, monkeypatch, rows=rows)
     with raises_code(code):
@@ -165,10 +212,15 @@ def test_wrong_kind(tmp_path, kind):
         store.baostock(sid).get_calendar()
 
 
-@pytest.mark.parametrize("field,value", [("last_byte_received_at", "bad"),
-                                        ("last_byte_received_at", "2024-01-01T00:00:00"),
-                                        ("last_byte_received_at", None),
-                                        ("first_byte_received_at", "2024-01-01T00:00:00Z")])
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("last_byte_received_at", "bad"),
+        ("last_byte_received_at", "2024-01-01T00:00:00"),
+        ("last_byte_received_at", None),
+        ("first_byte_received_at", "2024-01-01T00:00:00Z"),
+    ],
+)
 def test_clock_binding(tmp_path, monkeypatch, field, value):
     store, _, path = captured(tmp_path, monkeypatch)
     resign_receipt(path, lambda r: r["pages"][0].__setitem__(field, value))
@@ -193,10 +245,13 @@ def test_cli_success_and_parameter_rejection(tmp_path, monkeypatch, capsys):
     assert json.loads(capsys.readouterr().out) == store.baostock(sid).get_calendar().to_dict()
     assert main(args + ["calendar-links", "--capture", sid, "--dates", "2024-01-08"]) == 0
     assert json.loads(capsys.readouterr().out)["rows"][0]["previous_open"] == "2024-01-06"
-    for more in (["calendar-links"], ["calendar-links", "--dates", "2024-01-05"],
-                 ["calendar", "--dates", "2024-01-08"],
-                 ["calendar-links", "--dates", "2024-01-08", "--require-known"],
-                 ["calendar", "--end", "2024-01-08T15:00:00+08:00"]):
+    for more in (
+        ["calendar-links"],
+        ["calendar-links", "--dates", "2024-01-05"],
+        ["calendar", "--dates", "2024-01-08"],
+        ["calendar-links", "--dates", "2024-01-08", "--require-known"],
+        ["calendar", "--end", "2024-01-08T15:00:00+08:00"],
+    ):
         assert main(args + list(more) + ["--capture", sid]) == 2
         assert json.loads(capsys.readouterr().err)["error"]["code"]
 
@@ -222,6 +277,8 @@ def test_existing_publication_recovery_with_new_calendar_view(tmp_path, monkeypa
         p = store.root / "baostock-objects" / h
         p.chmod(0o644)
         p.write_bytes(b"broken")
-    assert store.recover_baostock() == [{"capture_id": sid, "status": "aborted" if corrupt else "published"}]
+    assert store.recover_baostock() == [
+        {"capture_id": sid, "status": "aborted" if corrupt else "published"}
+    ]
     if not corrupt:
         assert len(store.baostock(sid).get_calendar(require_known=True).rows) == 7

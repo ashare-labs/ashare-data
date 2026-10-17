@@ -13,11 +13,16 @@ import json
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from ashare_data import DailyResearchView
-from ashare_data.daily_execution import DATA_SCHEMA, SCHEMA, DailyExecutionView, standard_limits
-from ashare_data.daily_research import ROLE
+from ashare_data import DailyResearchView, __version__
+from ashare_data.research.execution_inputs import (
+    DATA_SCHEMA,
+    SCHEMA,
+    DailyExecutionView,
+    standard_limits,
+)
+from ashare_data.research.daily import ROLE
 
-COMMIT = "c9e9soth3s4j6kcq06p3f7nvt88pi319"
+SOURCE_REVISION = "c9e9soth3s4j6kcq06p3f7nvt88pi319"
 
 
 def check(condition, message):
@@ -64,7 +69,7 @@ def archive(root, name, table):
         doc["repository_owner"] == "chenditc"
         and doc["repository_name"] == "investment_data"
         and doc["query_execution_status"] == "Success"
-        and f"FROM {table} AS OF '{COMMIT}'" in doc["sql_query"],
+        and f"FROM {table} AS OF '{SOURCE_REVISION}'" in doc["sql_query"],
         "Archive identity/query mismatch",
     )
     receipt = load(root / "raw" / (name + ".receipt.json"))
@@ -442,7 +447,7 @@ def build(research, root):
         historical_pit=False,
         execution_permission=False,
         research_binding_sha256=research.binding_sha256,
-        producer=dict(name="ashare-data", version="0.9.1.dev12", source_commit=COMMIT),
+        producer=dict(name="ashare-data", version=__version__, source_revision=SOURCE_REVISION),
         data="execution-data.json",
         files=refs,
     )

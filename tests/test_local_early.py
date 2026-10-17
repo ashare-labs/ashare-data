@@ -6,8 +6,8 @@ import json
 
 import pytest
 
-from ashare_data.local_daily import LocalDailyStore
-from ashare_data.local_early import (
+from ashare_data.storage.local_daily import LocalDailyStore
+from ashare_data.market.early_history import (
     SCHEMA,
     ArchiveHTTP,
     add_job,
@@ -115,7 +115,7 @@ def test_empty_and_failed_responses_are_not_coverage(store):
 
 
 def test_invalid_sohu_row_remains_diagnostic_with_original_negative_amount(store):
-    from ashare_data.local_sources import sohu_daily
+    from ashare_data.providers.daily_sources import sohu_daily
 
     class HTTP:
         def get(self, *args):
@@ -210,7 +210,7 @@ def test_diagnostic_status_does_not_suppress_tencent_gap_request(store):
 def test_persistent_service_errors_pause_only_remaining_jobs_without_fake_empty_data(
     store, monkeypatch
 ):
-    from ashare_data import local_early
+    from ashare_data.market import early_history as local_early
 
     for number in range(6):
         add_job(store, "2000-2009", "tencent", f"sz00000{number}", "2000-01-01", "2000-12-31")
@@ -248,7 +248,7 @@ def test_replay_verifies_body_hash_and_uses_no_network(store, monkeypatch):
 
 
 def test_persisted_source_block_prevents_network_across_stages(store, monkeypatch):
-    from ashare_data.local_sources import SourceBlocked
+    from ashare_data.providers.daily_sources import SourceBlocked
 
     directory = store.root / "raw" / "early-transport"
     directory.mkdir(parents=True)
@@ -272,7 +272,7 @@ def test_early_job_scope_cannot_cross_boundary(store, start, end):
 
 
 def test_archive_only_collector_never_opens_or_publishes_a_library(tmp_path, monkeypatch):
-    from ashare_data import local_baostock
+    from ashare_data.providers import baostock_collection as local_baostock
 
     (tmp_path / "raw").mkdir()
     monkeypatch.setattr(
@@ -285,7 +285,7 @@ def test_archive_only_collector_never_opens_or_publishes_a_library(tmp_path, mon
 
 def test_installed_cli_route_is_readonly_and_includes_uncertainty(store, monkeypatch):
     import argparse
-    from ashare_data.local_daily import add_parser, command
+    from ashare_data.storage.local_daily import add_parser, command
 
     ingest_http(store, job(store), result([bar()]))
     parser = argparse.ArgumentParser()
@@ -312,7 +312,7 @@ def test_installed_cli_route_is_readonly_and_includes_uncertainty(store, monkeyp
 
 def cli_args(store, action, *options):
     import argparse
-    from ashare_data.local_daily import add_parser
+    from ashare_data.storage.local_daily import add_parser
 
     parser = argparse.ArgumentParser()
     add_parser(parser.add_subparsers(dest="command"))
@@ -322,7 +322,7 @@ def cli_args(store, action, *options):
 
 
 def test_early_cli_omitted_dates_include_both_authorized_boundaries(store, monkeypatch):
-    from ashare_data.local_daily import command
+    from ashare_data.storage.local_daily import command
 
     for stage, day in (("1990-1991", "1990-12-01"), ("2000-2009", "2009-12-31")):
         jid = add_job(store, stage, "tencent", "sz000002", day, day)
@@ -352,7 +352,7 @@ def test_early_cli_omitted_dates_include_both_authorized_boundaries(store, monke
     ],
 )
 def test_early_cli_preserves_each_explicit_date(store, options, start, end):
-    from ashare_data.local_daily import command
+    from ashare_data.storage.local_daily import command
 
     ingest_http(store, job(store), result([bar()]))
     output = command(cli_args(store, "query-early", *options))
@@ -361,7 +361,7 @@ def test_early_cli_preserves_each_explicit_date(store, options, start, end):
 
 
 def test_early_cli_does_not_replace_explicit_modern_start_with_early_default(store):
-    from ashare_data.local_daily import command
+    from ashare_data.storage.local_daily import command
 
     with pytest.raises(ValueError, match="pre-2010 interval"):
         command(cli_args(store, "query-early", "--start", "2010-01-01"))
@@ -370,7 +370,7 @@ def test_early_cli_does_not_replace_explicit_modern_start_with_early_default(sto
 @pytest.mark.parametrize("mode", ["single", "compatible"])
 def test_modern_cli_omitted_start_keeps_2010_boundary(store, monkeypatch, mode):
     import pandas as pd
-    from ashare_data.local_daily import command
+    from ashare_data.storage.local_daily import command
 
     received = []
 

@@ -26,27 +26,44 @@ def main():
         settings = case["settings"]
         if settings["start_date"] != settings["end_date"]:
             raise ValueError("only bounded single-day source runs supported")
-        sources.append(JQObservationInput(
-            case_id=case["case_id"], security=settings["symbol"],
-            session_date=settings["start_date"], events_path=str(root / "events.jsonl"),
-            events_sha256=case["reference_hashes"]["events.jsonl"],
-            script_path=str(root / "jq.py"), script_sha256=case["reference_hashes"]["jq.py"],
-        ))
+        sources.append(
+            JQObservationInput(
+                case_id=case["case_id"],
+                security=settings["symbol"],
+                session_date=settings["start_date"],
+                events_path=str(root / "events.jsonl"),
+                events_sha256=case["reference_hashes"]["events.jsonl"],
+                script_path=str(root / "jq.py"),
+                script_sha256=case["reference_hashes"]["jq.py"],
+            )
+        )
     store = Store.init(args.store)
     dataset_id = store.import_jq_observations(sources, source_kind="local_jq_backtest_observation")
     view = store.jq_observations(dataset_id)
     args.output.mkdir(parents=True, exist_ok=True)
     report = {
-        "version": __version__, "dataset_id": dataset_id, "store_path": str(store.root),
+        "version": __version__,
+        "dataset_id": dataset_id,
+        "store_path": str(store.root),
         "request_sha256": hashlib.sha256(request_bytes).hexdigest(),
         "manifest": view.describe(),
-        "bootstrap": [view.bootstrap(security, session) for security, session in
-                      sorted({(s.security, s.session_date) for s in sources})],
+        "bootstrap": [
+            view.bootstrap(security, session)
+            for security, session in sorted({(s.security, s.session_date) for s in sources})
+        ],
     }
     target = args.output / "delivery.json"
     target.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
-    print(json.dumps({"dataset_id": dataset_id, "delivery": str(target.resolve()),
-                      "record_count": report["manifest"]["record_count"]}, ensure_ascii=False))
+    print(
+        json.dumps(
+            {
+                "dataset_id": dataset_id,
+                "delivery": str(target.resolve()),
+                "record_count": report["manifest"]["record_count"],
+            },
+            ensure_ascii=False,
+        )
+    )
 
 
 if __name__ == "__main__":

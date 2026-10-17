@@ -1,6 +1,6 @@
 # 持久研究行情 v1：公开接口契约
 
-版本0.4.0.dev2，新增公开接口如下；既有 dev4 行为保持。
+公开接口与固定版本读取契约如下。
 
 | 入口 | 精确形态及返回 |
 |---|---|
@@ -85,10 +85,10 @@ ashare-data --store ./research-store research-price 600000.XSHG 000001.XSHE --da
 ashare-data --store ./research-store research-recover
 ```
 
-只有 `research-fetch` 联网；其失败不会发布半个多证券数据集，也不会自动重试、换源或扩大采集。未提供 HTTP 服务、UI、策略引擎、聚宽全 API、历史股票池、证券属性/限价/公司行动执行投影。此次解决 A宽 AD-D1 持久公开重开、AD-D2 描述符和 AD-D3 原生日线读取；不宣称完整 A宽交易验收通过。数据清洗和准入在 A数达；A宽使用公开 ResearchView/ResearchResult 做薄映射。
+只有 `research-fetch` 联网；其失败不会发布半个多证券数据集，也不会自动重试、换源或扩大采集。未提供 HTTP 服务、UI、策略引擎、聚宽全 API、历史股票池、证券属性/限价/公司行动执行投影。此次解决 A宽 AD-FACTS 持久公开重开、AD-D2 描述符和 AD-D3 原生日线读取；不宣称完整 A宽交易验收通过。数据清洗和准入在 A数达；A宽使用公开 ResearchView/ResearchResult 做薄映射。
 
 
-### 0.4.0.dev2 可变对象所有权
+### 可变对象所有权
 
 公开结果是调用者可修改的独立副本。`.report`、`.data`、`.data.attrs` 和每次 `.to_dict()` 均不共享可变对象与固定视图；DataFrame 的 object 单元格也逐项深复制。构造 `ResearchResult(data, report)` 时同样脱离传入对象。修改这些副本只改变当前副本，后续查询、已有/新建兄弟 view、重新打开的同 ID 数据均不改变。消费者自己的缓存可以保存并修改返回值，但不能因此改写 A数达内部版本。
 

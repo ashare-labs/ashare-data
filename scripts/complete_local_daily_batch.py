@@ -11,7 +11,7 @@ import subprocess
 import sys
 import tempfile
 
-from ashare_data.local_daily import DEFAULT_ROOT, LocalDailyStore
+from ashare_data.storage.local_daily import DEFAULT_ROOT, LocalDailyStore
 
 
 def main():
@@ -107,14 +107,14 @@ def main():
                     sys.executable,
                     "-u",
                     "-m",
-                    "ashare_data.local_baostock",
+                    "ashare_data.providers.baostock_collection",
                     "--root",
                     str(root),
                     "--all-bars",
                 ],
                 "bao-all-bars.log",
             )
-            base = [sys.executable, "-u", "-m", "ashare_data.local_daily", "local-daily"]
+            base = [sys.executable, "-u", "-m", "ashare_data.storage.local_daily", "local-daily"]
             supplement, supplement_step = launch(
                 "sohu_supplement",
                 base

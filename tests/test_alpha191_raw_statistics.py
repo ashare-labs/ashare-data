@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from ashare_data.alpha191 import Alpha191, Alpha191Stream, EXPLICIT_VERSION, VERSION
-from ashare_data.alpha191._engine import DOMAIN, OK, Engine, panel
+from ashare_data.factors.alpha191 import Alpha191, Alpha191Stream, EXPLICIT_VERSION, VERSION
+from ashare_data.factors.alpha191._engine import DOMAIN, OK, Engine, panel
 
 
 def exact_statistic(x, y, name):

@@ -1,7 +1,7 @@
 # 本地批量日线维护
 
 此入口把真实日线、复权依据和历史股票范围长期保存在独立目录，默认
-`~/Workspace/ashare-data-local`。它使用已有 A 数达证券代码格式、不可变原文写入器、
+`~/.local/share/ashare-data`。它使用已有 A 数达证券代码格式、不可变原文写入器、
 BaoStock 固定 SDK 身份与协议校验器；批量目录使用 SQLite WAL，查询时无需联网。
 原有 `Store` 不可变研究版本和其他运行环境不受影响。
 
@@ -11,13 +11,13 @@ BaoStock 固定 SDK 身份与协议校验器；批量目录使用 SQLite WAL，�
 
 ```sh
 UV_PROJECT_ENVIRONMENT=.venv-local-data uv sync --locked --no-config --python 3.12 --extra local-data
-./scripts/local_daily.sh --help
-./scripts/local_daily.sh update
-./scripts/local_daily.sh status
-./scripts/local_daily.sh report
+./scripts/local-daily.sh --help
+./scripts/local-daily.sh update
+./scripts/local-daily.sh status
+./scripts/local-daily.sh report
 ```
 
-`scripts/local_daily.sh` 默认使用这个专用环境；如需复用已验证的独立环境，可用
+`scripts/local-daily.sh` 默认使用这个专用环境；如需复用已验证的独立环境，可用
 `ASHARE_LOCAL_DATA_ENV` 指定其绝对路径。
 `update`、`resume` 和补采命令会联网并写库；`query`（含兼容模式）、`query-alias`、
 `universe`、`factors` 与 `status` 使用只读连接。可先用 `--help` 查看参数，再显式选择维护操作。
@@ -27,7 +27,7 @@ UV_PROJECT_ENVIRONMENT=.venv-local-data uv sync --locked --no-config --python 3.
 不会自行推进日期；已成功归档的历史请求会跳过。
 
 ```sh
-./scripts/local_daily.sh update
+./scripts/local-daily.sh update
 .venv-local-data/bin/python scripts/complete_local_daily_batch.py
 ```
 
@@ -38,17 +38,17 @@ UV_PROJECT_ENVIRONMENT=.venv-local-data uv sync --locked --no-config --python 3.
 
 ```sh
 # 中断后继续，完成的历史请求保持不动
-./scripts/local_daily.sh resume
+./scripts/local-daily.sh resume
 # 显式重试有限失败任务
-./scripts/local_daily.sh resume --retry-failed
+./scripts/local-daily.sh resume --retry-failed
 # 只为本地仍缺的交易日期段建补取任务
-./scripts/local_daily.sh update --repair-gaps
+./scripts/local-daily.sh update --repair-gaps
 # 固定窗口或受控验证；全量正常运行不需要股票数/历史窗口门槛
-./scripts/local_daily.sh update --start 2010-01-01 --end 2026-10-14
+./scripts/local-daily.sh update --start 2010-01-01 --end 2026-10-14
 # 为全部已发现证券补取独立的搜狐原始价量及成交额
-./scripts/local_daily.sh supplement --source sohu
+./scripts/local-daily.sh supplement --source sohu
 # 针对旧代码补取腾讯原始价量；按年度请求以避免来源 640 行上限截断
-./scripts/local_daily.sh supplement --source tencent --symbol 601313.XSHG
+./scripts/local-daily.sh supplement --source tencent --symbol 601313.XSHG
 ```
 
 首次启用搜狐补采后，后续 `update` 自动为它规划新增日期；已有来源不被覆盖。
@@ -90,8 +90,7 @@ UV_PROJECT_ENVIRONMENT=.venv-local-data uv sync --locked --no-config --python 3.
 来源落在交易日历之外的记录仍保留在原文和数据库中，但从查询与覆盖排除，不自动改日期；
 `source-boundary-observations.csv` 的 `reason` 区分日历异常与上市/代码边界，查询属性也列出排除数量。
 `coverage` 是保留的完整谱系；`main_board_at_date` 和 `main-board-coverage.csv` / `main-board-gaps.csv`
-仅统计当时属于主板的日期。原中小板在合板前已经退市的 8 个代码作为辅助历史保留，
-不计入主板的 3,418 个代码及 217 个终止上市标的范围。
+仅统计当时属于主板的日期。原中小板在合板前已退市的代码作为辅助历史保留，主板范围按日期、代码和上市事实重新计算。
 尚在队列中的日期标为 `awaiting_collection`，已经请求仍缺失的日期才列作未知缺口。
 分母是注册上市存续期与代码有效期内的开市日，包含停牌日；“已观察”可包括来源明确标识
 的停牌占位行，不等同于实际有成交的天数。最终核对使用独立重算与分层样本：
@@ -124,14 +123,14 @@ UV_PROJECT_ENVIRONMENT=.venv-local-data uv sync --locked --no-config --python 3.
 不将新浪重复量视为停牌日确有成交的证据。
 
 ```sh
-./scripts/local_daily.sh query --symbol 600000.XSHG --start 2026-10-01 --source eastmoney
-./scripts/local_daily.sh query --symbol 600003.XSHG --start 2010-01-01 --source baostock
-./scripts/local_daily.sh universe --end 2010-01-04
-./scripts/local_daily.sh factors --symbol 600000.XSHG
+./scripts/local-daily.sh query --symbol 600000.XSHG --start 2026-10-01 --source eastmoney
+./scripts/local-daily.sh query --symbol 600003.XSHG --start 2010-01-01 --source baostock
+./scripts/local-daily.sh universe --end 2010-01-04
+./scripts/local-daily.sh factors --symbol 600000.XSHG
 ```
 
 ```python
-from ashare_data.local_daily import LocalDailyStore
+from ashare_data.storage.local_daily import LocalDailyStore
 
 store = LocalDailyStore(readonly=True)
 prices = store.get_price("600000.XSHG", start="2020-01-01", source="auto")
@@ -142,14 +141,11 @@ pool = store.universe("2010-01-04", main_board_only=True)
 store.close()
 ```
 
-已核实的新代码回填数据通过显式别名入口单独查询。例如 BaoStock 以 601360 返回了
-601313 在 2012-01-16 至 2018-02-27 的 1,486 天日线，其中包括 118 个停牌占位行，
-以及原代码来源缺少成交额的 2013-05-27、2013-05-28、2015-10-22。
-原文与全段价量比对见 `reports/legacy-bao-alias-followup.json`。
+新代码回填的旧期间数据需要显式别名入口、原文校验及有效期依据；不自动合并为原代码行情。
 
 ```sh
-./scripts/local_daily.sh query-alias --symbol 601313.XSHG \
-  --capture ~/Workspace/ashare-data-local/raw/bao-alias-sh601360-old-period \
+./scripts/local-daily.sh query-alias --symbol 601313.XSHG \
+  --capture ~/.local/share/ashare-data/raw/bao-alias-sh601360-old-period \
   --start 2013-05-27 --end 2013-05-28
 ```
 
@@ -178,9 +174,9 @@ SQLite 可直接只读查询；SQL 中 `volume`、`amount` 为十进制文本，
 
 ```sh
 ashare-data local-daily query --mode compatible \
-  --root ~/Workspace/ashare-data-local --symbol 601313.XSHG \
+  --root ~/.local/share/ashare-data --symbol 601313.XSHG \
   --start 2013-05-27 --end 2013-05-28 \
-  --alias-capture ~/Workspace/ashare-data-local/raw/bao-alias-sh601360-old-period
+  --alias-capture ~/.local/share/ashare-data/raw/bao-alias-sh601360-old-period
 
 # 不提供 alias-capture 时，只使用库内原代码的来源。
 ashare-data local-daily query --mode compatible --source sina \
@@ -189,14 +185,14 @@ ashare-data local-daily query --mode compatible --source sina \
 
 ```python
 from pathlib import Path
-from ashare_data.local_daily import LocalDailyStore
+from ashare_data.storage.local_daily import LocalDailyStore
 
 store = LocalDailyStore(readonly=True)
 try:
     prices = store.get_price(
         "601313.XSHG", start="2013-05-27", end="2013-05-28",
         mode="compatible",
-        alias_captures=[Path.home() / "Workspace/ashare-data-local/raw/bao-alias-sh601360-old-period"],
+        alias_captures=[Path.home() / ".local/share/ashare-data/raw/bao-alias-sh601360-old-period"],
     )
     amount_source = prices.iloc[0]["field_sources"]["amount"]
     diagnostics = prices.attrs  # 包含覆盖、未返回日期及每个日期的状态依据
@@ -254,8 +250,7 @@ NULL 始终保持 NULL，未使用收盘价乘量替代成交额，也未将未�
 
 覆盖按当前请求与有效日期计算，区分 `native_observed_days`、`returned_days`、`missing_days` 和补字段计数。
 原库 `coverage` 表不会变更。保守的精确一致规则会留下仍有其他来源数值、但兼容性不足的空值。
-真实库验收可用 `scripts/accept_local_compatible.py` 复跑，见
-[验收记录](local-compatible-query-validation.md)。
+对显式本地库可运行 `scripts/accept_local_compatible.py` 生成本次验证，输出放在库的 reports 中；不分发历史验收计数。
 
 ## 历史范围与免费来源
 
@@ -295,10 +290,10 @@ NULL 始终保持 NULL，未使用收盘价乘量替代成交额，也未将未�
 
 ```sh
 # 单匿名连接、逐页原报文核验、已完成请求自动跳过
-.venv-local-data/bin/python -m ashare_data.local_baostock --all-bars
+.venv-local-data/bin/python -m ashare_data.providers.baostock_collection --all-bars
 # HTTP 采集结束或暂停后，在本地写锁下导入补充材料
-./scripts/local_daily.sh import-bao
-./scripts/local_daily.sh resume
+./scripts/local-daily.sh import-bao
+./scripts/local-daily.sh resume
 ```
 
 BaoStock 采集器独立保存原文，不与 HTTP 进程争写行情库，使用已有的机器单连接锁。

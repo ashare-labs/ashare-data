@@ -1,4 +1,5 @@
 """Opt-in small live check; outputs summaries, never bundles responses into source control."""
+
 from __future__ import annotations
 
 import argparse
@@ -9,7 +10,7 @@ from pathlib import Path
 import pandas as pd
 
 from ashare_data import Client, DataError
-from ashare_data.model import TZ
+from ashare_data.core.model import TZ
 
 
 def run(cache):
@@ -19,13 +20,18 @@ def run(cache):
     for frequency in ["daily", "1m", "5m"]:
         data = online.get_price("600000.XSHG", end_date=day, frequency=frequency, count=2)
         cached = Client(cache=cache, cache_mode="only").get_price(
-            "600000.XSHG", end_date=day, frequency=frequency, count=2)
+            "600000.XSHG", end_date=day, frequency=frequency, count=2
+        )
         pd.testing.assert_frame_equal(data, cached)
         assert all(p["network_used"] for p in data.attrs["provenance"])
         assert all(not p["network_used"] for p in cached.attrs["provenance"])
-        summary[frequency] = {"rows": len(data), "first": str(data.index[0]), "last": str(data.index[-1]),
-                              "cache_replay_equal": True,
-                              "provenance": data.attrs["provenance"][0]}
+        summary[frequency] = {
+            "rows": len(data),
+            "first": str(data.index[0]),
+            "last": str(data.index[-1]),
+            "cache_replay_equal": True,
+            "provenance": data.attrs["provenance"][0],
+        }
     multiple = online.get_price(["600000.XSHG", "000001.XSHE"], count=2, frequency="5m")
     assert len(multiple) == 4 and multiple.code.nunique() == 2
     summary["multiple"] = {"rows": len(multiple), "securities": multiple.code.nunique()}

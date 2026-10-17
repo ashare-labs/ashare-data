@@ -9,7 +9,7 @@ import json
 import pytest
 
 from ashare_data import DailyResearchView, DataError
-from ashare_data.daily_research import ROLE, SCHEMA
+from ashare_data.research.daily import ROLE, SCHEMA
 
 
 def digest(raw):

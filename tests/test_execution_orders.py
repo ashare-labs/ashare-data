@@ -84,8 +84,11 @@ def test_order_state_cannot_reuse_permission_for_another_day_or_before_clock(pac
     [("11.20", "BUY", True), ("10.67", "BUY", False), ("11.79", "SELL", False)],
 )
 def test_scenarios_keep_unknowns_and_detect_limit_boundary_sensitivity(
-    package, reference, side, all_allow  # noqa: F811 - imported fixture
-):  # noqa: F811
+    package,  # noqa: F811 - imported fixture
+    reference,
+    side,
+    all_allow,
+):
     row = package[1]["states"][0]
     unknown(row)
     row["reference_price"]["value"] = reference

@@ -1,13 +1,11 @@
 # Alpha191：本地、版本化的公开公式接口
 
-`ashare_data.alpha191` 在本地 NumPy/pandas 上计算 GTJA Alpha191，不联网、不调用聚宽或 DolphinDB。默认公式版本为 **`gtja191.public.v1`**，另提供覆盖全部 191 条计算路径的显式版本 **`gtja191.explicit.v1`**（[逐项解释与选择](alpha191-definitions.md)），随开发版 `0.9.1.dev13` 提供，尚未发布。已有 18 项来源库在系统中称为**“聚宽主因子库（部分实现）”**，新增的另一库称为 **“Alpha191”**；原计算 API、财报 PIT 和历史 JQ 差异记录保持原样。
-
-两库的目标都是定义明确、输入可固定、正确计算可复现，不强求 JQ 逐值一致。**没有宣称与聚宽逐值相等**，也没有更改 AQ 回测的聚宽对齐要求。
+`ashare_data.factors.alpha191` 在本地 NumPy/pandas 上计算 GTJA Alpha191，不联网、不调用聚宽或 DolphinDB。默认公式版本为 `gtja191.public.v1`，显式版本 `gtja191.explicit.v1` 覆盖全部 191 条计算路径，选择与来源见[定义说明](alpha191-definitions.md)。确定定义、输入和数值约定不等于供应商逐值相同或历史 PIT 认证。
 
 ## 两库统一目录
 
 ```python
-from ashare_data.factors import libraries, catalog
+from ashare_data.factors.catalog import libraries, catalog
 
 print(libraries()[["namespace", "label", "entry_count", "api_field_count"]])
 print(catalog("joinquant")[["qualified_name", "api_fields", "definition", "entrypoint"]])
@@ -17,17 +15,10 @@ print(catalog("alpha191")[["qualified_name", "availability", "dependencies", "no
 
 | library / namespace | 系统名称 | 当前登记 |
 | --- | --- | --- |
-| `joinquant` | 聚宽主因子库（部分实现） | 原 18 个条目：12 个原研究槽 + F2 的 6 项；ATR6/ATR14 共用 PV03，实际暴露 19 个 API 字段 |
+| `joinquant` | 聚宽主因子库（部分实现） | 19 个具名字段：13 个面板字段和 6 个研究字段，ATR6/ATR14 分列 |
 | `alpha191` | Alpha191 | 全 191 编号；默认 public.v1 为 183 定义 + 8 阻断；显式 explicit.v1 为 191 条确定路径，依赖和解释见版本说明 |
 
-这是统一的**来源库发现入口**。目录的 `api_fields`、`definition`、`entrypoint` 指向原有计算 API，
-不会用一种输入结构去调用另一库，也不新增聚宽 API 兼容别名。`joinquant:PV03` 是保留的目录槽身份，
-计算时仍传已有 `ATR6`/`ATR14` 字段；`alpha191:alpha012` 对应现有 `Alpha191.compute([12])`。
-Alpha191 输出元数据和覆盖行均带 `library/namespace`，原有数值列名保持不变。
-
-旧库的有限研究输入约定和全部历史兼容差异分别保留在 [F1](f1-research.md)、[F2](f2-research.md)及其引用报告。
-新目标不倒改这些记录，也不把原 18 项拆成 basic/fundamental 两个来源库。质量、成长、动量等可以是另行建立的标签；
-当前目录没有把 Alpha 编号硬映射到聚宽分类。来源归属也不意味着 GTJA、JQ 的内部数值实现已被证明一致。
+目录的 `api_fields`、`definition`、`entrypoint` 指向对应计算契约，不在不同输入结构间隐式转换。`alpha191:alpha012` 对应 `Alpha191.compute([12])`；Alpha191 数值列名和公式编号保留。JoinQuant 字段及开发工具见[因子指南](factors.md)。
 
 ## 先运行
 
@@ -40,7 +31,7 @@ PYTHONPATH=src .venv/bin/python examples/alpha191_offline.py
 合成示例演示接口，不是行情证据。真实使用时将合法取得的日线整理为以下形式，每个字段都是同一日期 × 证券矩阵：
 
 ```python
-from ashare_data.alpha191 import Alpha191, coverage
+from ashare_data.factors.alpha191 import Alpha191, coverage
 
 # frames = {"open": ..., "high": ..., "low": ..., "close": ...,
 #           "volume": ..., "amount": ..., "vwap": ...}
@@ -114,7 +105,7 @@ SMA 种子、`ddof`、排名归一化/并列、MIN/MAX 的窗口惯例并非都�
 ## 分块和状态
 
 ```python
-from ashare_data.alpha191 import Alpha191Stream
+from ashare_data.factors.alpha191 import Alpha191Stream
 stream = Alpha191Stream(ids=[12, 81, 143], adjustment="raw", alpha143_seed=1)
 a = stream.append(first_frames, universe=first_pool)
 b = stream.append(next_frames, universe=next_pool)
@@ -142,7 +133,3 @@ PYTHONPATH=src .venv/bin/python examples/alpha191_offline.py --panel panel.json 
 ```
 
 示例读入的 JSON 格式为 `schema: "alpha191.panel.v1"`，含 `sessions`（ISO 日期数组）、`securities`、`universe`（bool 矩阵）、`fields`（各字段数值矩阵，缺值写 null）、`units`（price/volume/amount）、`adjustment`。可附 `benchmark`、`factors`（列名到数组）、`version`、`alpha143_seed`、`alpha146_m`、`rank_policy` 和 `provenance`；只读取，不联网。生产调用可直接传 DataFrame，无需此文件格式。
-
-初版候选的历史验证（非当前内核验收）：12 股、342 个连续声明交易日（2022-12-01 至 2024-04-30）使用既有新浪冻结量额/价格；不混合两段不连续历史，不含 JQ 因子值。严格股票池下 168 项有至少一个有效值，共 620,737 个有效格；其余包括外部依赖缺失、原文歧义及嵌套排名无法形成完整池，逐格原因保留。其源数据不是历史 PIT 或完整全市场认证。批量性能在本机 Python 3.12.13 / pandas 2.3.3 / NumPy 2.5.3 上，512 日 × 128 股 × 全 191 登记、`available` 池模式、显式外部合成依赖，约 **2.03 秒**，进程峰值约 **399 MiB**；单次测量，不作普适承诺。复核结果见 [验证记录](alpha191-validation.json)。
-
-当前显式版本及统计内核的复验记录与旧候选分别保存；以 [显式定义说明](alpha191-definitions.md) 和 [v3 验证记录](alpha191-corr-validation.json) 为准，[v2 Standard 记录](alpha191-standard-validation.json) 为历史结果。旧候选有效格数量不代表计算正确性。

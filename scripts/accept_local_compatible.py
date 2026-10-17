@@ -15,7 +15,7 @@ import socket
 import time
 
 import ashare_data
-from ashare_data.local_daily import DEFAULT_ROOT, LocalDailyStore, digest
+from ashare_data.storage.local_daily import DEFAULT_ROOT, LocalDailyStore, digest
 
 
 def security(symbol):

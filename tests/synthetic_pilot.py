@@ -10,10 +10,10 @@ through pytest's monkeypatch fixture; no such override exists in the package.
 from decimal import Decimal
 from urllib.parse import urlencode
 
-from ashare_data.action_scope import CODES, catalog_url, content_url
-from ashare_data.daily_observation import sha
-from ashare_data.live import CALENDAR_URL
-from ashare_data.model import canonical
+from ashare_data.observations.action_baseline import CODES, catalog_url, content_url
+from ashare_data.observations.daily import sha
+from ashare_data.market.client import CALENDAR_URL
+from ashare_data.core.model import canonical
 
 CASH = dict(zip(CODES, ("1.23", "2.34", "3.45"), strict=True))
 

@@ -8,7 +8,6 @@ import runpy
 import pytest
 
 
-
 @pytest.fixture(scope="module")
 def builder():
     return runpy.run_path(str(Path(__file__).parents[1] / "scripts/build_daily_execution.py"))

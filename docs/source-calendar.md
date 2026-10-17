@@ -1,6 +1,6 @@
 # 固定 capture 源日历与开市邻日
 
-用于扩展研究窗口的数据输入。源日历按请求中的自然日保存，不以周末/工作日习惯推算；没有证券参数，也不能据此推导任何证券当天上市、停牌或可交易。现有 M2 固定证券/窗口和执行门禁不变。
+用于扩展研究窗口的数据输入。源日历按请求中的自然日保存，不以周末/工作日习惯推算；没有证券参数，也不能据此推导任何证券当天上市、停牌或可交易。现有 PORTABLE 固定证券/窗口和执行门禁不变。
 
 | 公共接口 | 行为 |
 | --- | --- |
@@ -21,7 +21,7 @@
 
 `historical_available_at=None`、`historical_pit=False`、`security_eligibility=None`、`exchange_certified=False`、`execution_permission=False`始终保留。`exchange_scope='provider_calendar_unspecified_exchange'`表示本接口没有独立认证交易所范围；不会自动变成SSE/SZSE/BSE个股通用资格。没有日内sessions或竞价时段推断。
 
-`SourceCalendarLink`包含trading_date、previous_open、next_open、capture_id，以及从previous到next的**全部自然日** `evidence_rows`。前后邻日均不包含锚点本身，所有跨过的日期必须为已知关闭日。即使捕获前/后一天通常开市，只要越出已捕获范围就拒绝。返回是 `derived_from_source_calendar`，不是M2执行plan或官方日历认证。
+`SourceCalendarLink`包含trading_date、previous_open、next_open、capture_id，以及从previous到next的**全部自然日** `evidence_rows`。前后邻日均不包含锚点本身，所有跨过的日期必须为已知关闭日。即使捕获前/后一天通常开市，只要越出已捕获范围就拒绝。返回是 `derived_from_source_calendar`，不是PORTABLE执行plan或官方日历认证。
 
 所有结果的report均返回独立字典，包括原request、coverage、quality、network_used=False和局限。`requested_values_known=True`只证明请求网格的源枚举已知，不等于全市场完整性、最终性、历史当时可见或历史资格。链条不因当前收到完整type-34帧而升级PIT。
 

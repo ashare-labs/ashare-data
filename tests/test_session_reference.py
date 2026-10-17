@@ -1,10 +1,9 @@
 """Self-authored minimal quote shapes; no actual market observations."""
 
-
 import pytest
 
-from ashare_data.model import DataError
-from ashare_data.session_reference import snapshot
+from ashare_data.core.model import DataError
+from ashare_data.providers.sse_snapshot import snapshot
 
 from synthetic_pilot import quote
 

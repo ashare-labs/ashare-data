@@ -1,4 +1,5 @@
 """Offline public import and daily-state reads; no data acquisition."""
+
 import argparse
 import json
 from pathlib import Path

@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from ashare_data import JQObservationInput, Store
-from ashare_data.model import DataError
+from ashare_data.core.model import DataError
 
 
 def fixture(tmp_path, changes=None):

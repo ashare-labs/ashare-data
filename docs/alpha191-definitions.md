@@ -3,8 +3,8 @@
 `gtja191.explicit.v1` 为全部 191 个编号提供确定的计算路径。选择它表示采用本文的研究定义；**原研报的 8 处缺参/歧义仍然存在**，没有声称还原了 GTJA 或聚宽内部实现。默认的 `gtja191.public.v1` 继续保留这 8 项阻断，方便按原文保守复核。
 
 ```python
-from ashare_data.alpha191 import Alpha191, EXPLICIT_VERSION, coverage
-from ashare_data.factors import catalog
+from ashare_data.factors.alpha191 import Alpha191, EXPLICIT_VERSION, coverage
+from ashare_data.factors.catalog import catalog
 
 result = Alpha191(
     frames, universe=pool, adjustment="raw",
@@ -45,7 +45,7 @@ print(catalog("alpha191", alpha191_version=EXPLICIT_VERSION))
 
 ## 数值修复与版本溯源
 
-两种公式版本均使用 `alpha191.python.v3` 统计内核，`metadata.engine_version` 参与输入计算哈希。公式版本相同、内核不同也不会复用旧哈希。此次修复会改变旧候选中错误的排名结果，**不宣称数值与 c5584c8/1db84c/88971d5 完全一致**。8条显式定义和来源许可与 v2 相同。
+两种公式版本均使用 `alpha191.python.v3` 统计内核，`metadata.engine_version` 参与输入计算哈希。公式版本相同、内核不同也不会复用旧哈希。公式版本、内核版本与输入身份共同决定计算身份，旧候选结果不能作为新运行结果。
 
 普通 CORR/COV 先减去各自窗口的首个观测值，再除以各自最大绝对差，最后中心化归一后的值。均值、乘积及平方和采用 Neumaier 补偿求和；协方差最后用浮点尾数和二进制指数恢复尺度，避免先乘巨大/微小尺度。若有限极值相减溢出，先将窗口除以 2 并保留指数。基数不同但可表示差分相同的窗口走相同的运算路径，045 的平移同形相关系数因此保持并列。该处理位于共享算子，没有按因子编号分支。
 
@@ -55,4 +55,4 @@ RANK 按实际数值排序，不添加统一容差或全局四舍五入。真实
 
 误差界按验证域明确限定：直接算子用输入 binary64 的精确 Fraction 矩与 80 位 Decimal 平方根作参考；测试 CORR 的绝对误差不超过 `1e-14 + 4e-15*abs(reference)`，COV 不超过 `1e-14 + 4e-15*sqrt(var_x*var_y)`（样本方差）。协方差近零时不能用它本身作为相对误差分母。验证覆盖窗口 3/5/15/17/230、最高 `1e12` 的平移基数、仅相差一个浮点间距的近常数、互补的 `2**±700` 尺度及相减溢出场景。上述是可复放测试的接受界，**不是所有浮点输入的全域误差证明，也不参与排名**。输入转换前已丢失的微小变化无法恢复；归一化下溢、一般算术舍入及整数路径保护界之外仍有有限精度边界。不宣称任意代数恒等相关都能得到位级相同的输出。
 
-独立验证包含全部 47 个 CORR/COV 消费者（含别名展开）、严格池与缺失/零值/池变化的 available 场景，共 156,259 个配对有效格，数值及有效性分歧均为 0。全公式对照采用 `rtol=1e-10, atol=1e-12`；其公式来自版本注册表，算子参考独立实现，不把它称为另一份外部公式证据。另有 045/099/113 公共 API 原反例、真实 Alpha113 闭式符号对照、因果前缀/分块/证券顺序和包验证。当前结果见 [v3 验证记录](alpha191-corr-validation.json)，[v2 历史记录](alpha191-standard-validation.json) 保留。旧独审的 NumPy/longdouble 在本机只有 52 位尾数，不能把其浮点拆分的并列当成真值。
+公开回归使用独立 Fraction/Decimal 参考、原反例及因果性/分块检查；当前结果由本次测试生成。历史实验计数不作为此版本的验收证据。

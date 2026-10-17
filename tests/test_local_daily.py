@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-from ashare_data.local_daily import LocalDailyStore
-from ashare_data.local_sources import validate_bars, eastmoney
+from ashare_data.storage.local_daily import LocalDailyStore
+from ashare_data.providers.daily_sources import validate_bars, eastmoney
 
 
 def setup_store(tmp_path):
@@ -145,8 +145,8 @@ def test_issuer_exit_correction_survives_newer_list_refresh_and_keeps_relisting(
 
 def test_exit_notice_requires_reviewed_digest_and_is_imported_once(tmp_path, monkeypatch):
     import hashlib
-    from ashare_data import local_code_history as module
-    from ashare_data.local_sources import SourceUnavailable
+    from ashare_data.reference import code_history as module
+    from ashare_data.providers.daily_sources import SourceUnavailable
 
     s = setup_store(tmp_path)
     payload = b"%PDF-synthetic issuer document"
@@ -194,7 +194,7 @@ def test_exit_notice_requires_reviewed_digest_and_is_imported_once(tmp_path, mon
 
 def test_later_verified_code_change_corrects_a_historical_only_universe(tmp_path, monkeypatch):
     import hashlib
-    from ashare_data import local_code_history as module
+    from ashare_data.reference import code_history as module
 
     s = LocalDailyStore(tmp_path)
     s.set_meta("start", "2012-01-16")
@@ -237,7 +237,8 @@ def test_later_verified_code_change_corrects_a_historical_only_universe(tmp_path
 def test_historical_command_resolves_identifiers_before_planning(tmp_path, monkeypatch):
     import hashlib
     from types import SimpleNamespace
-    from ashare_data import local_daily as module, local_code_history
+    from ashare_data.storage import local_daily as module
+    from ashare_data.reference import code_history as local_code_history
 
     payload = b"%PDF-synthetic code change"
     sha = hashlib.sha256(payload).hexdigest()
@@ -302,7 +303,7 @@ def test_known_future_code_event_recovers_old_instrument_when_window_crosses_ipo
     tmp_path, monkeypatch
 ):
     import hashlib
-    from ashare_data import local_code_history as module
+    from ashare_data.reference import code_history as module
 
     s = LocalDailyStore(tmp_path)
     s.set_meta("start", "2010-01-01")
@@ -349,7 +350,7 @@ def test_known_future_code_event_recovers_old_instrument_when_window_crosses_ipo
 
 @pytest.mark.parametrize("state", ["empty_unknown", "failed", "blocked", "running", "pending"])
 def test_http_maintenance_does_not_reset_or_consume_baostock_jobs(tmp_path, monkeypatch, state):
-    from ashare_data import local_daily
+    from ashare_data.storage import local_daily
 
     s = setup_store(tmp_path)
     s.db.execute("UPDATE jobs SET state='done'")
@@ -369,7 +370,7 @@ def test_http_maintenance_does_not_reset_or_consume_baostock_jobs(tmp_path, monk
 
 def test_http_dispatch_rejects_a_dedicated_collector_source_without_a_request():
     from types import SimpleNamespace
-    from ashare_data.local_sources import fetch_job
+    from ashare_data.providers.daily_sources import fetch_job
 
     class HTTP:
         history = SimpleNamespace()
@@ -390,7 +391,8 @@ def test_http_dispatch_rejects_a_dedicated_collector_source_without_a_request():
 
 def test_targeted_horizon_update_retries_only_selected_http_jobs(tmp_path, monkeypatch):
     from types import SimpleNamespace
-    from ashare_data import local_daily as module, local_code_history
+    from ashare_data.storage import local_daily as module
+    from ashare_data.reference import code_history as local_code_history
 
     s = setup_store(tmp_path)
     s.db.execute("UPDATE jobs SET state='failed'")
@@ -468,7 +470,7 @@ def test_resume_incremental_and_failed_retry(tmp_path):
 
 
 def test_targeted_retry_and_run_leave_other_symbols_pending_or_failed(tmp_path, monkeypatch):
-    from ashare_data import local_daily
+    from ashare_data.storage import local_daily
 
     s = setup_store(tmp_path)
     s.db.execute("UPDATE jobs SET state='failed'")
@@ -533,7 +535,7 @@ def test_source_contract_units_and_validation():
 
 
 def test_gap_slices_reuse_exact_snapshot_without_sharing_mutable_rows(monkeypatch):
-    from ashare_data import local_sources as module
+    from ashare_data.providers import daily_sources as module
 
     module._sina_history.cache_clear()
     calls = []
@@ -559,7 +561,7 @@ def test_concurrent_gap_requests_fetch_one_snapshot_per_horizon(tmp_path, monkey
     from concurrent.futures import ThreadPoolExecutor
     import threading
     import time
-    from ashare_data import local_sources
+    from ashare_data.providers import daily_sources as local_sources
 
     calls = []
     barrier = threading.Barrier(4)
@@ -599,7 +601,7 @@ def test_concurrent_gap_requests_fetch_one_snapshot_per_horizon(tmp_path, monkey
 
 
 def test_sohu_raw_units_identity_and_no_remote_code_execution():
-    from ashare_data.local_sources import sohu_daily, SourceUnavailable
+    from ashare_data.providers.daily_sources import sohu_daily, SourceUnavailable
 
     class HTTP:
         body = b'historySearchHandler([{"status":0,"code":"cn_600001","hq":[["2010-01-04","10","10.5","0.5","5%","9","11","123","45.67","1%"]]}]);'
@@ -619,7 +621,7 @@ def test_sohu_raw_units_identity_and_no_remote_code_execution():
 
 
 def test_tencent_raw_identity_units_and_year_bound():
-    from ashare_data.local_sources import tencent_daily, SourceUnavailable
+    from ashare_data.providers.daily_sources import tencent_daily, SourceUnavailable
 
     class HTTP:
         data = {
@@ -669,7 +671,8 @@ def test_tencent_source_jobs_split_years_and_keep_receipts_separate(tmp_path):
 def test_targeted_supplement_does_not_enable_market_wide_future_source(tmp_path, monkeypatch):
     import argparse
     from types import SimpleNamespace
-    from ashare_data import local_daily, local_code_history
+    from ashare_data.storage import local_daily
+    from ashare_data.reference import code_history as local_code_history
 
     setup_store(tmp_path).close()
     monkeypatch.setattr(
@@ -792,7 +795,7 @@ def test_auto_source_chooses_whole_series_without_splicing(tmp_path):
 
 
 def test_bao_supplement_only_plans_missing_source_segments(tmp_path):
-    from ashare_data.local_baostock import daily_requests
+    from ashare_data.providers.baostock_collection import daily_requests
 
     s = setup_store(tmp_path)
     job = dict(
@@ -953,7 +956,7 @@ def test_legacy_code_includes_source_outdate_and_sme_classification(tmp_path):
 
 def test_primary_failure_falls_back_but_denial_does_not(monkeypatch):
     import threading
-    from ashare_data import local_sources as sources
+    from ashare_data.providers import daily_sources as sources
 
     class HTTP:
         history = threading.local()
@@ -986,8 +989,8 @@ def test_primary_failure_falls_back_but_denial_does_not(monkeypatch):
 
 def test_http_cached_by_request_epoch_and_rate_denial_stops_host(tmp_path, monkeypatch):
     import urllib.error
-    from ashare_data.local_sources import PublicHTTP, SourceBlocked
-    import ashare_data.local_sources as sources
+    from ashare_data.providers.daily_sources import PublicHTTP, SourceBlocked
+    import ashare_data.providers.daily_sources as sources
 
     calls = []
 
@@ -1075,8 +1078,8 @@ def test_new_termination_supersedes_open_ended_fact_without_losing_history(tmp_p
 
 def test_same_day_horizon_advance_discovers_new_ipo(tmp_path, monkeypatch):
     from types import SimpleNamespace
-    from ashare_data import local_daily as module
-    from ashare_data import local_code_history
+    from ashare_data.storage import local_daily as module
+    from ashare_data.reference import code_history as local_code_history
 
     monkeypatch.setattr(local_code_history, "refresh_code_history", lambda *a: 0)
 

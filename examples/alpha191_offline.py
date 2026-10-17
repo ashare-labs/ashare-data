@@ -12,8 +12,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from ashare_data.alpha191 import Alpha191, VERSIONS
-from ashare_data.factors import catalog, libraries
+from ashare_data.factors.alpha191 import Alpha191, VERSIONS
+from ashare_data.factors.catalog import catalog, libraries
 
 
 def synthetic_panel(sessions=320, securities=8):

@@ -11,8 +11,8 @@ import pandas as pd
 import pytest
 
 from ashare_data import Client, CoverageContract, DataError, ResearchResult, Store
-from ashare_data.model import digest
-from ashare_data.query import DataView
+from ashare_data.core.model import digest
+from ashare_data.research.snapshots import DataView
 from test_research import calendar, payload, receipt, row, sina_rows, write
 
 SEC = "600000.XSHG"
@@ -282,7 +282,7 @@ def test_legacy_dataview_constructor_detaches_input_and_conflicts(published):
 
 def test_coverage_contract_input_and_all_returned_objects_are_detached():
     data = json.loads(
-        (Path(__file__).parents[1] / "examples/fixtures/paper_contract.json").read_text()
+        (Path(__file__).parents[1] / "tests/fixtures/snapshots/paper_contract.json").read_text()
     )
     contract = CoverageContract(data)
     clock = "2026-09-30T09:31:30+08:00"
@@ -311,7 +311,7 @@ def test_coverage_contract_input_and_all_returned_objects_are_detached():
 
 
 def test_sibling_context_creation_is_lightweight_and_does_not_reload(fixed, monkeypatch):
-    from ashare_data import research
+    from ashare_data.research import datasets as research
 
     store, sid, frequency = fixed
     view = store.research(sid)
@@ -383,7 +383,7 @@ def test_saved_client_inputs_and_nested_source_metadata_remain_pinned(store, tmp
 
 def test_lineage_envelope_detaches_legacy_or_extension_metadata(store, tmp_path):
     # Valid content addressing does not imply all optional metadata is scalar.
-    from ashare_data.model import canonical
+    from ashare_data.core.model import canonical
 
     sid = store.import_research([write(tmp_path, payload())])
     manifest = json.loads((store.root / "research-manifests" / (sid + ".json")).read_text())

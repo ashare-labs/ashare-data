@@ -6,8 +6,8 @@ import json
 import pytest
 
 
-from ashare_data import phase_observation as phase
-from ashare_data.model import DataError, canonical
+from ashare_data.observations import phases as phase
+from ashare_data.core.model import DataError, canonical
 from test_action_scope import issuer_sources
 
 pytestmark = pytest.mark.usefixtures("synthetic_action_baseline")

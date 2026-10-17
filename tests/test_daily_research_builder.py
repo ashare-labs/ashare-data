@@ -35,7 +35,7 @@ def test_fixed_outputs_cannot_be_replaced_by_a_new_revision(tmp_path, builder):
 @pytest.mark.parametrize("name", ["../binding.json", "facts.json", "raw/source.json"])
 def test_output_must_not_overwrite_inputs_or_escape_root(tmp_path, builder, name):
     with pytest.raises(ValueError, match="Output must"):
-        builder["build"](tmp_path, name)
+        builder["build"](tmp_path, name, expected_source_commit="a" * 40)
     assert not list(tmp_path.iterdir())
 
 
@@ -43,7 +43,7 @@ def test_foreign_manifest_baseline_is_rejected_before_building(tmp_path, builder
     (tmp_path / "strategy-manifest.json").write_text(json.dumps({"baselines": {"ad": "wrong"}}))
     (tmp_path / "facts.json").write_text("{}")
     with pytest.raises(ValueError, match="baselines"):
-        builder["build"](tmp_path)
+        builder["build"](tmp_path, expected_source_commit="a" * 40)
     assert not (tmp_path / "binding.json").exists()
 
 

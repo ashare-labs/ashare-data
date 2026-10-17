@@ -1,4 +1,5 @@
 """Public offline path; requires the separately delivered, reviewed real evidence package."""
+
 from __future__ import annotations
 
 import argparse
@@ -15,12 +16,22 @@ def demonstrate(store, evidence_directory):
     assert all(row["value"] == 2018 and row["precision"] == "year" for row in rows)
     refusals = {}
     calls = {
-        "exact_actual_date": lambda: view.get("300750.XSHE", "2026-09-30", field="initial_listing_date"),
+        "exact_actual_date": lambda: view.get(
+            "300750.XSHE", "2026-09-30", field="initial_listing_date"
+        ),
         "historical_eligibility": lambda: view.require_eligible("300750.XSHE", "2026-09-30"),
-        "historical_receipt": lambda: view.get("300750.XSHE", "2026-09-30", visibility="received",
-                                               knowledge_at="2026-09-30T15:00:00+08:00"),
-        "historical_pit": lambda: view.get("300750.XSHE", "2026-09-30", visibility="verified",
-                                            knowledge_at="2026-09-30T15:00:00+08:00"),
+        "historical_receipt": lambda: view.get(
+            "300750.XSHE",
+            "2026-09-30",
+            visibility="received",
+            knowledge_at="2026-09-30T15:00:00+08:00",
+        ),
+        "historical_pit": lambda: view.get(
+            "300750.XSHE",
+            "2026-09-30",
+            visibility="verified",
+            knowledge_at="2026-09-30T15:00:00+08:00",
+        ),
     }
     date_rows = []
     if "initial_listing_date" in view.descriptor().supported_fields:
@@ -40,9 +51,15 @@ def demonstrate(store, evidence_directory):
             raise AssertionError(f"Unexpected admission: {label}")
     for source in view.lineage():
         import hashlib
+
         assert hashlib.sha256(view.evidence(source.path)).hexdigest() == source.source_sha256
-    result = {"descriptor": view.descriptor().to_dict(), "rows": rows, "refusals": refusals,
-            "validation": view.validate(), "execution_permission": False}
+    result = {
+        "descriptor": view.descriptor().to_dict(),
+        "rows": rows,
+        "refusals": refusals,
+        "validation": view.validate(),
+        "execution_permission": False,
+    }
     if date_rows:
         result["date_rows"] = date_rows
     return result
@@ -53,8 +70,14 @@ def main():
     parser.add_argument("--store", required=True)
     parser.add_argument("--evidence", required=True)
     args = parser.parse_args()
-    print(json.dumps(demonstrate(Store.init(args.store), args.evidence), ensure_ascii=False,
-                     sort_keys=True, indent=2))
+    print(
+        json.dumps(
+            demonstrate(Store.init(args.store), args.evidence),
+            ensure_ascii=False,
+            sort_keys=True,
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

@@ -8,8 +8,8 @@ import runpy
 
 import pytest
 
-from ashare_data.local_baostock import import_captures
-from ashare_data.local_daily import LocalDailyStore
+from ashare_data.providers.baostock_collection import import_captures
+from ashare_data.storage.local_daily import LocalDailyStore
 
 
 ACCEPT = runpy.run_path(str(Path(__file__).parents[1] / "scripts/accept_local_daily.py"))

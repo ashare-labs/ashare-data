@@ -216,7 +216,7 @@ def run_batch(root, requests, *, workers=1, retry_failed=False):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("root", type=Path)
-    p.add_argument("--scope", type=Path, default=Path("docs/action-history-scope.json"))
+    p.add_argument("--scope", type=Path, required=True)
     p.add_argument("--requests", type=Path, help="Explicit additional public request list")
     p.add_argument("--retry-failed", action="store_true")
     p.add_argument("--workers", type=int, choices=(1, 2, 3), default=1)

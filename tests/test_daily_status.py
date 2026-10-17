@@ -7,7 +7,8 @@ from dataclasses import FrozenInstanceError
 import pytest
 
 from ashare_data import Store, DataError, BaoStockSource
-from ashare_data import baostock as api, daily_status
+from ashare_data.providers import baostock as api
+from ashare_data.reference import daily_status
 from ashare_data.cli import main
 from test_baostock import bundle
 
@@ -46,8 +47,6 @@ def persist(path, blobs):
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_bytes(value)
     return path
-
-
 
 
 def test_request_is_generic_bounded_and_legacy_unchanged():

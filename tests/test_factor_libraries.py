@@ -3,34 +3,36 @@
 import pandas as pd
 import pytest
 
-from ashare_data import f1, f2
-from ashare_data.f1_batch import FIELDS, SLOTS
-from ashare_data.factors import catalog, libraries
-from ashare_data.alpha191 import Alpha191, coverage
+from ashare_data.factors import joinquant as joinquant
+from ashare_data.factors.joinquant import research_view as factor_research
+from ashare_data.factors.joinquant.panel import FIELDS, SLOTS
+from ashare_data.factors.catalog import catalog, libraries
+from ashare_data.factors.alpha191 import Alpha191, coverage
 
 
-def test_two_source_libraries_and_original_slot_accounting():
+def test_two_source_libraries_and_named_field_accounting():
     lib = libraries()
     assert list(lib.index) == ["joinquant", "alpha191"]
     assert lib.loc["joinquant", "label"] == "聚宽主因子库（部分实现）"
     assert lib.loc["alpha191", "label"] == "Alpha191"
-    assert lib.loc["joinquant", "entry_count"] == 18
+    assert lib.loc["joinquant", "entry_count"] == 19
     assert lib.loc["joinquant", "api_field_count"] == 19
     jq = catalog("joinquant")
-    assert len(jq) == 18
-    assert jq.loc[("joinquant", "PV03"), "api_fields"] == ("ATR6", "ATR14")
-    assert set().union(*map(set, jq.api_fields)) == set(FIELDS) | set(f2.FIELDS)
+    assert len(jq) == 19
+    assert jq.loc[("joinquant", "ATR6"), "api_fields"] == ("ATR6",)
+    assert jq.loc[("joinquant", "ATR14"), "api_fields"] == ("ATR14",)
+    assert set().union(*map(set, jq.api_fields)) == set(FIELDS) | set(factor_research.FIELDS)
     for field in FIELDS:
         row = jq.loc[("joinquant", SLOTS[field])]
         assert field in row.api_fields
-        assert row.definition == f1.BATCH_RESEARCH_DEFINITION
-    for field in f2.FIELDS:
-        assert jq.loc[("joinquant", field), "definition"] == f2.DEFINITION
+        assert row.definition == joinquant.BATCH_RESEARCH_DEFINITION
+    for field in factor_research.FIELDS:
+        assert jq.loc[("joinquant", field), "definition"] == factor_research.DEFINITION
 
 
 def test_combined_catalog_namespace_and_no_invented_taxonomy():
     all_factors = catalog()
-    assert len(all_factors) == 18 + 191
+    assert len(all_factors) == 19 + 191
     assert all_factors.index.is_unique and all_factors.qualified_name.is_unique
     assert set(all_factors.namespace) == {"joinquant", "alpha191"}
     assert not {"basic", "fundamental", "quality", "growth", "momentum"} & set(

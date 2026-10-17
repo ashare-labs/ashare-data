@@ -8,8 +8,8 @@ import json
 from pathlib import Path
 import time
 
-from ashare_data._bao_receipt.protocol import decode_response
-from ashare_data.local_baostock import (
+from ashare_data.providers.baostock_receipt.protocol import decode_response
+from ashare_data.providers.baostock_collection import (
     collect,
     capture_path,
     read_capture,
@@ -17,10 +17,10 @@ from ashare_data.local_baostock import (
     FIELDS,
     RequestTimeout,
 )
-from ashare_data.local_daily import LocalDailyStore, DEFAULT_ROOT
-from ashare_data.local_early import STAGES, write_json
-from ashare_data.local_sources import decimal, now
-from ashare_data.storage import immutable_write
+from ashare_data.storage.local_daily import LocalDailyStore, DEFAULT_ROOT
+from ashare_data.market.early_history import STAGES, write_json
+from ashare_data.providers.daily_sources import decimal, now
+from ashare_data.storage.immutable import immutable_write
 
 
 def requests_for(store, stage):

@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from ashare_data.alpha191 import Alpha191, Alpha191Stream, EXPLICIT_VERSION
-from ashare_data.alpha191._engine import DOMAIN, OK
+from ashare_data.factors.alpha191 import Alpha191, Alpha191Stream, EXPLICIT_VERSION
+from ashare_data.factors.alpha191._engine import DOMAIN, OK
 from test_alpha191 import engine, sample
 
 
@@ -94,7 +94,7 @@ def test_statistics_keep_true_near_ties_distinct_and_constants_undefined():
     e = engine([[1, 1, 1], [2, 2, 2], [4, 4 + 1e-4, 4 + 2e-4], [8, 8, 8]])
     # Every column is compared to the same explicit series, bypassing any formula.
     x = e.fields["close"]
-    from ashare_data.alpha191._engine import panel
+    from ashare_data.factors.alpha191._engine import panel
 
     y = panel(np.repeat(np.array([1.0, 2.0, 4.0, 8.0])[:, None], 3, axis=1))
     corr = e.call("CORR", x, y, 4)
@@ -159,7 +159,7 @@ def test_stream_does_not_backfill_new_benchmark_fields_into_old_blocks():
 def test_statistic_consumer_inventory_is_exhaustive():
     import ast
 
-    from ashare_data.alpha191._formulas import ALIASES, EXPLICIT_FORMULAS, FORMULAS
+    from ashare_data.factors.alpha191._formulas import ALIASES, EXPLICIT_FORMULAS, FORMULAS
 
     def calls(expression):
         node = ast.parse(expression, mode="eval")
@@ -177,7 +177,7 @@ def test_statistic_consumer_inventory_is_exhaustive():
 @pytest.mark.parametrize("i", STATISTIC_CONSUMERS)
 def test_shared_rank_statistic_consumers_against_fraction_decimal_oracle(i):
     from _alpha191_precision_oracle import PrecisionOracle
-    from ashare_data.alpha191._formulas import ALIASES, EXPLICIT_FORMULAS, FORMULAS
+    from ashare_data.factors.alpha191._formulas import ALIASES, EXPLICIT_FORMULAS, FORMULAS
 
     d, u, _, _ = sample(320, 5)
     names = dict(O="open", C="close", H="high", L="low", V="volume", P="vwap", A="amount")
@@ -196,7 +196,7 @@ def test_shared_rank_statistic_consumers_against_fraction_decimal_oracle(i):
 
 
 def test_rank_rational_paths_are_local_to_each_window():
-    from ashare_data.alpha191._engine import Engine, panel
+    from ashare_data.factors.alpha191._engine import Engine, panel
 
     rng = np.random.default_rng(888)
     values = rng.uniform(size=(100, 11))

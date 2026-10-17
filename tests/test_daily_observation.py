@@ -8,8 +8,10 @@ import signal
 
 import pytest
 
-from ashare_data import DataError, live, transport
-from ashare_data import daily_observation as observation
+from ashare_data import DataError
+from ashare_data.market import client as live
+from ashare_data.providers import http as transport
+from ashare_data.observations import daily as observation
 
 SECURITIES = ["600000.XSHG", "600036.XSHG", "601318.XSHG"]
 

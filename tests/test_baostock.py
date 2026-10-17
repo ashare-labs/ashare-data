@@ -8,9 +8,9 @@ import zlib
 import pytest
 
 from ashare_data import Store, DataError, BaoStockSource
-from ashare_data import baostock as api
-from ashare_data._bao_receipt.capture import capture_query, save_capture, sh
-from ashare_data._bao_receipt.protocol import decode_response
+from ashare_data.providers import baostock as api
+from ashare_data.providers.baostock_receipt.capture import capture_query, save_capture, sh
+from ashare_data.providers.baostock_receipt.protocol import decode_response
 
 SEP = "\x01"
 END = b"<![CDATA[]]>\n"
@@ -538,7 +538,7 @@ def test_source_bad_ohlc_stored_as_failed_evidence(tmp_path):
 
 @pytest.mark.parametrize("fault", ["eof", "timeout", "bytes", "short_send", "vip"])
 def test_sdk_login_socket_bounded(fault):
-    from ashare_data.baostock_worker import BoundedSocket
+    from ashare_data.providers.baostock_worker import BoundedSocket
     import time
 
     fake = SimpleNamespace(

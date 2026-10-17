@@ -6,9 +6,10 @@ import json
 import pytest
 
 
-from ashare_data import intraday_observation as obs, phase_observation as phase
-from ashare_data.model import DataError, canonical
-from ashare_data.session_reference import snapshot
+from ashare_data.observations import intraday as obs
+from ashare_data.observations import phases as phase
+from ashare_data.core.model import DataError, canonical
+from ashare_data.providers.sse_snapshot import snapshot
 from test_intraday_observation import DAY, sources
 
 pytestmark = pytest.mark.usefixtures("synthetic_action_baseline")

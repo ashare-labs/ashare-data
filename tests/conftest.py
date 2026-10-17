@@ -1,11 +1,16 @@
+import sys
 import importlib.util
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 import pytest
 
 from ashare_data import Store
 
-spec = importlib.util.spec_from_file_location("golden", Path(__file__).parents[1] / "examples" / "golden.py")
+spec = importlib.util.spec_from_file_location(
+    "golden", Path(__file__).parents[1] / "examples" / "golden.py"
+)
 golden = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(golden)
 
@@ -36,7 +41,7 @@ def published(store, bundle, requirements):
 @pytest.fixture
 def synthetic_action_baseline(tmp_path, monkeypatch):
     """Explicit test-only pin substitution; never loaded by production defaults."""
-    from ashare_data import action_scope
+    from ashare_data.observations import action_baseline as action_scope
     from synthetic_pilot import write_baselines
 
     root = tmp_path / "synthetic-actions"

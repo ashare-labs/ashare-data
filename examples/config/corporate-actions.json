@@ -1,0 +1,13 @@
+{
+  "schema": "ad.action-history-scope.v1",
+  "selection": "Example configuration only. Review and explicitly freeze your own scope before acquisition; this is not an acceptance record.",
+  "securities": [
+    {
+      "security": "600000.XSHG",
+      "start": "2024-01-01",
+      "end": "2024-12-31"
+    }
+  ],
+  "historical_pit": false,
+  "market_complete": false
+}

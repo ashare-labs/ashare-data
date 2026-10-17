@@ -4,9 +4,10 @@ from datetime import datetime
 
 import pytest
 
-from ashare_data import action_scope as action
-from ashare_data import phase_observation as phase, intraday_observation as intraday
-from ashare_data.model import DataError
+from ashare_data.observations import action_baseline as action
+from ashare_data.observations import phases as phase
+from ashare_data.observations import intraday as intraday
+from ashare_data.core.model import DataError
 from synthetic_pilot import write_baselines
 
 

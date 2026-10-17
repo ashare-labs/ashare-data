@@ -1,22 +1,22 @@
-# 本地 JQ 稀疏行情观察：0.9.1.dev2 本地研究能力
+# 本地 JQ 稀疏行情观察
 
-仅供有界本地研究。此版本以已发布 v0.9.0 为基线，迁入原 0.8.8.dev1 的六题数据接口；既有 M2、研究 preflight 与发布标签保持不变，不继承其执行准入。本轮没有联网采集、JQ 重跑、上传、推送或发版。公开 API 是可调用的软件接口；真实行情仍是用户本地私有文件，不在仓库或 wheel 中。
+仅供有界本地研究，不继承其他产品的执行准入。公开 API 是可调用的软件接口；真实行情仍是用户本地私有文件，不在仓库或 wheel 中。调用者提供显式路径与原件摘要。
 
 ## 生成与固定重开
 
 ```python
 from ashare_data import JQObservationInput, Store
 
-store = Store.init("/private/new-store")
+store = Store.init("data/new-store")
 dataset_id = store.import_jq_observations([
     JQObservationInput(
         case_id="B09", security="000001.XSHE", session_date="2024-03-04",
-        events_path="/private/B09/events.jsonl", events_sha256="完整SHA256",
-        script_path="/private/B09/jq.py", script_sha256="完整SHA256",
+        events_path="data/observations/events.jsonl", events_sha256="完整SHA256",
+        script_path="data/observations/jq.py", script_sha256="完整SHA256",
     ),
 ], source_kind="local_jq_backtest_observation")
 
-view = Store("/private/new-store").jq_observations(dataset_id)
+view = Store("data/new-store").jq_observations(dataset_id)
 manifest = view.describe()
 result = view.read("000001.XSHE", kind="current",
                    as_of="2024-03-04T10:00:00+08:00", role="strategy")
@@ -63,16 +63,16 @@ print(result.to_dict())
 
 `local_research_use=conditional_sparse_native_execution` 允许消费方在这些限制内读取以运行自己的原生研究引擎。AD 不执行交易、不输出目标成交数量，也不声明 AQ 已运行；`live_execution_permission=false`。未知生命周期若被消费方要求为已验证事实，必须明确阻断，不能默认补齐。
 
-## 六题复现与缺口
+## 显式本地请求
 
 ```sh
 python examples/jq_observations.py \
-  --request /private/aq/docs/execution-six/data-request.json \
-  --store /private/new-store --output /private/delivery
+  --request data/request.json \
+  --store data/new-store --output data/delivery
 ```
 
 示例仅使用请求里的 case_id、证券、单日日期、源路径及 events/jq.py 摘要，其他设置和目标结果不进入数据产品。输出 `delivery.json` 含 dataset_id、manifest、各会话 bootstrap、请求摘要与本机 store 路径。wheel/commit 身份由交付记录单独固定。测试使用显式 `source_kind=synthetic_fixture` 的协议样例，真实数据在包外验证。
 
-本次请求允许稀疏观测和有界初始化假设。既有真实材料的主要不足是：09:00 没有行情；09:30 没有分钟 bar；11 个主证券和 5 个停牌证券分钟标签不构成完整会话；前日尾分钟首次在次日 09:20 观察，不能回标成前日实时可见；竞价没有排队/逐笔撮合账簿；完整日历/上市事实未采集。无需为这些未请求的完整性证明扩采或制造行情。需要超出上述范围时，按证券、标签、字段和用途另报缺项。
+稀疏观测不能推断完整会话、开盘行情或历史可见性。范围外的证券、标签、字段和用途分别返回缺项；读取成功不要求隐式扩采。
 
 错误均为公开 `DataError`：`JQ_INPUT`、`JQ_SOURCE_HASH`、`JQ_SCHEMA`、`JQ_SCOPE`、`JQ_CONFLICT`、`JQ_VISIBILITY`、`JQ_ROLE`、`JQ_RANGE`、`JQ_INTEGRITY`，以及既有标识符/日期/时间错误。校验失败不产生数据产品；固定产品损坏后不回退重采。

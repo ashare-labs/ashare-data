@@ -4,7 +4,7 @@ import argparse
 import json
 
 from ashare_data import FinancialPIT
-from ashare_data.f1_financial import RESEARCH_MODE
+from ashare_data.financials.ledger import RESEARCH_MODE
 
 
 def main():

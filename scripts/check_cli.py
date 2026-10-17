@@ -1,4 +1,5 @@
 """Executable CLI lifecycle proof, using only synthetic local input."""
+
 from __future__ import annotations
 
 import argparse
@@ -10,6 +11,7 @@ from pathlib import Path
 
 def run(root):
     calls = []
+
     def call(*args, expected=0):
         command = [sys.executable, "-m", "ashare_data.cli", "--store", str(root), *args]
         result = subprocess.run(command, capture_output=True, text=True)
@@ -18,13 +20,32 @@ def run(root):
         parsed = json.loads(result.stdout if result.stdout else result.stderr)
         calls.append({"args": list(args), "exit": result.returncode})
         return parsed
-    fixtures = Path(__file__).resolve().parents[1] / "examples" / "fixtures"
+
+    fixtures = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "snapshots"
     call("init")
     bid = call("import", str(fixtures / "golden.json"))["batch_id"]
-    report = call("validate", "--batch", bid, "--requirements", str(fixtures / "requirements.json"), "--policy", "synthetic")
+    report = call(
+        "validate",
+        "--batch",
+        bid,
+        "--requirements",
+        str(fixtures / "requirements.json"),
+        "--policy",
+        "synthetic",
+    )
     sid = call("publish", "--report", report["id"])["snapshot_id"]
-    base = ("query", "--snapshot", sid, "bars", "--symbol", "000001.XSHE",
-            "--start", "2026-04-09T14:53:00+08:00", "--end", "2026-04-09T14:56:00+08:00")
+    base = (
+        "query",
+        "--snapshot",
+        sid,
+        "bars",
+        "--symbol",
+        "000001.XSHE",
+        "--start",
+        "2026-04-09T14:53:00+08:00",
+        "--end",
+        "2026-04-09T14:56:00+08:00",
+    )
     response = call(*base, "--quality", "synthetic")
     denied = call(*base, expected=2)
     assert len(response["rows"]) == 3 and denied["error"]["code"] == "COVERAGE_GAP"
@@ -32,7 +53,12 @@ def run(root):
     call("query", "--snapshot", sid, "quality")
     call("snapshots")
     call("recover")
-    return {"snapshot_id": sid, "rows": len(response["rows"]), "default_error": denied["error"]["code"], "calls": calls}
+    return {
+        "snapshot_id": sid,
+        "rows": len(response["rows"]),
+        "default_error": denied["error"]["code"],
+        "calls": calls,
+    }
 
 
 if __name__ == "__main__":

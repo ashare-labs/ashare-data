@@ -4,8 +4,8 @@ import json
 from pathlib import Path
 import runpy
 
-from ashare_data.local_baostock import import_captures
-from ashare_data.local_daily import LocalDailyStore
+from ashare_data.providers.baostock_collection import import_captures
+from ashare_data.storage.local_daily import LocalDailyStore
 
 
 def test_audit_uses_named_sample_snapshot_and_excludes_legacy_comparison(tmp_path):
@@ -37,7 +37,12 @@ def test_audit_uses_named_sample_snapshot_and_excludes_legacy_comparison(tmp_pat
     summary = result["independent_crosscheck"]
     assert summary["at"] == report["at"]
     assert summary["bar_snapshot_at"] == report["bar_snapshot_at"]
-    for key in ("read_consistency", "scope_note", "sample_definition_report", "sample_definition_report_at"):
+    for key in (
+        "read_consistency",
+        "scope_note",
+        "sample_definition_report",
+        "sample_definition_report_at",
+    ):
         assert summary[key] == report[key]
     assert summary["securities"] == 2 and summary["third_source_windows"] == 3
     assert summary["checked_price_field_disagreements"] == 1

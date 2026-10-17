@@ -4,8 +4,9 @@ from datetime import datetime, timedelta
 import json
 import pytest
 
-from ashare_data import intraday_observation as obs, phase_observation as phase
-from ashare_data.model import canonical, DataError
+from ashare_data.observations import intraday as obs
+from ashare_data.observations import phases as phase
+from ashare_data.core.model import canonical, DataError
 from test_phase_timing import sources as morning_sources
 
 pytestmark = pytest.mark.usefixtures("synthetic_action_baseline")

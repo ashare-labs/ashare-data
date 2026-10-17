@@ -7,8 +7,14 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from ashare_data.alpha191 import Alpha191, Alpha191Stream, EXPLICIT_VERSION, VERSION, coverage
-from ashare_data.alpha191._engine import DOMAIN, MISSING, OK, WARMUP
+from ashare_data.factors.alpha191 import (
+    Alpha191,
+    Alpha191Stream,
+    EXPLICIT_VERSION,
+    VERSION,
+    coverage,
+)
+from ashare_data.factors.alpha191._engine import DOMAIN, MISSING, OK, WARMUP
 from ashare_data.factors import catalog
 from test_alpha191 import sample, rank
 
@@ -248,7 +254,7 @@ def test_explicit_prefix_append_permutation_and_future_changes():
 
 
 def test_per_factor_resolution_provenance_is_packaged():
-    source = json.loads(files("ashare_data.alpha191").joinpath("sources.json").read_text())
+    source = json.loads(files("ashare_data.factors.alpha191").joinpath("sources.json").read_text())
     for i in IDS:
         spec = source["factors"][str(i)]["explicit_definition"]
         assert spec["version"] == EXPLICIT_VERSION

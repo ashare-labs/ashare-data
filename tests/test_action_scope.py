@@ -10,10 +10,10 @@ from urllib.parse import parse_qs, urlparse
 import pytest
 
 
-from ashare_data import action_scope as action
-from ashare_data import phase_observation as phase
-from ashare_data.calendar_scope import cash_inventory
-from ashare_data.model import DataError, canonical
+from ashare_data.observations import action_baseline as action
+from ashare_data.observations import phases as phase
+from ashare_data.observations.calendar_scope import cash_inventory
+from ashare_data.core.model import DataError, canonical
 from test_calendar_scope import market
 
 from synthetic_pilot import dividends

@@ -1,4 +1,5 @@
 """Synthetic wire records only; real TDX responses stay outside the package."""
+
 from dataclasses import replace
 import hashlib
 import json
@@ -28,22 +29,55 @@ def source(tmp_path, count=240):
         record = encode(delta) + encode(aux) + encode(volume)
         minute = 571 + index if index < 120 else 661 + index
         label = f"{minute // 60:02}:{minute % 60:02}"
-        points.append(dict(index=index, time_label=label, time=f"2024-03-04T{label}:00+08:00",
-                           price=price / 100, price_milli=price * 10, volume=volume,
-                           price_field=None, avg_field=None, avg_price=None, price_raw=price,
-                           avg_raw=None, price_delta_raw=delta, aux_delta_raw=aux, record_hex=record.hex()))
+        points.append(
+            dict(
+                index=index,
+                time_label=label,
+                time=f"2024-03-04T{label}:00+08:00",
+                price=price / 100,
+                price_milli=price * 10,
+                volume=volume,
+                price_field=None,
+                avg_field=None,
+                avg_price=None,
+                price_raw=price,
+                avg_raw=None,
+                price_delta_raw=delta,
+                aux_delta_raw=aux,
+                record_hex=record.hex(),
+            )
+        )
         records.append(record)
         prior = price
     packet = struct.pack("<Hf", count, 24.0) + b"".join(records)
-    response = dict(exchange="sz", market_id=0, code="000001", trading_date="2024-03-04",
-                    points=points, reserved_zero=None, prev_close=24.0, open_price=None,
-                    date_selector_raw=None,
-                    raw_payload=dict(encoding="hex", data=packet.hex(), sha256=hashlib.sha256(packet).hexdigest()))
+    response = dict(
+        exchange="sz",
+        market_id=0,
+        code="000001",
+        trading_date="2024-03-04",
+        points=points,
+        reserved_zero=None,
+        prev_close=24.0,
+        open_price=None,
+        date_selector_raw=None,
+        raw_payload=dict(
+            encoding="hex", data=packet.hex(), sha256=hashlib.sha256(packet).hexdigest()
+        ),
+    )
     path = tmp_path / "synthetic-response.json"
     path.write_text(json.dumps(response))
-    return TDXPointInput("000001.XSHE", "2024-03-04", str(path), hashlib.sha256(path.read_bytes()).hexdigest(),
-                         "synthetic.invalid:7709", "2026-10-10T15:00:00+00:00",
-                         "2026-10-10T15:00:01+00:00", "test-1", "a" * 40, "b" * 64)
+    return TDXPointInput(
+        "000001.XSHE",
+        "2024-03-04",
+        str(path),
+        hashlib.sha256(path.read_bytes()).hexdigest(),
+        "synthetic.invalid:7709",
+        "2026-10-10T15:00:00+00:00",
+        "2026-10-10T15:00:01+00:00",
+        "test-1",
+        "a" * 40,
+        "b" * 64,
+    )
 
 
 def publish(store, source):
@@ -51,12 +85,17 @@ def publish(store, source):
 
 
 def read(view, clock="13:01", **kwargs):
-    return view.read("000001.XSHE", at=f"2024-03-04T{clock}:00+08:00",
-                     role="retrospective_point_research", **kwargs)
+    return view.read(
+        "000001.XSHE",
+        at=f"2024-03-04T{clock}:00+08:00",
+        role="retrospective_point_research",
+        **kwargs,
+    )
 
 
 def mutate(src, change):
     from pathlib import Path
+
     p = Path(src.response_path)
     obj = json.loads(p.read_text())
     change(obj)
@@ -69,13 +108,19 @@ def test_exact_points_with_separate_source_clocks_and_units(store, tmp_path):
     view = publish(store, s)
     result = read(view)
     assert result["rows"][0]["source_index"] == 120
-    assert result["rows"][0]["values"] == {"price": "25", "volume_lots": "240", "volume_shares": "24000"}
+    assert result["rows"][0]["values"] == {
+        "price": "25",
+        "volume_lots": "240",
+        "volume_shares": "24000",
+    }
     assert result["rows"][0]["observed_at"] == "2026-10-10T23:00:01+08:00"
     assert result["rows"][0]["source_label_at"] == "2024-03-04T13:01:00+08:00"
     assert result["rows"][0]["executable"] is None
     assert result["strategy_visible"] is False and result["historical_pit"] is False
     desc = view.describe()
-    assert desc["coverage"] == dict(point_count=240, full_240_point_grid=True, complete_minute_ohlcv=False)
+    assert desc["coverage"] == dict(
+        point_count=240, full_240_point_grid=True, complete_minute_ohlcv=False
+    )
     assert "point_interval_boundaries" in desc["unknown"]
     assert "source lot" in desc["volume_precision"]
     assert Store(store.root).tdx_points(view.dataset_id).describe() == desc
@@ -120,25 +165,30 @@ def test_reject_implicit_historical_visibility_or_execution_roles(store, tmp_pat
     assert caught.value.code == "TDX_ROLE"
 
 
-@pytest.mark.parametrize("change,code", [
-    (lambda x: x.update(orders=[{"price": "REFERENCE_ANSWER"}]), "TDX_SCHEMA"),
-    (lambda x: x["points"][120].update(fill_price=99), "TDX_SCHEMA"),
-    (lambda x: x["points"][120].update(time_label="13:00"), "TDX_LABEL"),
-    (lambda x: x["points"][120].update(price=99), "TDX_WIRE"),
-    (lambda x: x["points"][120].update(price_milli=99), "TDX_WIRE"),
-    (lambda x: x["points"][120].update(volume=-1), "TDX_SCHEMA"),
-    (lambda x: x["points"][120].update(volume=999), "TDX_WIRE"),
-    (lambda x: x["points"][120].update(volume=True), "TDX_SCHEMA"),
-    (lambda x: x["points"][120].update(record_hex="8000"), "TDX_WIRE"),
-    (lambda x: x["points"][120].update(record_hex="xyz"), "TDX_SCHEMA"),
-    (lambda x: x["points"][120].update(index=119), "TDX_SCHEMA"),
-    (lambda x: x.update(trading_date="2024-03-05"), "TDX_SCOPE"),
-    (lambda x: x.update(code="000002"), "TDX_SCOPE"),
-    (lambda x: x.update(prev_close=1e100), "TDX_SCHEMA"),
-    (lambda x: x.update(prev_close=26), "TDX_WIRE"),
-    (lambda x: x["raw_payload"].update(sha256="0" * 64), "TDX_WIRE"),
-])
-def test_reject_answer_fields_and_wire_disagreement_before_publication(store, tmp_path, change, code):
+@pytest.mark.parametrize(
+    "change,code",
+    [
+        (lambda x: x.update(orders=[{"price": "REFERENCE_ANSWER"}]), "TDX_SCHEMA"),
+        (lambda x: x["points"][120].update(fill_price=99), "TDX_SCHEMA"),
+        (lambda x: x["points"][120].update(time_label="13:00"), "TDX_LABEL"),
+        (lambda x: x["points"][120].update(price=99), "TDX_WIRE"),
+        (lambda x: x["points"][120].update(price_milli=99), "TDX_WIRE"),
+        (lambda x: x["points"][120].update(volume=-1), "TDX_SCHEMA"),
+        (lambda x: x["points"][120].update(volume=999), "TDX_WIRE"),
+        (lambda x: x["points"][120].update(volume=True), "TDX_SCHEMA"),
+        (lambda x: x["points"][120].update(record_hex="8000"), "TDX_WIRE"),
+        (lambda x: x["points"][120].update(record_hex="xyz"), "TDX_SCHEMA"),
+        (lambda x: x["points"][120].update(index=119), "TDX_SCHEMA"),
+        (lambda x: x.update(trading_date="2024-03-05"), "TDX_SCOPE"),
+        (lambda x: x.update(code="000002"), "TDX_SCOPE"),
+        (lambda x: x.update(prev_close=1e100), "TDX_SCHEMA"),
+        (lambda x: x.update(prev_close=26), "TDX_WIRE"),
+        (lambda x: x["raw_payload"].update(sha256="0" * 64), "TDX_WIRE"),
+    ],
+)
+def test_reject_answer_fields_and_wire_disagreement_before_publication(
+    store, tmp_path, change, code
+):
     s = mutate(source(tmp_path), change)
     with pytest.raises(DataError) as caught:
         publish(store, s)
@@ -158,8 +208,12 @@ def test_input_hash_and_clock_scope(store, tmp_path):
         assert caught.value.code == code
     view = publish(store, s)
     with pytest.raises(DataError):
-        view.read("000002.XSHE", at="2024-03-04T13:01:00+08:00", role="retrospective_point_research")
+        view.read(
+            "000002.XSHE", at="2024-03-04T13:01:00+08:00", role="retrospective_point_research"
+        )
     with pytest.raises(DataError):
-        view.read("000001.XSHE", at="2024-03-05T13:01:00+08:00", role="retrospective_point_research")
+        view.read(
+            "000001.XSHE", at="2024-03-05T13:01:00+08:00", role="retrospective_point_research"
+        )
     with pytest.raises(DataError):
         view.read("000001.XSHE", at="2024-03-04 13:01:00", role="retrospective_point_research")

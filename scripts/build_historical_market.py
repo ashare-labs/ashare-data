@@ -13,14 +13,14 @@ from pathlib import Path
 import re
 from urllib.parse import parse_qs, urlparse
 
-from ashare_data.historical_market import (
+from ashare_data.reference.historical_market import (
     DATA_SCHEMA,
     SCHEMA,
     HistoricalMarketView,
     ordinary_limits,
     _state_dependency_conflicts,
 )
-from ashare_data.model import canonical, day, require, timestamp
+from ashare_data.core.model import canonical, day, require, timestamp
 
 
 def convert(symbol):

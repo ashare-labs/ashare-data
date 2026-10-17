@@ -54,12 +54,12 @@ API 的 `historical_pit`、`execution_permission` 始终为 false。
 0.936124元；源标记32.14元与原始前收33.08元分开保存。现金到账日不能自动升级为
 开盘前现金可用，递延持有期红利税也仍需消费者明确建模。
 
-生成工具 `scripts/build_daily_research.py <目录>` 只读取已采集原文：
+生成工具 `scripts/build_daily_research.py <目录> --source-commit <源基线完整提交>` 只读取已采集原文：
 固定策略 manifest、`raw/`、`derived/`、经原文核对的 `facts.json`。
-`scripts/decode_research_daily.cjs <目录>` 只执行固定 SHA 的既有纯 KLC 解码器，
+`scripts/decode-research-daily.cjs <目录>` 只执行固定 SHA 的既有纯 KLC 解码器，
 不执行行情响应。原文及解码器另行本地交付，不随 wheel 分发。
 重新采集应使用新目录和新绑定，不能覆盖已经交付的版本。
-生成器只允许字节完全一致的重建，拒绝覆盖不同内容；`node scripts/decode_research_daily.cjs <目录> --verify`
+生成器只允许字节完全一致的重建，拒绝覆盖不同内容；`node scripts/decode-research-daily.cjs <目录> --verify`
 可从原始字节重新解码并核对已有结果，不写入数据。
 
 公开合成边界测试：`python -m pytest tests/test_daily_research.py`。

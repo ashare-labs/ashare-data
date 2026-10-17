@@ -12,7 +12,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from ashare_data.corporate_history import (
+from ashare_data.corporate_actions.history import (
     CorporateHistoryView,
     SCHEMA,
     DATA_SCHEMA,
@@ -20,9 +20,9 @@ from ashare_data.corporate_history import (
     unlocated,
     event_key,
 )
-from ashare_data.corporate_history_identity import associate_actions
-from ashare_data.corporate_history_sources import PARSERS
-from ashare_data.model import timestamp
+from ashare_data.corporate_actions.identity import associate_actions
+from ashare_data.corporate_actions.sources import PARSERS
+from ashare_data.core.model import timestamp
 
 
 def encode(value):
@@ -288,6 +288,6 @@ if __name__ == "__main__":
     p.add_argument("captures", type=Path)
     p.add_argument("curation", type=Path)
     p.add_argument("output", type=Path)
-    p.add_argument("--scope", type=Path, default=Path("docs/action-history-scope.json"))
+    p.add_argument("--scope", type=Path, required=True)
     args = p.parse_args()
     build(args.captures, args.curation, args.scope, args.output)

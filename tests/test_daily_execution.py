@@ -8,7 +8,7 @@ import json
 import pytest
 
 from ashare_data import DataError
-from ashare_data.daily_execution import (
+from ashare_data.research.execution_inputs import (
     ASSUMPTIONS,
     DATA_SCHEMA,
     SCHEMA,
@@ -324,8 +324,6 @@ def test_bad_policy_selection_and_scope(package):
             v.preflight("w", **args)
     with pytest.raises(DataError):
         v.preflight("other", **options())
-
-
 
 
 @pytest.mark.parametrize("policy", [[], {}, 9, "source_date_is_spendable"])

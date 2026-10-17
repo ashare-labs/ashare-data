@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from ashare_data.corporate_history_sources import (
+from ashare_data.corporate_actions.sources import (
     number,
     source_day,
     parse_sina_actions,
@@ -292,7 +292,7 @@ def test_offline_build_is_deterministic_and_retains_failed_raw(tmp_path):
 
 
 def test_explicit_stock_credit_detail_not_cash_payment_or_tradable_date():
-    from ashare_data.corporate_history_sources import parse_sina_action_detail
+    from ashare_data.corporate_actions.sources import parse_sina_action_detail
 
     detail = html(
         table(

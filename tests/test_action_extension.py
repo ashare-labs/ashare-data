@@ -5,10 +5,11 @@ import json
 
 import pytest
 
-from ashare_data import action_extension as extension, action_scope as action
-from ashare_data.daily_observation import sha
-from ashare_data.live import CALENDAR_URL
-from ashare_data.model import DataError, canonical
+from ashare_data.observations import action_extensions as extension
+from ashare_data.observations import action_baseline as action
+from ashare_data.observations.daily import sha
+from ashare_data.market.client import CALENDAR_URL
+from ashare_data.core.model import DataError, canonical
 
 
 @pytest.fixture

@@ -7,7 +7,7 @@ import json
 import pytest
 
 from ashare_data import BaoStockSource, DataError, Store
-from ashare_data import baostock as api
+from ashare_data.providers import baostock as api
 from ashare_data.cli import main
 from test_baostock import BASIC, BASIC_FIELDS, bundle as basic_bundle
 from test_baostock_minutes import bundle as minute_bundle, rows_for

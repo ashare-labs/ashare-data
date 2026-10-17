@@ -10,9 +10,9 @@ import zlib
 import pytest
 
 from ashare_data import BaoStockSource, DataError, Store
-from ashare_data import baostock as api
-from ashare_data import baostock_minutes as minute
-from ashare_data._bao_receipt.capture import capture_query, save_capture, sh
+from ashare_data.providers import baostock as api
+from ashare_data.providers import minute_labels as minute
+from ashare_data.providers.baostock_receipt.capture import capture_query, save_capture, sh
 from test_baostock import frame, SEP, END
 
 

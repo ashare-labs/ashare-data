@@ -7,7 +7,7 @@ import json
 import pytest
 
 from ashare_data import CorporateHistoryView, DataError
-from ashare_data.corporate_history import DATA_SCHEMA, SCHEMA
+from ashare_data.corporate_actions.history import DATA_SCHEMA, SCHEMA
 
 SEC = "000001.XSHE"
 CLOCK = "2026-10-15T12:00:00+00:00"
