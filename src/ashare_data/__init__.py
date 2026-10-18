@@ -116,7 +116,7 @@ __all__ += [
     "ConditionalListingView",
     "QueryLimits",
 ]
-__version__ = "0.10.0.dev3"
+__version__ = "0.10.0.dev4"
 
 __all__ += [
     "PortableView",

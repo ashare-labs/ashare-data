@@ -1,12 +1,17 @@
-"""Publish self-contained price-diagnostic inputs; the mutable library stays in place."""
+"""Publish frozen research inputs; the mutable source library stays in place."""
 
+from contextlib import contextmanager
 from decimal import Decimal, InvalidOperation
+import fcntl
 import hashlib
 import json
 from pathlib import Path
+import time
 
 from ashare_data.core.model import DataError, canonical, digest, require
 from ashare_data.product.daily import LIMITATIONS
+from ashare_data.product import references as reference_api
+from ashare_data.product.validation import validate_covered_input
 from ashare_data.storage.immutable import Store, identifier, immutable_write, now
 
 MAX_INPUT_BYTES = 64 * 1024 * 1024
@@ -76,7 +81,7 @@ def _number(row, field, gaps):
     return None
 
 
-def _portfolio(bundle, securities, start, end, successor):
+def _portfolio(bundle, securities, start, end, successor, *, ordinary=False):
     gaps = list(bundle["gaps"])
     rows = []
     known_receipts = {r["id"] for r in bundle["receipt"]["responses"] if r.get("sha256")}
@@ -111,7 +116,9 @@ def _portfolio(bundle, securities, start, end, successor):
                 )
             volume = numbers["volume"]
             status = row.get("tradestatus")
-            if status in ("0", "1"):
+            if ordinary:
+                pass  # Pinned reference evidence supplies state; prices cannot infer it.
+            elif status in ("0", "1"):
                 row["suspended"] = status == "0"
                 row["state_origin"] = "retrospective_provider_tradestatus"
                 if status == "0" and volume is not None and volume > 0:
@@ -215,13 +222,7 @@ def _portfolio(bundle, securities, start, end, successor):
     }
 
 
-def publish(product, store_root, securities, start, end, source):
-    destination = Path(store_root).expanduser().resolve()
-    require(
-        not destination.is_relative_to(product.root),
-        "PRODUCT_OUTPUT_OVERLAP",
-        "The publication Store must be outside the read-only source library",
-    )
+def _prepare(product, securities, start, end, source, *, ordinary):
     with product._read() as library:
         calendar = [dict(r) for r in library.db.execute("SELECT * FROM calendar ORDER BY date")]
         days = [r["date"] for r in calendar]
@@ -261,10 +262,162 @@ def publish(product, store_root, securities, start, end, source):
             [*bundle["calendar_evidence"], successor],
             bundle["listing_evidence"],
         )
-        document = _portfolio(bundle, securities, start, end, successor)
+        document = _portfolio(bundle, securities, start, end, successor, ordinary=ordinary)
         document["owner_api_reads"].append(
             {"operation": "source_selection", "receipt": selection["receipt"]}
         )
+    return document, bundle, selection, warmup, successor
+
+
+def _assess(document, bundle, securities, start, end, source, references):
+    scope = dict(securities=securities, start=start, end=end, source=source)
+    try:
+        evidence, schedule, gaps, reads = reference_api.assess(
+            references, securities, start, end, bundle["rows"], document["calendar"]
+        )
+    except DataError as exc:
+        evidence, schedule, gaps, reads = None, None, [reference_api.gap(exc)], []
+    result = dict(
+        schema="ad-local-daily-coverage.v1",
+        scope=scope,
+        ready=not gaps,
+        gaps=gaps,
+        assumptions=(
+            evidence["market"]["accepted_assumptions"] if evidence and evidence["market"] else []
+        ),
+        limitations=list(reference_api.LIMITATIONS),
+        reference_set=evidence["reference_set"] if evidence else None,
+        source_bindings=evidence["source_bindings"] if evidence else {},
+        selected_sources={r["security"]: r["source"] for r in bundle["coverage"]},
+        price_receipt_sha256=bundle["receipt"]["receipt_sha256"],
+        reference_evidence_sha256=digest(evidence) if evidence else None,
+        corporate_coverage=schedule["coverage"] if schedule else None,
+        owner_api_reads=reads,
+    )
+    result["coverage_sha256"] = digest(result)
+    return result, evidence, schedule
+
+
+def coverage(product, securities, start, end, source, references):
+    """Full ordinary admission, without initializing any output Store or account."""
+    try:
+        document, bundle, _, _, _ = _prepare(product, securities, start, end, source, ordinary=True)
+        return _assess(document, bundle, securities, start, end, source, references)[0]
+    except DataError as exc:
+        result = dict(
+            schema="ad-local-daily-coverage.v1",
+            scope=dict(securities=securities, start=start, end=end, source=source),
+            ready=False,
+            gaps=exc.details.get("gaps") or [reference_api.gap(exc, field="prices")],
+            assumptions=[],
+            limitations=list(reference_api.LIMITATIONS),
+            reference_set=None,
+            source_bindings={},
+            owner_api_reads=[],
+            price_issue=exc.as_dict(),
+        )
+        try:
+            result["reference_set"], _, result["source_bindings"] = reference_api.normalize(
+                references
+            )
+        except DataError:
+            pass
+        result["coverage_sha256"] = digest(result)
+        return result
+
+
+def _ordinary(document, evidence, schedule, report):
+    for key in ("research_model", "price_limit_policy"):
+        document.pop(key, None)
+    document.update(
+        reference_evidence=evidence,
+        coverage_sha256=report["coverage_sha256"],
+        action_coverage={
+            "status": "separate_corporate_schedule",
+            "scope": "AQ must attach the frozen corporate schedule before account use",
+        },
+        limitations=[x for x in LIMITATIONS if not x.startswith("Corporate actions,")]
+        + list(reference_api.LIMITATIONS),
+        assumptions=[
+            "Source-scoped market-reference models explicitly accepted for retrospective research.",
+            {"market_reference": evidence["market"]["accepted_assumptions"]},
+        ],
+        economic_acceptance="conditional_research_only",
+    )
+    states = {(r["security"], r["date"]): r for r in evidence["market"]["rows"]}
+    for row in document["daily"]:
+        state = states.get((row["security"], row["date"]))
+        if state is None:
+            continue
+        for field in ("suspended", "reference_price", "upper_limit", "lower_limit"):
+            row[field] = state[field]["value"]
+        row["state_evidence"] = {"reference_sha256": digest(state)}
+        row["state_origin"] = evidence["reference_set"]["kind"]
+        row["limit_origin"] = (
+            "Pinned public reference facts; derived values retain their rule model"
+        )
+    document["owner_api_reads"].extend(report["owner_api_reads"])
+    document["source_refs"].append(
+        {
+            "kind": "product_reference_evidence",
+            "source_bindings": evidence["source_bindings"],
+            "response_sha256": digest(evidence),
+        }
+    )
+    validate_covered_input(document, schedule)
+
+
+@contextmanager
+def _publication_lock(destination):
+    # Serialize creation as well as publication; Store.init otherwise races on a new root.
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with (destination.parent / ("." + destination.name + ".product.lock")).open("a+b") as stream:
+        until = time.monotonic() + 30
+        while True:
+            try:
+                fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                require(
+                    time.monotonic() < until,
+                    "WRITER_BUSY",
+                    "Product publication is busy; retry this exact request",
+                )
+                time.sleep(0.02)
+        try:
+            yield
+        finally:
+            fcntl.flock(stream, fcntl.LOCK_UN)
+
+
+def publish(product, store_root, securities, start, end, source, *, mode, references):
+    require(
+        mode in {"covered_research", "price_only_no_limits"},
+        "PRODUCT_MODE",
+        "Choose an explicit supported publication mode",
+    )
+    destination = Path(store_root).expanduser().resolve()
+    require(
+        not destination.is_relative_to(product.root),
+        "PRODUCT_OUTPUT_OVERLAP",
+        "The publication Store must be outside the read-only source library",
+    )
+    ordinary = mode == "covered_research"
+    document, bundle, selection, warmup, successor = _prepare(
+        product, securities, start, end, source, ordinary=ordinary
+    )
+    report, schedule = None, None
+    if ordinary:
+        report, evidence, schedule = _assess(
+            document, bundle, securities, start, end, source, references
+        )
+        require(
+            report["ready"],
+            "PRODUCT_COVERAGE_GAPS",
+            "The chosen ordinary scope has source gaps",
+            report,
+        )
+        _ordinary(document, evidence, schedule, report)
     raw = canonical(document)
     require(
         len(raw) <= MAX_INPUT_BYTES,
@@ -287,33 +440,63 @@ def publish(product, store_root, securities, start, end, source):
         "source_selection_receipt": selection["receipt"],
         "selected_sources": {r["security"]: r["source"] for r in bundle["coverage"]},
         "portfolio_input_sha256": input_hash,
+        "portfolio_input_path": "input.json",
         "portfolio_input_bytes": len(raw),
         "receipt": bundle["receipt"],
-        "mode": "price_only_no_limits",
+        "mode": mode,
+        "reference_set": report["reference_set"] if report else None,
+        "source_bindings": report["source_bindings"] if report else {},
+        "coverage_sha256": report["coverage_sha256"] if report else None,
         "limitations": document["limitations"],
         "dependencies": {
             "execution": "input.json and this manifest; no live-library dependency",
             "original_evidence": "Source raw bodies remain in the preserved library",
         },
     }
+    if ordinary:
+        schedule_raw, coverage_raw = canonical(schedule), canonical(report)
+        require(
+            max(len(schedule_raw), len(coverage_raw)) <= MAX_INPUT_BYTES,
+            "PRODUCT_RESOURCE_LIMIT",
+            "Reference response exceeds 64 MiB",
+        )
+        manifest.update(
+            corporate_schedule_path="corporate-schedule.json",
+            corporate_schedule_sha256=hashlib.sha256(schedule_raw).hexdigest(),
+            corporate_schedule_bytes=len(schedule_raw),
+            coverage_path="coverage.json",
+            coverage_file_sha256=hashlib.sha256(coverage_raw).hexdigest(),
+            coverage_bytes=len(coverage_raw),
+        )
     dataset_id = digest(manifest)
     # Nothing is initialized or written until the complete source scope passed validation.
-    store = Store.init(store_root)
-    with store._writer():
-        root = store.root / "local_daily_products" / dataset_id
-        root.mkdir(parents=True, exist_ok=True)
-        immutable_write(root / "input.json", raw)
-        immutable_write(root / "manifest.json", canonical(manifest))
-        with store._db(write=True) as db:
-            db.executescript(PUBLICATION_SCHEMA)
-            db.execute(
-                "INSERT OR IGNORE INTO local_daily_products VALUES (?,?,?)",
-                (dataset_id, input_hash, now()),
-            )
+    with _publication_lock(destination):
+        store = Store.init(destination)
+        with store._writer():
+            root = store.root / "local_daily_products" / dataset_id
+            root.mkdir(parents=True, exist_ok=True)
+            immutable_write(root / "input.json", raw)
+            if ordinary:
+                immutable_write(root / "corporate-schedule.json", schedule_raw)
+                immutable_write(root / "coverage.json", coverage_raw)
+            immutable_write(root / "manifest.json", canonical(manifest))
+            with store._db(write=True) as db:
+                db.executescript(PUBLICATION_SCHEMA)
+                db.execute(
+                    "INSERT OR IGNORE INTO local_daily_products VALUES (?,?,?)",
+                    (dataset_id, input_hash, now()),
+                )
     view = LocalDailyProductView(store, dataset_id)
     return {
         "dataset_id": dataset_id,
         "portfolio_input_path": str(view.portfolio_input_path),
+        "portfolio_input_sha256": input_hash,
+        "corporate_schedule_path": str(root / "corporate-schedule.json") if ordinary else None,
+        "corporate_schedule_sha256": manifest.get("corporate_schedule_sha256"),
+        "mode": mode,
+        "reference_set": manifest["reference_set"],
+        "source_bindings": manifest["source_bindings"],
+        "coverage_sha256": manifest["coverage_sha256"],
         "manifest": view.describe(),
     }
 
@@ -348,12 +531,19 @@ class LocalDailyProductView:
         root = self.store.root / "local_daily_products" / self.dataset_id
         try:
             require(
-                (root / "input.json").stat().st_size <= MAX_INPUT_BYTES,
+                not root.is_symlink()
+                and not root.parent.is_symlink()
+                and root.resolve().is_relative_to(self.store.root),
                 "PRODUCT_INTEGRITY",
-                "Published input exceeds its budget",
+                "Release directory escapes the selected Store",
             )
-            manifest = json.loads((root / "manifest.json").read_bytes())
-            raw = (root / "input.json").read_bytes()
+            manifest = json.loads(self._bytes(root, "manifest.json"))
+            require(
+                manifest.get("portfolio_input_path", "input.json") == "input.json",
+                "PRODUCT_INTEGRITY",
+                "Input path must be inside this release",
+            )
+            raw = self._bytes(root, "input.json")
             require(
                 digest(manifest) == self.dataset_id
                 and manifest["schema"] == SCHEMA
@@ -366,18 +556,106 @@ class LocalDailyProductView:
             )
             document = json.loads(raw)
             require(
-                document["schema"] == "ad-daily-portfolio.v1",
+                document["schema"] == "ad-daily-portfolio.v1"
+                and document["securities"] == manifest["securities"]
+                and document["calendar"][0] == manifest["warmup_start"]
+                and document["calendar"][120] == manifest["start"]
+                and document["calendar"][-2:] == [manifest["end"], manifest["next_session"]],
                 "PRODUCT_INTEGRITY",
-                "Unexpected published input schema",
+                "Published input schema or scope differs",
             )
-            return manifest, document
-        except (OSError, ValueError, KeyError, TypeError) as exc:
+            schedule, report = None, None
+            require(
+                manifest["mode"] in {"covered_research", "price_only_no_limits"},
+                "PRODUCT_INTEGRITY",
+                "Unsupported publication mode",
+            )
+            if manifest["mode"] == "covered_research":
+                for field, filename in (
+                    ("corporate_schedule", "corporate-schedule.json"),
+                    ("coverage", "coverage.json"),
+                ):
+                    require(
+                        manifest[field + "_path"] == filename,
+                        "PRODUCT_INTEGRITY",
+                        "Reference file must be inside this release",
+                    )
+                    body = self._bytes(root, filename)
+                    hash_key = "coverage_file_sha256" if field == "coverage" else field + "_sha256"
+                    require(
+                        len(body) == manifest[field + "_bytes"]
+                        and hashlib.sha256(body).hexdigest() == manifest[hash_key],
+                        "PRODUCT_INTEGRITY",
+                        "Frozen reference file differs",
+                    )
+                    if field == "coverage":
+                        report = json.loads(body)
+                    else:
+                        schedule = json.loads(body)
+                expected_scope = {k: manifest[k] for k in ("securities", "start", "end")}
+                require(
+                    report["schema"] == "ad-local-daily-coverage.v1"
+                    and report["ready"] is True
+                    and report["gaps"] == []
+                    and report["scope"]
+                    == {**expected_scope, "source": manifest["source_selection"]}
+                    and document["reference_evidence"]["scope"] == expected_scope
+                    and digest({k: v for k, v in report.items() if k != "coverage_sha256"})
+                    == report["coverage_sha256"]
+                    == manifest["coverage_sha256"]
+                    == document["coverage_sha256"],
+                    "PRODUCT_INTEGRITY",
+                    "Coverage scope or semantic identity differs",
+                )
+                for key in ("reference_set", "source_bindings"):
+                    require(
+                        manifest[key] == report[key] == document["reference_evidence"][key],
+                        "PRODUCT_INTEGRITY",
+                        "Reference selection or source binding differs",
+                    )
+                require(
+                    report["reference_evidence_sha256"] == digest(document["reference_evidence"])
+                    and report["corporate_coverage"] == schedule["coverage"]
+                    and report["selected_sources"] == manifest["selected_sources"]
+                    and report["price_receipt_sha256"] == manifest["receipt"]["receipt_sha256"],
+                    "PRODUCT_INTEGRITY",
+                    "Frozen coverage evidence differs",
+                )
+                validate_covered_input(document, schedule)
+            else:
+                require(
+                    document.get("research_model") == "price_only_no_actions"
+                    and not document.get("corporate_schedule")
+                    and not document.get("reference_evidence"),
+                    "PRODUCT_INTEGRITY",
+                    "Diagnostic mode conflicts with ordinary evidence",
+                )
+            return manifest, document, schedule, report
+        except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
             raise DataError(
                 "PRODUCT_INTEGRITY", "Published product is missing or malformed"
             ) from exc
+
+    @staticmethod
+    def _bytes(root, name):
+        path = root / name
+        require(
+            not path.is_symlink()
+            and path.resolve().is_relative_to(root)
+            and path.stat().st_size <= MAX_INPUT_BYTES,
+            "PRODUCT_INTEGRITY",
+            "Published file escapes its release or exceeds its budget",
+        )
+        return path.read_bytes()
 
     def describe(self):
         return self._load()[0]
 
     def read(self):
         return self._load()[1]
+
+    def read_corporate_schedule(self):
+        return self._load()[2]
+
+    def read_coverage(self):
+        return self._load()[3]

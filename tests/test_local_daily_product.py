@@ -91,7 +91,7 @@ def update(library, sql, args=()):
 
 def publish(library, target, **kwargs):
     return LocalDailyProduct(library[0]).publish(
-        target, IDS, library[1][120], library[1][129], **kwargs
+        target, IDS, library[1][120], library[1][129], mode="price_only_no_limits", **kwargs
     )
 
 

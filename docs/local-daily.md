@@ -81,23 +81,29 @@ BaoStock 早期工具用 archive_only=True，原件进入 raw/early-baostock，�
 from ashare_data.product import LocalDailyProduct
 from ashare_data import Store
 
-product = LocalDailyProduct("data/market/local-daily")
+product = LocalDailyProduct.from_deployment("data/deployment.json")
 print(product.catalogue(query="600519", limit=20, offset=0))
 print(product.prices(["600519.XSHG", "000858.XSHE"], "2024-02-19", "2024-02-28"))
-release = product.publish(
-    "data/releases", ["600519.XSHG", "000858.XSHE"], "2024-02-19", "2024-02-28"
-)
+selection = (["000651.XSHE", "000858.XSHE"], "2022-04-01", "2022-04-15")
+print(product.coverage(*selection))  # 只读检查，不创建 Store 或账户
+release = product.publish("data/releases", *selection)  # 默认 covered_research
 view = Store("data/releases").local_daily_product(release["dataset_id"])
 print(view.describe())
-portfolio_input = view.read()  # 校验 manifest 与输入 hash；不再依赖主库在线
-print(release["portfolio_input_path"])  # 交给 AQ 的 portfolio-data-import
+portfolio_input = view.read()
+schedule = view.read_corporate_schedule()
+coverage = view.read_coverage()
+# AQ 产品入口验证这份发布，再用现有 corporate_export.attach 附加账户模型后导入。
 ```
 
-日期是调用示例，必须在所选库中确实存在；没有数据就报缺口。`source="auto"` 在用户选定窗口内为每个证券选择一整份来源，发布固定这些来源后再读取预热；某来源预热不足就拒绝，不用其他来源拼补或静默替换。可显式指定来源重新查询。每次查询最多 100 个证券、100000 个证券交易日，每份发布最多 64 MiB；这是资源预算，不是固定证券或日期白名单。
+日期是调用示例，必须在所选库和证据包中确实覆盖；没有数据就报缺口。`source="auto"` 在用户选定窗口内为每个证券选择一整份行情来源，发布固定这些来源后再读取预热；某来源预热不足就拒绝，不用其他来源拼补或静默替换。可显式指定来源重新查询。每次查询最多 100 个证券、100000 个证券交易日；普通交易状态准入最多 50000 个证券交易日（每个交易日核对 BUY/SELL）。每份输入不超过 64 MiB；这些是资源预算，不是固定证券或日期白名单。
 
-发布必须具备窗口之前完整的 120 个源日历交易日、窗口所有真实行情与后继日历。缺行情、非法 OHLC、无来源回执、上市范围之外或零量未知状态会返回 `PRODUCT_DATA_GAPS` 和具体字段/日期；起止须是实际交易日。缺日历/预热返回 `PRODUCT_SESSION_UNAVAILABLE` / `PRODUCT_WARMUP_UNAVAILABLE`。主库目录不能作为发布输出目录，失败的输入不初始化 Store。
+发布必须具备窗口之前完整的 120 个源日历交易日、窗口所有真实行情与后继日历。缺行情、非法 OHLC、无来源回执或上市范围之外会返回 `PRODUCT_DATA_GAPS` 和具体字段/日期；起止须是实际交易日。缺日历/预热返回 `PRODUCT_SESSION_UNAVAILABLE` / `PRODUCT_WARMUP_UNAVAILABLE`。主库目录不能作为发布输出目录，失败的输入不初始化 Store。
 
-当前发布为 **价格诊断** `price_only_no_limits`：真实原始价格与股数，但排除公司行动现金/股份和价限，不能解释为总收益或完整经济回测。AQ 执行需用户显式确认该模式及回顾性状态；不能当作 covered 输入。状态保留源 `tradestatus`；缺标记时只有正成交量才生成明确标注的“事后已发生交易”模型，零量不推断停牌。价格、缺行、行动和价限都不补造。
+普通发布 `covered_research` 通过指定参考集合的 `DailyResearchView + DailyExecutionView` 或 `HistoricalMarketView` 公共接口验证所选证券日，并从 `CorporateHistoryView.export_aq` 冻结完整公司行动响应。主库原始行情始终作为价格来源；参考包快照不替代行情。主库与参考的日历、停牌、ST、preclose，以及原始 OHLC 与限幅不兼容时给出具体缺口。已知停牌保留 true；未知字段、上市/退市边界、源冲突和当前不支持的无限价状态不会准入。参考缺口返回 `PRODUCT_COVERAGE_GAPS`，不会自动改用其他集合或诊断。
+
+普通基底保留结构化 `reference_evidence`：原始状态行、规则与 assumption_ids、一次批量准入响应、绑定身份和读取回执。`derived` 限幅继续标为规则模型，不能变成交易所直接源限价。公司行动独立存放于 `corporate-schedule.json`，AD 不计算账户资金/股份。AQ 附加自己的税前、日期级到账模型；源的 PIT、执行许可和全类型完备性 false 标记仍保留。合法空窗口仅是来源范围无事件，不等于全市场不存在行动。
+
+**价格诊断**仍可显式选择 `mode="price_only_no_limits"`：排除公司行动现金/股份和价限，不能解释为总收益或完整经济回测。该模式保留源 `tradestatus`；缺标记时正成交量只支持“事后已发生交易”模型，零量不推断停牌。未配置参考包仍可查价格和主动选择诊断，但不能得到普通发布。
 
 同一 `ashare-deployment.v1` 清单可同时供 AD/AQ/web 选库。AD 独立入口的优先级为 `--deployment` > `ASHARE_DEPLOYMENT` > `ASHARE_DATA_ROOT/deployment.json`，显式 `--root` 则直接选择主库。`data_root` 相对清单目录解析，资产相对 `data_root` 解析；正式主库可登记为原位绝对路径，无须复制。`LocalDailyStore` 原有采集默认目录保持不变，不受该产品清单影响。
 
@@ -107,10 +113,19 @@ print(release["portfolio_input_path"])  # 交给 AQ 的 portfolio-data-import
   "data_root": ".",
   "assets": {
     "main": {"kind": "local_daily", "path": "ad/market/local-daily", "role": "market", "retention": "preserve"},
-    "releases": {"kind": "store", "path": "ad/releases", "role": "publication", "retention": "preserve"}
+    "releases": {"kind": "store", "path": "ad/releases", "role": "publication", "retention": "preserve"},
+    "research": {"kind": "daily_research", "path": "ad/reference/research", "binding": "binding.json", "binding_sha256": "<固定64位SHA>", "role": "market_reference"},
+    "execution": {"kind": "daily_execution", "path": "ad/reference/execution", "binding_sha256": "<固定64位SHA>", "role": "market_reference"},
+    "corporate": {"kind": "corporate_history", "path": "ad/reference/corporate", "binding_sha256": "<固定64位SHA>", "role": "corporate_source"}
   },
   "profiles": {
-    "product": {"kind": "product", "daily_asset": "main", "release_store_asset": "releases", "control_db": "aq/product/control.sqlite3", "paper_root": "aq/product/paper", "api_port": 18839, "paper_port": 18818, "web_port": 41839, "default_dataset_id": null}
+    "product": {
+      "kind": "product", "daily_asset": "main", "release_store_asset": "releases",
+      "control_db": "aq/product/control.sqlite3", "paper_root": "aq/product/paper",
+      "api_port": 18839, "paper_port": 18818, "web_port": 41839, "default_dataset_id": null,
+      "reference_sets": {"daily-evidence": {"kind": "daily_execution", "research_asset": "research", "execution_asset": "execution", "corporate_history_asset": "corporate"}},
+      "default_reference_set": "daily-evidence"
+    }
   }
 }
 ```
@@ -119,10 +134,29 @@ print(release["portfolio_input_path"])  # 交给 AQ 的 portfolio-data-import
 python -m ashare_data.product --deployment "$DEPLOYMENT" catalogue --query 600519
 python -m ashare_data.product --deployment "$DEPLOYMENT" prices \
   --security 600519.XSHG --start 2024-02-19 --end 2024-02-28
+python -m ashare_data.product --deployment "$DEPLOYMENT" coverage \
+  --security 000651.XSHE --start 2022-04-01 --end 2022-04-15
 python -m ashare_data.product --deployment "$DEPLOYMENT" publish \
+  --security 000651.XSHE --start 2022-04-01 --end 2022-04-15
+python -m ashare_data.product --deployment "$DEPLOYMENT" publish --mode price_only_no_limits \
   --security 600519.XSHG --start 2024-02-19 --end 2024-02-28
 ```
 
-`LocalDailyProduct.from_deployment(path, profile="product")` 同样只解析已有清单。未配置不会建立空库或寻找样例。发布是追加到独立 Store 的 `catalog.sqlite` 与内容寻址目录，包含 `ad-daily-portfolio.v1` 完整输入、源回执、发布 manifest 和生产代码摘要。重开 Store 会验证 hash；复制该 Store 到干净目录后无需原主库即可重读输入。原始响应压缩正文仍属于主库保留资产，发布回执只引用其 SHA；完整源资产备份必须另保存 `daily.sqlite3` 的一致快照、raw、采集状态及其他库外证据。运行恢复还需 AQ 任务/账户/检查点等完整状态，不能只备份这份 SQLite。
+SHA 占位符须替换为经过核对的绑定身份。另一类集合为 `{"kind":"historical_market","market_asset":"market","corporate_history_asset":"corporate"}`，对应 `historical_market` 资产。`--reference-set` 或 `from_deployment(..., reference_set=...)` 只使用明确选择的集合；未指定时使用配置默认值。直接 Python 调用可传 `references={name,kind,research?/execution?/market?/corporate:{binding_path,binding_sha256}}`，各 binding_path 是包内入口文件。
+
+发布追加到独立 Store 的 `catalog.sqlite` 和内容寻址目录；普通目录内为 `input.json`、`corporate-schedule.json`、`coverage.json`、`manifest.json`。manifest 分别绑定路径、字节 SHA 和大小；`coverage_sha256` 是完整 coverage 去掉该字段后的规范 JSON 语义摘要，`coverage_file_sha256` 是文件字节摘要。`source_bindings` 按 research/execution/market/corporate 角色保存 kind 和 binding_sha256，不把机器绝对路径用作源身份。Store 重读校验文件、模式、范围、参考集合、逐日源字段投影和 schedule；并发相同发布会串行校验并重用同一内容身份。
+
+复制 Store 后，读取冻结输入和恢复已有任务均不要求原 PDF 在线。任务恢复还需要 AQ 控制状态、策略、日志、账户、native 检查点、未结权益和回执，不能只备份 SQLite。要在恢复环境进行新发布，需要保留所选参考包的 binding 及全部被绑定文件，以及正式行情库；小型参考包应随能力备份保存。主库原始响应压缩正文继续原位保留，发布回执引用 SHA；完整主库源备份须另外保存一致 SQLite 快照、raw、采集状态和库外证据。
+
+可离线检查任意已配置范围及行情来源一致性，不采集或复制主库：
+
+```sh
+python scripts/verify_local_daily_product.py --deployment "$DEPLOYMENT" \
+  --security 000333.XSHE --security 000651.XSHE --security 000858.XSHE \
+  --window 2020-02-03:2020-02-14 --window 2022-04-01:2022-04-15 \
+  --output data/verification
+```
+
+该检查验证数据发布和冻结重读；原生账户、故障恢复与资金成交一致性由 AQ 独立验收。
 
 来源协议和解码依赖见 [提供者](providers.md)、[开发工具职责](development.md)。行情/可见性保证见 [行情查询](market-data.md)，历史股票池严格接口见 [历史市场](historical-market.md)。

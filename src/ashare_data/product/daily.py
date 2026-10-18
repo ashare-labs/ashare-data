@@ -49,8 +49,9 @@ class LocalDailyProduct:
     is performed. This object can be shared by API threads; connections cannot.
     """
 
-    def __init__(self, root):
+    def __init__(self, root, *, references=None):
         self.root = Path(root).expanduser().resolve()
+        self.references = references
         require(
             (self.root / "daily.sqlite3").is_file(),
             "PRODUCT_NOT_CONFIGURED",
@@ -58,10 +59,11 @@ class LocalDailyProduct:
         )
 
     @classmethod
-    def from_deployment(cls, deployment=None, *, profile="product"):
+    def from_deployment(cls, deployment=None, *, profile="product", reference_set=None):
         from ashare_data.product.configuration import resolve
 
-        return cls(resolve(deployment, profile=profile)["daily_root"])
+        config = resolve(deployment, profile=profile, reference_set=reference_set)
+        return cls(config["daily_root"], references=config["references"])
 
     @contextmanager
     def _read(self):
@@ -304,8 +306,40 @@ class LocalDailyProduct:
         with self._read() as store:
             return self._prices(store, securities, start, end, source)
 
-    def publish(self, store_root, securities, start, end, source="auto"):
+    def coverage(self, securities, start, end, source="auto", *, references=None):
+        from ashare_data.product.publication import coverage
+
+        securities, start, end = _selection(securities, start, end, source)
+        return coverage(
+            self,
+            securities,
+            start,
+            end,
+            source,
+            self.references if references is None else references,
+        )
+
+    def publish(
+        self,
+        store_root,
+        securities,
+        start,
+        end,
+        source="auto",
+        *,
+        mode="covered_research",
+        references=None,
+    ):
         from ashare_data.product.publication import publish
 
         securities, start, end = _selection(securities, start, end, source)
-        return publish(self, store_root, securities, start, end, source)
+        return publish(
+            self,
+            store_root,
+            securities,
+            start,
+            end,
+            source,
+            mode=mode,
+            references=self.references if references is None else references,
+        )

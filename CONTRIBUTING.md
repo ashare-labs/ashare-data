@@ -16,7 +16,7 @@ uv run --locked --no-config ruff check src tests scripts examples
 uv run --locked --no-config python scripts/check_structure.py
 uv run --locked --no-config pytest -q
 uv build --no-config
-python scripts/verify_wheel.py dist/ashare_data-0.10.0.dev3-py3-none-any.whl --full
+python scripts/verify_wheel.py dist/ashare_data-0.10.0.dev4-py3-none-any.whl --full
 ```
 
 构建工具的来源目录和安装验证输出目录分开。wheel 需验证包资源、CLI、公开读取与数值行为；sdist 解包后同样运行检查并能重建 wheel。`verify_wheel.py --offline --cache DIR` 可显式使用预备缓存，不得把缺依赖或跳过联网测试写成已完成采集验收。

@@ -20,22 +20,44 @@ def main():
     catalogue.add_argument("--query", default="")
     catalogue.add_argument("--limit", type=int, default=100)
     catalogue.add_argument("--offset", type=int, default=0)
-    for name in ("prices", "publish"):
+    for name in ("prices", "coverage", "publish"):
         sub = commands.add_parser(name)
         sub.add_argument("--security", action="append", required=True)
         sub.add_argument("--start", required=True)
         sub.add_argument("--end", required=True)
         sub.add_argument("--source", choices=SOURCES, default="auto")
+        if name in {"coverage", "publish"}:
+            sub.add_argument(
+                "--reference-set", help="Explicit configured reference set; no fallback"
+            )
         if name == "publish":
             sub.add_argument("--store", help="Output Store root; otherwise use the manifest asset")
+            sub.add_argument(
+                "--mode",
+                choices=("covered_research", "price_only_no_limits"),
+                default="covered_research",
+            )
     args = parser.parse_args()
     try:
-        configuration = None if args.root else resolve(args.deployment, profile=args.profile)
-        product = LocalDailyProduct(args.root or configuration["daily_root"])
+        configuration = (
+            None
+            if args.root and not args.deployment
+            else resolve(
+                args.deployment,
+                profile=args.profile,
+                reference_set=getattr(args, "reference_set", None),
+            )
+        )
+        product = LocalDailyProduct(
+            args.root or configuration["daily_root"],
+            references=configuration["references"] if configuration else None,
+        )
         if args.operation == "catalogue":
             result = product.catalogue(args.query, args.limit, args.offset)
         elif args.operation == "prices":
             result = product.prices(args.security, args.start, args.end, args.source)
+        elif args.operation == "coverage":
+            result = product.coverage(args.security, args.start, args.end, args.source)
         else:
             if not args.store and configuration is None:
                 configuration = resolve(args.deployment, profile=args.profile)
@@ -45,6 +67,8 @@ def main():
                 args.start,
                 args.end,
                 args.source,
+                mode=args.mode,
+                references=configuration["references"] if configuration else None,
             )
         print(json.dumps(result, ensure_ascii=False, sort_keys=True, allow_nan=False))
         return 0

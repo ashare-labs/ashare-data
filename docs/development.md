@@ -73,7 +73,7 @@ node --check scripts/decode-factor-panel.cjs
 node --check scripts/decode-research-daily.cjs
 node --check src/ashare_data/providers/sina-decode.js
 uv build --no-config
-python scripts/verify_wheel.py dist/ashare_data-0.10.0.dev3-py3-none-any.whl --full
+python scripts/verify_wheel.py dist/ashare_data-0.10.0.dev4-py3-none-any.whl --full
 ```
 
 `verify_wheel.py --offline --cache DIR --full` 使用预备锁定依赖缓存，在无 src 的环境运行安装包及公开测试。还应解开 sdist，检查其文档/测试/示例/脚本能复验并重建 wheel。测试不应读取真实证据目录；需要私有输入的复放与免费源联网抽样另列结果，未做或不可用不得记为通过。
