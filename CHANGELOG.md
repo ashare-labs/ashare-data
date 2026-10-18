@@ -1,5 +1,9 @@
 # 更新记录
 
+## 0.10.0.dev5
+
+- Integrate formal daily publication and generic source-labelled minute research exports in one paired runtime; retain the existing source, quality and visibility boundaries.
+
 ## 0.10.0.dev4
 
 新增正式日线产品目录、只读查询与发布：大库行情通过显式参考集合接入普通条件研究，保留逐日交易状态、派生价限、独立公司行动计划和可验证来源绑定。缺失或冲突的数据明确拒绝，价格诊断保留为独立模式。统一数据根及资产配置，支持可恢复发布和来源确证。
@@ -7,6 +11,8 @@
 修复 TDX 子进程入口导入旧模块的回归，新增真实进程启动测试。
 
 ## 0.10.0.dev3
+
+- 增加公开 `export_minute_research`：从固定快照生成有界来源标签研究文档，保留原始/派生字段、质量、未知可见时间和来源摘要；不授予执行权限。
 
 将 docs 从 48 个文件收敛为 19 篇任务指南，合并重复入口并移除两份可生成覆盖 CSV；明确两份开发 CJS、随包 JS、QuickJS 与 Node 的职责和依赖，修复导航及源码文档引用。
 
