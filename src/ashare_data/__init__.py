@@ -26,6 +26,7 @@ from ashare_data.market.turnover import reconcile_turnover
 from ashare_data.market.turnover_diagnostics import reconcile_sina_day
 from ashare_data.storage.immutable import Store
 from ashare_data.research.datasets import ResearchResult, ResearchView
+from ashare_data.research.minute_export import export_minute_research
 from ashare_data.research.preflight import (
     ResearchInputRef,
     ResearchSecurityInputs,
@@ -93,6 +94,7 @@ __all__ = [
     "ResearchResult",
     "ResearchView",
     "Store",
+    "export_minute_research",
     "DataError",
     "Client",
     "get_price",

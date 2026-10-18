@@ -2,6 +2,34 @@
 
 ## 不可变快照
 
+`export_minute_research(snapshot, metadata)` 是独立的有界研究导出接口，输出
+`ad-minute-research.v1` JSON 字典。它读取已发布快照的 `quality="research", as_of=None`
+分钟；合成测试使用 `real_market_data=False` 与 synthetic policy。它不授予执行权限。
+调用方先准备显式日历、状态、公司行动和时间模型，再交给消费者验证能力。证券、日期和来源
+均来自输入，无内置证券或月份名单；最多 20 标的、60 天、每日 4 个区间。
+
+```python
+from ashare_data import export_minute_research
+with store.snapshot(snapshot_id) as snapshot:
+    document = export_minute_research(snapshot, metadata)
+```
+
+metadata 必须提供 `real_market_data, securities, days, sessions`，其余研究证据原样保留。
+导出器拥有 `schema, producer, minute, content_sha256`，调用方不能覆写这些字段。
+`source_refs.ad_lineage` 保存完整批次来源合同；每根的 `evidence.ad_row` 保存原 AD 行与
+`source_fields`，包括原始/派生标记、质量原因和来源标签。六个量价字段不修正。
+`content_sha256` 是去掉该字段后的 JSON 摘要：UTF-8、排序键、紧凑分隔符、保留 Unicode、
+拒绝非有限数。它校验内容一致性，不是来源真实性签名。
+
+当前导出能力限 end 标签、历史 `available_at=None`。`bar_start/bar_end/available_at/
+historical_available_at` 在研究顶层保持 null；单独的 `replay_bar_start/replay_bar_end`
+记录标签减一分钟及标签本身。Store 计算的区间仅保留在原行证据中，不能据此宣称交易所
+区间已验证。零成交阶段证据可由 `bar_annotations["证券|带时区标签"]` 传入，字段限
+`session_phase, phase_evidence`；所有注释必须命中导出行。导出器不推断停牌、阶段或公司行动。
+
+消费者还需验证完整分钟网格、来源摘要、日历前后继、逐日状态/前收、公司行动重叠与明确的
+研究假设。缺证据不可升级到 observed、历史 PIT 或严格回测。原有严格快照读取不变。
+
 普通行情用户请使用[直接 get_price 接口](market-data.md#查询与缓存)，无需本页的手工导入流程。
 
 本页只描述高级离线存储 API。数据流：显式本地 JSON 导入 → 规范化 Parquet → 验证 → 发布不可变快照 → 固定快照查询。
