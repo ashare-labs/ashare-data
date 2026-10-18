@@ -5,7 +5,9 @@ import importlib.metadata
 import json
 import sys
 
-from tdx_bars_core import SCHEMA, collect_pages, error_kind, now, save_journal, sha
+# This file is launched directly by the selected SDK interpreter. Its sibling
+# module is stdlib-only, so the SDK environment does not need AD installed.
+from tdx_collection import SCHEMA, collect_pages, error_kind, now, save_journal, sha
 
 
 def main():

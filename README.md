@@ -60,6 +60,7 @@ print(prices.attrs)  # 来源、单位和实际观察时间
 |---|---|
 | 少量行情、缓存、覆盖及可见性 | [行情查询](docs/market-data.md)；Client / get_price |
 | 维护长期本地日线及早期观察 | [本地日线](docs/local-daily.md)；LocalDailyStore |
+| 搜索已有大库、查看行情、发布回测输入 | [日线产品](docs/local-daily.md#查询与发布产品)；LocalDailyProduct |
 | 读取停牌/ST、前收、日历、上市事实 | [参考数据](docs/reference-data.md) |
 | 历史状态、股票池及分钟证据 | [历史市场](docs/historical-market.md) |
 | 公司行动、历史股份及事件身份 | [公司行动](docs/corporate-actions.md)；CorporateHistoryView |
@@ -96,6 +97,8 @@ print(dataset_id, result.report)
 `ashare-data local-daily --help` 和 `scripts/local-daily.sh --help` 是维护入口，采集命令会写库并联网。默认根目录为 `~/.local/share/ashare-data`；已有库必须显式传 `--root`，升级不会寻找、搬移或覆盖旧库。
 
 开发工具统一在 `scripts/`。`python scripts/check_structure.py` 检查目录、内部导入和文档链接；完整流程见 [贡献约定](CONTRIBUTING.md)。测试只使用合成或最小协议输入，源采集需另行显式执行。
+
+正式产品可用 `python -m ashare_data.product --deployment "$DEPLOYMENT" catalogue --query 600519` 搜索已登记的大库。该入口只读现有库；发布到单独 Store 后由 AQ 导入组合回测，缺配置或数据会明确失败，不回退固定评测。共享清单与发布调用见 [日线产品](docs/local-daily.md#查询与发布产品)。
 
 ## 限制与说明
 

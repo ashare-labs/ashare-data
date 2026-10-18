@@ -192,6 +192,11 @@ class Store:
 
         return RecordedMarketView(self, dataset_id)
 
+    def local_daily_product(self, dataset_id):
+        from ashare_data.product.publication import LocalDailyProductView
+
+        return LocalDailyProductView(self, dataset_id)
+
     def import_jq_observations(self, sources, *, source_kind):
         from ashare_data.providers.joinquant_observations import import_observations
 

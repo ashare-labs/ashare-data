@@ -11,6 +11,7 @@
 | corporate_actions / financials | 事件与股份来源；财报账本、版本和时点 |
 | factors | 具名因子目录、研究定义、Alpha191 算子 |
 | storage | 不可变 Store 发布/恢复；可变本地 SQLite 日线库 |
+| product | 正式本地库目录、只读查询、共享清单选库与有界组合输入发布 |
 | providers | 来源协议、HTTP、SDK 子进程、格式解析与解码资源 |
 | observations / research | 实际时钟观察；固定快照、输入预检与条件研究 |
 | cli | 安装后的 ashare-data 命令 |

@@ -27,6 +27,7 @@ DOMAINS = {
     "providers",
     "observations",
     "research",
+    "product",
     "cli",
 }
 

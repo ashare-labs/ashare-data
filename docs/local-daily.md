@@ -73,4 +73,56 @@ BaoStock 早期工具用 archive_only=True，原件进入 raw/early-baostock，�
 
 累计后复权因子用于价格调整，不是完整现金/股份事件账本。分红支付、法定权益日期与价格调整生效可不同；股本、配股、到账及可卖日期由 [公司行动](corporate-actions.md) 的独立事实处理。来源分歧保留原值与诊断，不自动按多数票改历史。
 
+## 查询与发布产品
+
+`LocalDailyProduct` 从显式选择的 `daily.sqlite3` 提供证券搜索、分页覆盖和原价查询。每个请求使用只读 SQLite 事务，返回 JSON 数值字符串、缺口、原始来源行 hash、响应摘要与读回执；不联网、不搬库。目录中的来源范围是公共日历内的已有观察，名称不是历史名称；实际查询还受上市和代码有效期约束。日历之外的早期原观察仍保留在主库，由早期观察接口读取，不能当作完整产品日历。
+
+```python
+from ashare_data.product import LocalDailyProduct
+from ashare_data import Store
+
+product = LocalDailyProduct("data/market/local-daily")
+print(product.catalogue(query="600519", limit=20, offset=0))
+print(product.prices(["600519.XSHG", "000858.XSHE"], "2024-02-19", "2024-02-28"))
+release = product.publish(
+    "data/releases", ["600519.XSHG", "000858.XSHE"], "2024-02-19", "2024-02-28"
+)
+view = Store("data/releases").local_daily_product(release["dataset_id"])
+print(view.describe())
+portfolio_input = view.read()  # 校验 manifest 与输入 hash；不再依赖主库在线
+print(release["portfolio_input_path"])  # 交给 AQ 的 portfolio-data-import
+```
+
+日期是调用示例，必须在所选库中确实存在；没有数据就报缺口。`source="auto"` 在用户选定窗口内为每个证券选择一整份来源，发布固定这些来源后再读取预热；某来源预热不足就拒绝，不用其他来源拼补或静默替换。可显式指定来源重新查询。每次查询最多 100 个证券、100000 个证券交易日，每份发布最多 64 MiB；这是资源预算，不是固定证券或日期白名单。
+
+发布必须具备窗口之前完整的 120 个源日历交易日、窗口所有真实行情与后继日历。缺行情、非法 OHLC、无来源回执、上市范围之外或零量未知状态会返回 `PRODUCT_DATA_GAPS` 和具体字段/日期；起止须是实际交易日。缺日历/预热返回 `PRODUCT_SESSION_UNAVAILABLE` / `PRODUCT_WARMUP_UNAVAILABLE`。主库目录不能作为发布输出目录，失败的输入不初始化 Store。
+
+当前发布为 **价格诊断** `price_only_no_limits`：真实原始价格与股数，但排除公司行动现金/股份和价限，不能解释为总收益或完整经济回测。AQ 执行需用户显式确认该模式及回顾性状态；不能当作 covered 输入。状态保留源 `tradestatus`；缺标记时只有正成交量才生成明确标注的“事后已发生交易”模型，零量不推断停牌。价格、缺行、行动和价限都不补造。
+
+同一 `ashare-deployment.v1` 清单可同时供 AD/AQ/web 选库。AD 独立入口的优先级为 `--deployment` > `ASHARE_DEPLOYMENT` > `ASHARE_DATA_ROOT/deployment.json`，显式 `--root` 则直接选择主库。`data_root` 相对清单目录解析，资产相对 `data_root` 解析；正式主库可登记为原位绝对路径，无须复制。`LocalDailyStore` 原有采集默认目录保持不变，不受该产品清单影响。
+
+```json
+{
+  "schema": "ashare-deployment.v1",
+  "data_root": ".",
+  "assets": {
+    "main": {"kind": "local_daily", "path": "ad/market/local-daily", "role": "market", "retention": "preserve"},
+    "releases": {"kind": "store", "path": "ad/releases", "role": "publication", "retention": "preserve"}
+  },
+  "profiles": {
+    "product": {"kind": "product", "daily_asset": "main", "release_store_asset": "releases", "control_db": "aq/product/control.sqlite3", "paper_root": "aq/product/paper", "api_port": 18839, "paper_port": 18818, "web_port": 41839, "default_dataset_id": null}
+  }
+}
+```
+
+```sh
+python -m ashare_data.product --deployment "$DEPLOYMENT" catalogue --query 600519
+python -m ashare_data.product --deployment "$DEPLOYMENT" prices \
+  --security 600519.XSHG --start 2024-02-19 --end 2024-02-28
+python -m ashare_data.product --deployment "$DEPLOYMENT" publish \
+  --security 600519.XSHG --start 2024-02-19 --end 2024-02-28
+```
+
+`LocalDailyProduct.from_deployment(path, profile="product")` 同样只解析已有清单。未配置不会建立空库或寻找样例。发布是追加到独立 Store 的 `catalog.sqlite` 与内容寻址目录，包含 `ad-daily-portfolio.v1` 完整输入、源回执、发布 manifest 和生产代码摘要。重开 Store 会验证 hash；复制该 Store 到干净目录后无需原主库即可重读输入。原始响应压缩正文仍属于主库保留资产，发布回执只引用其 SHA；完整源资产备份必须另保存 `daily.sqlite3` 的一致快照、raw、采集状态及其他库外证据。运行恢复还需 AQ 任务/账户/检查点等完整状态，不能只备份这份 SQLite。
+
 来源协议和解码依赖见 [提供者](providers.md)、[开发工具职责](development.md)。行情/可见性保证见 [行情查询](market-data.md)，历史股票池严格接口见 [历史市场](historical-market.md)。
