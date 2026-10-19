@@ -94,6 +94,7 @@ def reviewed_ledger(root, review):
                 "record_id": item["record_id"],
                 "report_id": rid,
                 "replaces_in_this_pack": item.get("replaces"),
+                "replacement_scope_reviewed": bool(item.get("replaces") and item.get("supporting_receipts")),
                 "field_review_sha256": digest(encoded(item)),
                 "source_receipt": document["pdf_receipt"],
                 "historical_pit_certified": False,

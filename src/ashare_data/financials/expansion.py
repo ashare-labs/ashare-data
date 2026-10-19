@@ -523,13 +523,18 @@ def load_batch(root):
     return root, manifest, json.loads((root / "tasks.json").read_text())
 
 
-def run(root, max_jobs=0, interval=2.0, *, fetcher=None, normalizer=None):
+def run(root, max_jobs=0, interval=2.0, *, fetcher=None, normalizer=None, adaptive=False,
+        authenticated=False, minimum_interval=2.0, stop_paths=()):
+    from ashare_data.financials import http_backoff
     fetcher = fetcher or fetch
     normalizer = normalizer or normalize_saved
     root, manifest, tasks = load_batch(root)
-    if interval < 2:
-        raise ValueError("Minimum request interval is two seconds")
+    if interval < minimum_interval or minimum_interval <= 0:
+        raise ValueError("Request interval is below the source-specific minimum")
     stop = {"requested": False}
+    stop_paths = (root / "STOP", *(Path(p) for p in stop_paths))
+    def stopping():
+        return stop["requested"] or any(path.exists() for path in stop_paths)
     def stop_signal(signum, frame):
         stop["requested"] = True
     attempted = 0
@@ -552,7 +557,7 @@ def run(root, max_jobs=0, interval=2.0, *, fetcher=None, normalizer=None):
             hosts = json.loads(state_path.read_text()) if state_path.exists() else {}
             last_request = 0.0
             for task in tasks:
-                if stop["requested"] or (root / "STOP").exists() or (max_jobs and attempted >= max_jobs):
+                if stopping() or (max_jobs and attempted >= max_jobs):
                     break
                 host = urlparse(task["url"]).hostname
                 host_state = hosts.setdefault(host, {})
@@ -577,41 +582,36 @@ def run(root, max_jobs=0, interval=2.0, *, fetcher=None, normalizer=None):
                 if raw is None:
                     delay = max(interval, host_state.get("interval", interval)) - (time.monotonic() - last_request)
                     until = time.monotonic() + max(0, delay)
-                    while time.monotonic() < until and not stop["requested"]:
+                    while time.monotonic() < until and not stopping():
                         time.sleep(min(1, until - time.monotonic()))
-                    if stop["requested"]:
+                    if stopping():
                         break
-                    attempt = {"started_at": now(), "url": task["url"], "authenticated": False}
+                    attempt = {"started_at": now(), "url": task["url"], "authenticated": authenticated}
                     receipt["attempts"].append(attempt)
                     receipt["state"] = "running"
                     atomic(path, encoded(receipt))
                     attempted += 1
                     try:
                         status, raw, headers = fetcher(task["url"])
-                        attempt.update(http_status=status, received_at=now(), response_bytes=len(raw),
+                        attempt.update(http_status=int(headers.get("_transport_status", status)),
+                                       effective_status=status, received_at=now(), response_bytes=len(raw),
                                        response_sha256=digest(raw))
+                        if "_provider_status" in headers:
+                            attempt["provider_status"] = headers["_provider_status"]
+                        attempt.update(http_backoff.diagnostics(status, raw, headers, time.time()))
                         if status != 200:
                             raise RuntimeError(f"HTTP {status}")
                         receipt["raw"] = artifact(root, "raw/" + task["id"] + ".json.gz", gzip.compress(raw, mtime=0))
                         receipt["state"] = "captured"
                         receipt["observed_at"] = attempt["received_at"]
                         atomic(path, encoded(receipt))
-                        host_state["consecutive_errors"] = 0
+                        http_backoff.success(host_state, headers, time.time(), interval, adaptive=adaptive)
                     except Exception as error:
-                        status = attempt.get("http_status")
+                        status = attempt.get("effective_status")
                         attempt["error"] = f"{type(error).__name__}: {error}"[:500]
                         receipt["state"] = "failed_retryable"
-                        failures = host_state.get("consecutive_errors", 0) + 1
-                        host_state["consecutive_errors"] = failures
-                        if status in (401, 402, 403):
-                            host_state["blocked"] = f"HTTP {status}: access/payment approval required"
-                        elif status == 429:
-                            host_state["interval"] = max(10, host_state.get("interval", interval) * 2)
-                            retry = headers.get("Retry-After", "3600")
-                            cooldown = max(3600, int(retry)) if str(retry).isdigit() else 3600
-                            host_state["cooldown_until"] = time.time() + cooldown
-                        elif failures >= 3:
-                            host_state["cooldown_until"] = time.time() + 1800
+                        attempt["backoff"] = http_backoff.failure(
+                            host_state, status, headers if status is not None else {}, time.time(), interval)
                         receipt["retry_after"] = max(time.time() + 60 * 2 ** len(receipt["attempts"]), host_state.get("cooldown_until", 0))
                         atomic(path, encoded(receipt))
                         atomic(state_path, encoded(hosts))
@@ -630,7 +630,7 @@ def run(root, max_jobs=0, interval=2.0, *, fetcher=None, normalizer=None):
             return audit(root, verify=False, write=True, _writer_owned=True)
         finally:
             atomic(root / "worker-exit.json", encoded({"at": now(), "pid": os.getpid(), "requests": attempted,
-                                                       "stop_requested": stop["requested"]}))
+                                                       "stop_requested": stopping()}))
             for sig, handler in previous.items():
                 signal.signal(sig, handler)
 

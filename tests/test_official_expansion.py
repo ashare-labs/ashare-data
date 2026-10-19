@@ -2,6 +2,7 @@
 
 import gzip
 import json
+from datetime import datetime
 
 import pytest
 
@@ -22,7 +23,7 @@ from ashare_data.financials.ledger import RESEARCH_MODE, VisibilityUnproven
 
 @pytest.fixture
 def reviewed_fixture(tmp_path):
-    def source(key, raw):
+    def source(key, raw, url=None):
         path = tmp_path / "raw" / (key + ".gz")
         path.parent.mkdir(exist_ok=True)
         path.write_bytes(gzip.compress(raw))
@@ -31,26 +32,31 @@ def reviewed_fixture(tmp_path):
             "path": str(path.relative_to(tmp_path)),
             "sha256": digest(raw),
             "bytes": len(raw),
+            "request": {"url": url},
         }
         folder = tmp_path / "receipts"
         folder.mkdir(exist_ok=True)
         (folder / (key + ".json")).write_bytes(encoded(receipt))
         return receipt
 
-    source("notice", b"synthetic correction notice")
+    source("pdf-notice", b"synthetic correction notice", "https://static.cninfo.com.cn/notice.pdf")
     review = {"schema": "ad.official-field-review.v1", "fields": []}
+    indexed = []
+    issuer = {"code": "600000", "category": "A股", "orgId": "synthetic"}
+    source("identity-sh600000", encoded([issuer]))
     for aid, day, value, parent in [
         ("one", "2015-04-29", "100.00", None),
         ("two", "2015-06-06", "90.00", "one"),
     ]:
-        pdf = source("pdf-" + aid, ("synthetic original " + aid).encode())
-        source("index-" + aid, b"synthetic official index")
-        report = {
-            "published_date": day,
-            "index_receipt": "index-" + aid,
-            "publication_precision": "date_only_in_current_official_index",
-            "source_url": "https://example.invalid/synthetic",
-        }
+        url = "https://static.cninfo.com.cn/" + aid + ".pdf"
+        pdf = source("pdf-" + aid, ("synthetic original " + aid).encode(), url)
+        raw_row = dict(secCode="600000", orgId="synthetic", announcementId=aid,
+                       announcementTitle="2015年第一季度报告" + ("（修订版）" if parent else ""),
+                       announcementTime=int(datetime.fromisoformat(day + "T00:00:00+08:00").timestamp() * 1000),
+                       adjunctUrl=aid + ".pdf")
+        source("index-" + aid, encoded({"announcements": [raw_row]}))
+        report = report_identity(raw_row) | {"index_receipt": "index-" + aid}
+        indexed.append(report)
         cell = dict(
             field="net_operate_cash_flow",
             value=value,
@@ -87,9 +93,21 @@ def reviewed_fixture(tmp_path):
                 document_derivative_sha256=digest(blob),
                 layout_reviewed=True,
                 replaces=parent,
-                supporting_receipts=["notice"] if parent else [],
+                supporting_receipts=["pdf-notice"] if parent else [],
             )
         )
+    raw_notice = dict(raw_row, announcementId="notice", adjunctUrl="notice.pdf",
+                      announcementTitle="2015年第一季度报告更正公告")
+    source("index-notice", encoded({"announcements": [raw_notice]}))
+    source("index-empty", encoded({"announcements": None}))
+    indexed.append(report_identity(raw_notice) | {"index_receipt": "index-notice"})
+    (tmp_path / "indices").mkdir(exist_ok=True)
+    (tmp_path / "indices/sh600000.json.gz").write_bytes(gzip.compress(encoded(dict(
+        security="600000.XSHG", issuer=issuer, announcements=indexed,
+        sources=["identity-sh600000", "index-one", "index-two", "index-notice", "index-empty"],
+        queries=[dict(kind=k, pagination_complete_for_query=True)
+                 for k in ("periodic", "correction", "revision")],
+    ))))
     return tmp_path, review
 
 
@@ -127,11 +145,93 @@ def test_review_cannot_approve_changed_or_unreviewed_evidence(reviewed_fixture):
         reviewed_ledger(root, review)
 
 
+def daily_view(fixture, monkeypatch):
+    from ashare_data.financials import official_daily
+
+    sessions = {"XSHG": {d: {"source": "synthetic_session_evidence"}
+                         for d in ("2015-04-30", "2015-06-08")}}
+    monkeypatch.setattr(official_daily, "traded_sessions", lambda *a: sessions)
+    root, review = fixture
+    return official_daily.reader(root, review, reference_root=root, reference_tasks=["synthetic"])
+
+
+def test_daily_versions_need_no_second_clock_and_change_only_after_later_session(reviewed_fixture, monkeypatch):
+    from ashare_data.financials.ledger import DAILY_MODE
+
+    view = daily_view(reviewed_fixture, monkeypatch)
+    for day, value in [("2015-04-29", None), ("2015-04-30", "100.00"),
+                       ("2015-06-06", "100.00"), ("2015-06-07", "100.00"),
+                       ("2015-06-08", "90.00")]:
+        row = view.query("600000.XSHG", "net_operate_cash_flow", period="2015-03-31",
+                         as_of=day, mode=DAILY_MODE)["rows"][0]
+        assert row["value"] == value
+        if value is not None:
+            assert row["daily_pit_usable"]
+            assert row["terms"][0]["published_at"] is None
+            assert row["terms"][0]["captured_at"].startswith("2026")
+
+
+def test_daily_reader_checks_original_index_date_not_only_hashes(reviewed_fixture, monkeypatch):
+    root, _ = reviewed_fixture
+    path = root / "indices/sh600000.json.gz"
+    index = json.loads(gzip.decompress(path.read_bytes()))
+    index["announcements"][0]["published_date"] = "2015-04-01"
+    path.write_bytes(gzip.compress(encoded(index)))
+    with pytest.raises(ValueError, match="differs from captured index"):
+        daily_view(reviewed_fixture, monkeypatch)
+
+
+def test_known_unreviewed_version_blocks_only_after_its_official_date(reviewed_fixture, monkeypatch):
+    from ashare_data.financials.ledger import DAILY_MODE
+
+    root, review = reviewed_fixture
+    review["fields"] = review["fields"][:1]
+    view = daily_view((root, review), monkeypatch)
+    args = ("600000.XSHG", "net_operate_cash_flow")
+    assert view.query(*args, period="2015-03-31", as_of="2015-06-05", mode=DAILY_MODE)["rows"][0]["value"] == "100.00"
+    row = view.query(*args, period="2015-03-31", as_of="2015-06-08", mode=DAILY_MODE)["rows"][0]
+    assert row["status"] == "visibility_unproven" and "known revision" in row["reason"]
+
+
+def test_derived_index_cannot_hide_known_revision(reviewed_fixture, monkeypatch):
+    root, _ = reviewed_fixture
+    path = root / "indices/sh600000.json.gz"
+    index = json.loads(gzip.decompress(path.read_bytes()))
+    index["announcements"] = index["announcements"][:1]
+    path.write_bytes(gzip.compress(encoded(index)))
+    with pytest.raises(ValueError, match="versions missing"):
+        daily_view(reviewed_fixture, monkeypatch)
+
+
+def test_daily_reader_does_not_borrow_another_exchanges_sessions(reviewed_fixture, monkeypatch):
+    from ashare_data.financials import official_daily
+    from ashare_data.financials.ledger import DAILY_MODE
+
+    monkeypatch.setattr(official_daily, "traded_sessions", lambda *a: {"XSHE": {"2015-04-30": {}}})
+    root, review = reviewed_fixture
+    view = official_daily.reader(root, review, reference_root=root, reference_tasks=["synthetic"])
+    row = view.query("600000.XSHG", "net_operate_cash_flow", period="2015-03-31",
+                     as_of="2015-04-30", mode=DAILY_MODE)["rows"][0]
+    assert row["status"] == "visibility_unproven"
+
+
+def test_same_day_explicit_correction_orders_daily_versions_without_clock(reviewed_fixture, monkeypatch):
+    from ashare_data.financials.ledger import DAILY_MODE, FinancialLedger
+
+    view = daily_view(reviewed_fixture, monkeypatch)
+    pack = view._pack
+    pack["reports"]["two"]["published_date"] = "2015-04-29"
+    pack["reports"]["two"]["daily_visibility"]["available_from"] = "2015-04-30T00:00:00+08:00"
+    row = FinancialLedger(pack).select("600000.XSHG", "net_operate_cash_flow", "2015-03-31",
+                                       as_of="2015-04-30T00:00:00+08:00", mode=DAILY_MODE)
+    assert row["value"] == "90.00"
+
+
 def test_offline_replay_preserves_exact_reviewed_documents(reviewed_fixture):
     root, review = reviewed_fixture
     (root / "field-reviews.json").write_bytes(encoded(review))
     (root / "manifest.json").write_bytes(encoded({"source_batch": str(root), "target_codes": 1}))
-    (root / "indices").mkdir()
+    (root / "indices").mkdir(exist_ok=True)
     (root / "indices/sh600000.json.gz").write_bytes(
         gzip.compress(
             encoded(

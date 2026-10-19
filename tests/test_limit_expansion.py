@@ -148,6 +148,30 @@ class ReferenceBatchTests(unittest.TestCase):
         self.assertIn("blocked", state["api.zizizaizai.com"])
         self.assertEqual(result["task_states"]["pending"], 1)
 
+    def test_trading_session_evidence_needs_actual_nonpaused_positive_volume(self):
+        from ashare_data.financials.official_daily import traded_sessions
+
+        payload = json.loads(body())
+        payload["data"]["list"][0]["volume"] = 100
+        with patch.object(p, "fetch", return_value=(200, e.encoded(payload), {})):
+            p.run(self.batch, max_jobs=1)
+        task = e.load_batch(self.batch)[2][0]["id"]
+        sessions = traded_sessions(self.batch, [task])
+        self.assertEqual(list(sessions["XSHG"]), ["2010-01-04"])
+        self.assertFalse(sessions["XSHG"]["2010-01-04"]["official_exchange_calendar"])
+
+    def test_error_receipt_preserves_http_vs_provider_status_and_safe_retry_hint(self):
+        with patch.object(p, "fetch", return_value=(429, b'{"code":429,"message":"slow down"}',
+                                                    {"_transport_status": 200, "retry-after": "7200", "Set-Cookie": "secret"})):
+            p.run(self.batch, max_jobs=1)
+        task = e.load_batch(self.batch)[2][0]["id"]
+        receipt = json.loads((self.batch / "receipts" / (task + ".json")).read_text())
+        attempt = receipt["attempts"][0]
+        self.assertEqual((attempt["http_status"], attempt["effective_status"]), (200, 429))
+        self.assertEqual(attempt["server_retry_after"]["seconds"], 7200)
+        self.assertIn("slow down", attempt["error_body_redacted"])
+        self.assertNotIn("secret", str(receipt))
+
     def test_read_keeps_current_reference_separate_from_pit_and_absence(self):
         from ashare_data.financials.expansion_access import SourceUseDenied
 

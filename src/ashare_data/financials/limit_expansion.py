@@ -194,7 +194,7 @@ def fetch(url):
             payload = _json(raw)
             business = payload.get("code") if isinstance(payload, dict) else None
             if str(business) in {"401", "402", "403", "429"}:
-                return int(business), raw, dict(res.headers)
+                return int(business), raw, dict(res.headers) | {"_transport_status": res.status}
             return res.status, raw, dict(res.headers)
     except HTTPError as error:
         return error.code, error.read(4096), dict(error.headers)
@@ -330,7 +330,7 @@ def run(root, max_jobs=0, interval=2.2):
     _, manifest, tasks = e.load_batch(root)
     if manifest["source_families"] != [KIND] or any(t["kind"] != KIND for t in tasks):
         raise ValueError("Not a zzshare reference batch")
-    return e.run(root, max_jobs, interval, fetcher=fetch, normalizer=normalize_saved)
+    return e.run(root, max_jobs, interval, fetcher=fetch, normalizer=normalize_saved, adaptive=True)
 
 
 class ReferenceReader:

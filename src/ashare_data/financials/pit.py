@@ -15,6 +15,7 @@ from pathlib import Path
 from ashare_data.financials.validation import AcceptanceError, instant, number
 from ashare_data.financials.ledger import (
     FIELDS,
+    DAILY_MODE,
     RESEARCH_MODE,
     SHANGHAI,
     FinancialLedger,
@@ -26,7 +27,7 @@ from ashare_data.financials.ledger import (
 
 
 def _cutoff(as_of: str, mode: str) -> str:
-    if mode not in {"strict", RESEARCH_MODE}:
+    if mode not in {"strict", RESEARCH_MODE, DAILY_MODE}:
         raise AcceptanceError("choose strict or explicitly named research visibility mode")
     if isinstance(as_of, str) and len(as_of) == 10:
         try:
@@ -143,8 +144,11 @@ class FinancialPIT:
             "availability_basis": (
                 "max_publication_and_recorded_availability"
                 if mode == "strict"
+                else "first_verified_later_exchange_session_Shanghai_start"
+                if mode == DAILY_MODE
                 else "next_calendar_day_Shanghai_convention"
             ),
+            "daily_visibility_evidence": report.get("daily_visibility") if mode == DAILY_MODE else None,
             "captured_at": report.get("captured_at"),
             "source_url": report.get("source_url", report.get("url")),
             "source_path": report.get("path"),
@@ -202,6 +206,7 @@ class FinancialPIT:
             "unit": "CNY",
             "currency": "CNY",
             "scope": "consolidated",
+            "daily_pit_usable": mode == DAILY_MODE,
             "terms": terms,
             "quarters": quarters,
             "quarter_sum_equals_bridge": True if basis == "TTM" else None,

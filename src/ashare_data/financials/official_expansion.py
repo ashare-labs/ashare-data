@@ -11,7 +11,6 @@ import argparse
 from collections import Counter
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
-from email.utils import parsedate_to_datetime
 import fcntl
 import gzip
 import json
@@ -27,6 +26,7 @@ from urllib.parse import urlencode, urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from ashare_data.financials.expansion import atomic, digest, encoded, immutable, now, security
+from ashare_data.financials import http_backoff
 
 SCHEMA = "ad.official-financial-batch.v1"
 NORMALIZER_SHA256 = digest(Path(__file__).read_bytes())
@@ -177,6 +177,7 @@ class Client:
                 except HTTPError as error:
                     status, headers, raw = error.code, dict(error.headers), error.read(4096)
             attempt.update(status=status, received_at=now(), sha256=digest(raw), bytes=len(raw))
+            attempt.update(http_backoff.diagnostics(status, raw, headers, time.time()))
             if status != 200:
                 raise ValueError("HTTP " + str(status))
             if len(raw) > 32_000_000:
@@ -190,27 +191,12 @@ class Client:
                 bytes=len(raw),
                 observed_at=attempt["received_at"],
             )
-            host["consecutive_errors"] = 0
+            http_backoff.success(host, headers, time.time(), 3)
             return raw, receipt
         except Exception as error:
             attempt["error"] = f"{type(error).__name__}: {error}"[:400]
             receipt["state"] = "failed_retryable"
-            host["consecutive_errors"] = host.get("consecutive_errors", 0) + 1
-            if status in (401, 402, 403):
-                host["blocked"] = f"HTTP {status}: access/payment review required"
-            elif status == 429:
-                retry = headers.get("Retry-After", "3600")
-                try:
-                    seconds = int(retry)
-                except (ValueError, TypeError):
-                    try:
-                        seconds = parsedate_to_datetime(retry).timestamp() - time.time()
-                    except (ValueError, TypeError):
-                        seconds = 3600
-                host["cooldown_until"] = time.time() + max(3600, seconds)
-                host["interval"] = max(10, host.get("interval", 3) * 2)
-            elif host["consecutive_errors"] >= 3:
-                host["cooldown_until"] = time.time() + 1800
+            attempt["backoff"] = http_backoff.failure(host, status, headers, time.time(), 3)
             receipt["retry_after"] = max(
                 time.time() + 60 * 2 ** len(receipt["attempts"]), host.get("cooldown_until", 0)
             )

@@ -23,6 +23,7 @@ class VisibilityUnproven(InputUnavailable):
 
 
 RESEARCH_MODE = "reported_date_next_day_incomplete_archive"
+DAILY_MODE = "official_date_next_verified_session"
 
 
 FIELDS = {
@@ -78,6 +79,7 @@ class FinancialLedger:
             raise AcceptanceError("unsupported input pack")
         self.reports = pack["reports"]
         self.observations = pack["observations"]
+        self.daily_blockers = pack.get("known_unresolved_revisions", [])
         self.by_id = {}
         for r in self.observations:
             if r["record_id"] in self.by_id:
@@ -125,8 +127,9 @@ class FinancialLedger:
                     report.get("publication_precision") != "timestamp"
                     for report in (new_report, old_report)
                 ):
-                    raise AcceptanceError("same-day replacement requires exact publication order")
-                if self._publication_time(new_report) <= self._publication_time(old_report):
+                    if not r.get("replacement_scope_reviewed"):
+                        raise AcceptanceError("same-day replacement requires explicit correction evidence")
+                elif self._publication_time(new_report) <= self._publication_time(old_report):
                     raise AcceptanceError("replacement chronology mismatch")
         self.ancestors = {}
         for r in self.observations:
@@ -151,6 +154,14 @@ class FinancialLedger:
         return datetime.combine(day, time.min, SHANGHAI)
 
     def _available(self, report: dict, mode: str) -> datetime:
+        if mode == DAILY_MODE:
+            proof = report.get("daily_visibility")
+            if not proof or not proof.get("available_from"):
+                raise VisibilityUnproven("reviewed official date and later exchange session required")
+            available = instant(proof["available_from"])
+            if available.astimezone(SHANGHAI).date() <= date.fromisoformat(report["published_date"]):
+                raise AcceptanceError("daily visibility must follow the official publication date")
+            return available
         if mode == "strict":
             if (
                 report.get("publication_precision") != "timestamp"
@@ -170,6 +181,13 @@ class FinancialLedger:
 
     def select(self, security: str, field: str, period: str, *, as_of: str, mode: str) -> dict:
         cutoff = instant(as_of)
+        if mode == DAILY_MODE:
+            for item in self.daily_blockers:
+                if (item["security"], item["field"], item["period_end"]) == (security, field, period):
+                    if instant(item["blocked_from"]) <= cutoff:
+                        raise VisibilityUnproven(
+                            "known revision scope or field not reviewed: " + item["announcement_id"]
+                        )
         matches = []
         for r in self.observations:
             if (r["security"], r["field"], r["period_end"]) != (security, field, period):
@@ -177,6 +195,8 @@ class FinancialLedger:
             report = self.reports[r["report_id"]]
             # A known future date is excluded before demanding its exact timestamp.
             if date.fromisoformat(report["published_date"]) > cutoff.astimezone(SHANGHAI).date():
+                continue
+            if mode == DAILY_MODE and date.fromisoformat(report["published_date"]) == cutoff.astimezone(SHANGHAI).date():
                 continue
             released = self._publication_time(report)
             if released > cutoff:
@@ -192,6 +212,20 @@ class FinancialLedger:
         if not matches:
             raise InputUnavailable(f"missing visible observation: {security} {field} {period}")
         matches.sort(key=lambda item: item[0])
+        if mode == DAILY_MODE:
+            # Explicit correction edges order date-only versions, including same-day
+            # releases. No intraday clock or absence of unknown revisions is asserted.
+            tips = [r for _, r in matches if all(
+                other["record_id"] == r["record_id"]
+                or other["record_id"] in self.ancestors[r["record_id"]]
+                for _, other in matches
+            )]
+            if len(tips) != 1:
+                raise AcceptanceError("ambiguous eligible versions lack one replacement chain")
+            r = tips[0]
+            return {**r, "visibility_mode": mode,
+                    "source_sha256": self.reports[r["report_id"]]["sha256"],
+                    "daily_pit_usable": True, "historical_pit_certified": False}
         if len(matches) > 1 and matches[-1][0] == matches[-2][0]:
             raise AcceptanceError("ambiguous same-time versions")
         r = matches[-1][1]

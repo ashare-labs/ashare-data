@@ -35,12 +35,15 @@ def share_source_restrictions(root, roots):
         atomic(path, encoded(current))
 
 
-def supervise(root, runner=run):
+def supervise(root, runner=run, *, stop_paths=()):
     root, _, tasks = load_batch(root)
-    while not (root / "STOP").exists():
+    stop_paths = (root / "STOP", *(Path(p) for p in stop_paths))
+    def stopping():
+        return any(path.exists() for path in stop_paths)
+    while not stopping():
         result = runner(root)
         exited = json.loads((root / "worker-exit.json").read_text())
-        if exited["stop_requested"] or (root / "STOP").exists():
+        if exited["stop_requested"] or stopping():
             state = "stopped"
             break
         if not result["pending_or_retryable"]:
@@ -62,7 +65,7 @@ def supervise(root, runner=run):
         wake = max(time.time() + 2, min(pending))
         atomic(root / "supervisor.json", encoded({"at": now(), "pid": os.getpid(),
                "state": "cooldown", "next_attempt_epoch": wake}))
-        while time.time() < wake and not (root / "STOP").exists():
+        while time.time() < wake and not stopping():
             time.sleep(min(30, max(0, wake - time.time())))
     else:
         state = "stopped"
