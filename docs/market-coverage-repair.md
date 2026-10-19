@@ -31,3 +31,25 @@ Market backup/restore retains the release chain and its data, metadata and audit
 New dates without an evidenced calendar remain queryable with unknown expected coverage. Observed dates are not invented calendar sessions. Uncorroborated early observations, minute interval endpoints, the HF partial final day, rounded reported quantities and strict historical market PIT remain explicit limitations.
 
 All repair audit artifacts, runtimes, test outputs and worktrees are retained in controlled Workspace paths. Preserve originals and every published object. This repair imports no financial samples, starts no persistent service and replays no account orders.
+
+
+## Verified R2 scale and retained limits
+
+Release 2 has manifest SHA256 `ffd319cef54f6ba850cd0e3678f9b85aec2e0e8e9a85310072eb5d5ae6a1d7fc`.
+All 4,085,305,933 registered input observations are accounted for: 3,549,641,333 adopted, 13,058 equal duplicates, 535,064,901 resolved but unused, 586,641 quarantined, and zero format rejects. These are input dispositions; adopted rows equal the two logical tables' unique keys.
+
+| Logical facts / series | Rows | Observed date range |
+| --- | ---: | --- |
+| Daily selected source, series 1 | 14,164,397 | 1990-12-19–2026-10-14 |
+| Daily free-stockdb supplement, series 5 | 4,125,453 | 2000-01-04–2026-10-16 |
+| HF minute labels, series 2 | 3,475,793,906 | 2010-01-04–2026-08-07 |
+| Free-stockdb minute supplement, series 4 | 55,556,617 | 2026-04-13–2026-10-16 |
+| Explicit TDX minute series 3 | 960 | 2026-10-09–2026-10-12 |
+
+Daily facts contain 18,289,850 keys for 5,870 observed stable identities; minute facts contain 3,531,351,483 keys for 5,821. All 10,736,431 R1 daily keys and their values are preserved. Across the original early SQLite universe, 3,544,135 of 3,654,381 observed unique security days are now represented. The remaining 110,246 dates affect 747 identities; `000508.XSHE` still has no admitted daily facts. Exact residual dates, including wholly absent identities, are retained in the local coverage audit, rather than omitted from its denominator.
+
+The frozen source versions contain 38,736,814 multi-provider SQLite daily inputs and 570,743,678 free-stockdb daily/minute inputs. They are not all distinct canonical securities/times, nor is their difference automatically same-value duplication. Explicit original daily source queries retain all 31,384,115 previously queryable records. All 30,581 previously excluded HF native observations remain queryable with their restrictions; six structurally valid conflicts also return to canonical facts with execution and fresh valuation denied.
+
+The latest HF date still ends at 10:21 local time. Supplements cover separate security days and extend observations through 2026-10-16; they do not establish that every expected day or minute is complete. Source labels and rounded reported quantities retain their limitations. Missing historical listing evidence produces unknown expected coverage, even when the general calendar contains dates. A source identity labelled BJ does not certify a Beijing exchange listing throughout that identity's historical observations.
+
+The R2 manifest references 61,456 verified objects totaling 48,216,091,613 bytes, excluding retained older-version-only objects and raw originals. The asset budget remains 200 GiB with 150 GiB free-space reserve. A 301,519,212-byte real-instrument recovery exercise verified old/new values, repeated restore, restrictions, and relocation of native audit evidence. No full-market repair copy was created. Formal market runtime is paired AD 0.10.0.dev10, AQ 0.12.0.dev12 and Web 0.3.8; the account runtime remains separate. Actual economic backtest results for 2020-02-03–07 and 2024-01-02–05 match the original-source baseline, including values, money, orders, trades, signals and restart results. These runs remain price-only diagnostics, not total-return certification.
