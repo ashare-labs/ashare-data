@@ -53,7 +53,7 @@ class FrozenDailyStore(LocalDailyStore):
 
     def get_price(self, security, start="2010-01-01", end=None, source="auto", **unused):
         selected = "canonical" if source in ("auto", "canonical") else source
-        if selected != "canonical":
+        if selected not in ("canonical", "free_stockdb"):
             require(
                 not security.startswith("BJ."),
                 "MARKET_SOURCE_SCOPE",
@@ -80,8 +80,9 @@ class FrozenDailyStore(LocalDailyStore):
                 source_asset_id="daily-sqlite",
             )
             return frame
-        rows = self.release.read("bars_1d", security, start, end, series_id=1)
-        rows.extend(self.release.read("bars_1d", security, start, end, series_id=5))
+        rows = []
+        for series in (5,) if selected == "free_stockdb" else (1, 5):
+            rows.extend(self.release.read("bars_1d", security, start, end, series_id=series))
         rows.sort(key=lambda row: row["trade_date"])
         require(
             len({row["trade_date"] for row in rows}) == len(rows),
@@ -137,6 +138,7 @@ class FrozenDailyStore(LocalDailyStore):
         frame.attrs = {
             "source": selected,
             "source_selection": source,
+            "access": "published_source_subset" if selected == "free_stockdb" else "canonical",
             "price_basis": "raw",
             "price_unit": "CNY/share",
             "volume_unit": "shares",
@@ -187,7 +189,7 @@ class ReleasedDailyProduct(LocalDailyProduct):
         value = super()._prices(*args, **kwargs)
         value["limitations"] = list(LIMITATIONS)
         value["market_release"] = self.release.receipt()
-        if value["source"] in ("auto", "canonical"):
+        if value["source"] in ("auto", "canonical", "free_stockdb"):
             known = set(value["calendar"])
             missing_listing = {
                 gap["security"] for gap in value["gaps"] if gap["code"] == "SECURITY_UNAVAILABLE"
@@ -226,7 +228,12 @@ class ReleasedDailyProduct(LocalDailyProduct):
                             "detail": "Source observations exist outside the frozen calendar; expected sessions are not inferred from their presence",
                         }
                     )
-        if value["source"] not in ("auto", "canonical"):
+        if value["source"] == "free_stockdb":
+            value["access"] = "published_source_subset"
+            value["limitations"].append(
+                "This source filter returns only the release-admitted free-stockdb supplement, not all original provider observations."
+            )
+        elif value["source"] not in ("auto", "canonical"):
             value["access"] = "explicit_frozen_source_observation"
             value["limitations"] = [
                 "Explicit source observations retain the original provider values and listing/calendar filters.",

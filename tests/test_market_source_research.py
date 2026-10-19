@@ -134,9 +134,10 @@ def test_restored_conflict_remains_denied_in_published_minute_reader(tmp_path):
     assert row["use_decision"]["execution"] == row["use_decision"]["fresh_valuation"] == "deny"
 
 
+@pytest.mark.parametrize("source", ["auto", "free_stockdb"])
 @pytest.mark.parametrize("with_observation", [True, False])
 def test_missing_listing_keeps_coverage_unknown_even_on_known_calendar(
-    market_library, tmp_path, with_observation
+    market_library, tmp_path, with_observation, source
 ):
     from ashare_data.product.market_release import ReleasedDailyProduct
     from ashare_data.storage.market_release import MarketRelease, ReleaseWriter, connection
@@ -190,10 +191,22 @@ def test_missing_listing_keeps_coverage_unknown_even_on_known_calendar(
     owner = ReleasedDailyProduct(
         {"market_release": {"root": str(target), "release_id": 1, "manifest_sha256": r.sha256}}
     )
-    result = owner.prices(["000858.XSHE"], days[0], days[2])
+    result = owner.prices(["000858.XSHE"], days[0], days[2], source=source)
+    if source == "free_stockdb":
+        assert result["access"] == "published_source_subset"
+        assert result["coverage"][0]["source_metadata"]["access"] == "published_source_subset"
+        assert all(row["source"] == "free_stockdb" for row in result["rows"])
     assert len(result["rows"]) == int(with_observation)
     assert len(result["calendar"]) == 3
     item = result["coverage"][0]
     assert item["expected_days"] is item["listing_days"] is item["missing_days"] is None
     assert item["expected_state"] == "unknown" and item["calendar_session_count"] == 3
     assert any(gap["code"] == "LISTING_STATE_UNKNOWN" for gap in result["gaps"])
+
+
+def test_free_stockdb_requires_a_published_view(market_library):
+    from ashare_data.product.daily import LocalDailyProduct
+
+    root, days = market_library
+    with pytest.raises(DataError, match="require a pinned market release"):
+        LocalDailyProduct(root).prices([IDS[0]], days[0], days[2], source="free_stockdb")
