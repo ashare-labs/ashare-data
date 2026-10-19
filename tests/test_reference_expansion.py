@@ -90,6 +90,16 @@ class FinancialParserTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.parse(payload)
 
+    def test_explicit_broker_parent_profit_label_variant(self):
+        payload = response()
+        fields = payload["result"]["data"]["report_list"]["20200331"]["data"]
+        fields.append({"item_field": "PARENETP", "item_title": "归属于母公司的净利润", "item_value": "7.5000"})
+        rows, _ = self.parse(payload)
+        self.assertEqual(rows[0]["metrics"]["parent_net_profit"]["value"], "7.5000")
+        fields[-1]["item_title"] = "different meaning"
+        with self.assertRaisesRegex(ValueError, "Ambiguous"):
+            self.parse(payload)
+
 
 class BatchTests(unittest.TestCase):
     def setUp(self):

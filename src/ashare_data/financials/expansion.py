@@ -47,6 +47,7 @@ METRICS = {
     "TOTLIAB": ("total_liabilities", "负债合计"),
     "FINALCASHBALA": ("cash_equivalents_at_end", "期末现金及现金等价物余额"),
 }
+TITLE_ALIASES = {"PARENETP": {"归属于母公司的净利润"}}
 
 
 def now():
@@ -180,7 +181,7 @@ def parse_financial(raw, task, start, end):
                            "value": value, "state": state, "raw_value": item.get("item_value")})
             if field in METRICS:
                 canonical, expected_title = METRICS[field]
-                if field in seen or title != expected_title:
+                if field in seen or title not in {expected_title, *TITLE_ALIASES.get(field, set())}:
                     raise ValueError("Ambiguous or changed mapped financial field")
                 seen.add(field)
                 metrics[canonical] = {"value": value, "state": state, "source_ordinal": index,
