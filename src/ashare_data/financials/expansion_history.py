@@ -65,7 +65,7 @@ supplier's booleans or date labels cannot confer historical availability.
     if (metric.get("state") != "source_observed" or metric.get("unit") != selected["unit"]
             or Decimal(metric["value"]) != Decimal(selected["value"])
             or any(row.get(k) != selected.get(k) for k in
-                   ("security", "period_start", "period_end", "basis", "scope"))):
+                   ("security", "period_start", "period_end", "basis", "scope", "currency"))):
         raise ValueError("official/provider field value or reporting scope mismatch")
     report = ledger.reports[selected["report_id"]]
     if report.get("security") != row["security"]:

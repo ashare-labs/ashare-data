@@ -207,15 +207,70 @@ def run(root, max_jobs=0, interval=2.2):
     return e.run(root, max_jobs, interval, fetcher=fetch, normalizer=normalize_saved)
 
 
+class ReferenceReader:
+    """One captured reference fact, with explicit ordinary research use only."""
+    def __init__(self, root):
+        self.root, manifest, self.tasks = e.load_batch(root)
+        if manifest["source_families"] != [KIND]:
+            raise ValueError("Not a reference batch")
+
+    def read(self, symbol, trade_date, field, *, purpose="source_research", as_of=None):
+        from ashare_data.financials.expansion_access import SourceUseDenied, timestamp, SHANGHAI
+        if purpose not in {"source_research", "source_audit", "historical_pit"} or field not in FIELDS:
+            raise ValueError("Choose an explicit reference field and supported purpose")
+        if purpose == "historical_pit":
+            raise SourceUseDenied(["supplier_reference_has_no_verified_historical_release"])
+        e.security(symbol); e.day(trade_date)
+        matches = [t for t in self.tasks if t["symbol"] == symbol and t["start"] <= trade_date <= t["end"]]
+        if len(matches) != 1:
+            raise SourceUseDenied(["date_outside_collected_code_lifetime"])
+        task = matches[0]; path = self.root / "receipts" / (task["id"] + ".json")
+        if not path.exists(): raise SourceUseDenied(["reference_window_not_yet_captured"])
+        receipt = json.loads(path.read_text())
+        if receipt["state"] != "complete":
+            raise SourceUseDenied(["reference_source_not_available:" + receipt["state"]])
+        e.verify_receipt(self.root, receipt)
+        with gzip.open(self.root / receipt["normalized"]["path"], "rt") as stream:
+            rows = [json.loads(line) for line in stream]
+        selected = [r for r in rows if r["trade_date"] == trade_date]
+        if len(selected) != 1:
+            raise SourceUseDenied(["reference_date_missing_or_ambiguous_no_inference"])
+        row = selected[0]
+        if (row["security"] != e.security(symbol) or row["observed_at"] != receipt["observed_at"]
+                or row["response_sha256"] != receipt["attempts"][-1]["response_sha256"]):
+            raise ValueError("Reference provenance differs from verified capture")
+        if purpose == "source_audit":
+            return {"source_record": row, "calculation_value_exposed": False}
+        if as_of is None: raise ValueError("Research read requires explicit as_of")
+        if timestamp(as_of) < timestamp(row["observed_at"]):
+            raise SourceUseDenied(["reference_snapshot_not_yet_captured"])
+        if timestamp(as_of).astimezone(SHANGHAI).date().isoformat() < trade_date:
+            raise SourceUseDenied(["reference_date_after_requested_day"])
+        value = row["fields"][field]
+        if value["state"] != "source_claimed" or (field.endswith("limit") and row["quality_flags"]):
+            raise SourceUseDenied(["reference_field_missing_invalid_or_conflicted"])
+        return {"security": row["security"], "trade_date": trade_date, "field": field,
+                "value": value["value"], "unit": value["unit"], "raw_token": value["raw_token"],
+                "source_locator": row["source_locator"], "response_sha256": row["response_sha256"],
+                "observed_at": row["observed_at"], "classification": "source_claimed",
+                "official_limit_certified": False, "historical_pit_certified": False,
+                "status_role": row["status_role"], "execution_permission": False}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("prepare", "run", "audit", "replay"))
+    parser.add_argument("command", choices=("prepare", "run", "audit", "replay", "read"))
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--baseline-root", type=Path)
     parser.add_argument("--end", default="2026-10-19")
     parser.add_argument("--max-jobs", type=int, default=0)
     parser.add_argument("--verify", action="store_true")
     parser.add_argument("--all-captured", action="store_true")
+    parser.add_argument("--symbol")
+    parser.add_argument("--date")
+    parser.add_argument("--field", choices=FIELDS)
+    parser.add_argument("--as-of")
+    parser.add_argument("--source-audit", action="store_true")
     args = parser.parse_args()
     if args.command == "prepare":
         if not args.baseline_root: parser.error("prepare requires --baseline-root")
@@ -227,6 +282,10 @@ def main():
         _, manifest, _ = e.load_batch(args.root)
         if manifest["source_families"] != [KIND]: raise ValueError("Not a reference batch")
         result = e.replay(args.root, args.all_captured, normalizer=normalize_saved)
+    elif args.command == "read":
+        if not (args.symbol and args.date and args.field): parser.error("read requires symbol/date/field")
+        result = ReferenceReader(args.root).read(args.symbol, args.date, args.field,
+            purpose="source_audit" if args.source_audit else "source_research", as_of=args.as_of)
     else:
         result = e.audit(args.root, verify=args.verify)
     print(json.dumps(result, ensure_ascii=False, indent=2))

@@ -186,7 +186,7 @@ PYTHONPATH=src /Users/yinming/Workspace/ashare-local/.venv/bin/python -B \
 | 入口 | 实际范围 | 时间含义 |
 | --- | --- | --- |
 | `source_audit` | 已取得的原始记录、缺失和异常 | 原始证据查看，无可计算值 |
-| `source_research` | 三表8个映射金额及参考事实；字段缺失/未核实未来日期等逐条限制 | 当前捕获快照，不能声称当时投资者已知 |
+| `source_research` | 三表8个映射金额及支持的股本字段；公司行动仍走事件专用契约；字段限制逐条执行 | 当前捕获快照，不能声称当时投资者已知 |
 | `listed_security` | 上项加原代码上市生命周期过滤 | 不延长旧代码，不把发行人延续视为股票延续 |
 | 现有官方ledger研究模式 | 已有18份报告、66条观察形成46个证券×字段×期间可选结果 | 官方索引日期次日的显式研究约定，无精确首发证明 |
 | `historical_pit` | 有可信发布与版本绑定的具体字段可通过；目前正式扩采根没有这样的真实绑定 | 严格截止时刻选择，缺少证据逐条拒绝 |
@@ -227,3 +227,38 @@ PYTHONPATH=src /Users/yinming/Workspace/ashare-local/.venv/bin/python -u -B \
   scripts/run_reference_expansion.py --provider zzshare-reference \
   --root /Users/yinming/Workspace/ashare-data-local/financial-reference/batches/20261019-limits-v1
 ```
+
+## 退出后主体核实与当前读取验收
+
+固定678条/30旧代码已逐组查阅官方终止上市PDF和退市板主体。29组630条的法律主体延续得到支持，
+其中博元→亚美、西部资源迁址更名、美都能源→美都控股有公告或报告中的明确沿革；
+津信科官网简介将全称写成证券简称，已以2026半年报正文确认其仍为天津卓朗信息科技股份有限公司。
+商业城关键词曾命中世茂，已按完整法律名称排除，实际退市板代码为400215；
+锦州港A/B分别保留400280/420280，不按发行人合并股份类型。
+这些是发行人证据，不是630条全部金额或全部合并范围已验收。
+
+葛洲坝48条仍为 `absorption_merger_verified_post_merger_financial_scope_unresolved`。
+官方公告确认2021年被中国能建换股吸收合并，但尚不能证明供应商后续报表属于哪个法律主体、
+是否为重组后的子公司口径；不改成601868、不延长600068的上市区间。
+
+银鸽、天成、美都、津信科4份2026半年报的合并三表8个金额逐一复核，共12源记录、32字段。
+证据和页码写入 `usage-reviews.json`（加上此前7记录20字段，共19记录52字段）；
+仅证明当前对应版本金额吻合，不反推首次可见时钟，不让旧代码期间外记录进入上市期计算。
+完整归因与原件索引位于 `investigations/20261019-followup/issuer-review.json`、
+`classified-records.jsonl.gz`、`current-amount-review.json`。
+
+新限价批次的读取入口是 `financials.limit_expansion.ReferenceReader`，每次只给一个证券日字段，
+验证任务/原件/规范文件hash及捕获时钟。`source_audit`保留缺陷事实，`source_research`允许明确供应商观察，
+`historical_pit`拒绝尚无发布历史证据的该条参考输入；缺日不返回0或推导为停牌。
+
+```sh
+PYTHONPATH=src /Users/yinming/Workspace/ashare-local/.venv/bin/python -B \
+  -m ashare_data.financials.limit_expansion read \
+  --root /Users/yinming/Workspace/ashare-data-local/financial-reference/batches/20261019-limits-v1 \
+  --symbol sh600000 --date 2010-01-04 --field high_limit \
+  --as-of 2026-10-19T13:00:00+00:00
+```
+
+48项扩采/读取/历史证据回归测试通过，包括可用历史字段正例、无关未知字段、公布时刻边界、
+版本不符、证据损坏、日期-only伪精确证据、金额不符、证券退出区间、缺日与限流/访问拒绝。
+合成PIT正例不能计入实际已认证覆盖。现有采集进程不因读取器更新而重启。

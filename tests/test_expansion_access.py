@@ -19,7 +19,7 @@ TASK = {"id": "sina_income-sh600176", "kind": "sina_income", "symbol": "sh600176
 def row():
     return {"schema": "ad.financial-source-report.v1", "security": "600176.XSHG",
             "period_start": "2025-01-01", "period_end": "2025-09-30", "basis": "YTD",
-            "scope": "consolidated", "announcement_date": "2026-10-20",
+            "scope": "consolidated", "currency": "CNY", "announcement_date": "2026-10-20",
             "observed_at": "2026-10-19T10:00:00+00:00", "period_after_code_exit": False,
             "source_revision_id": "revision", "response_sha256": "source-hash",
             "source_locator": "result/data/report_list/20250930", "historical_available_at": None,

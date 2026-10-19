@@ -105,5 +105,22 @@ class ReferenceBatchTests(unittest.TestCase):
         self.assertIn('blocked',state['api.zizizaizai.com'])
         self.assertEqual(result['task_states']['pending'],1)
 
+    def test_read_keeps_current_reference_separate_from_pit_and_absence(self):
+        from ashare_data.financials.expansion_access import SourceUseDenied
+        with patch.object(p, "fetch", return_value=(200,body(),{})):
+            p.run(self.batch,max_jobs=1)
+        reader = p.ReferenceReader(self.batch)
+        result = reader.read("sh600000", "2010-01-04", "high_limit", as_of="2030-01-01T00:00:00Z")
+        self.assertEqual(result["value"], "23.86")
+        self.assertFalse(result["official_limit_certified"])
+        with self.assertRaises(SourceUseDenied):
+            reader.read("sh600000", "2010-01-04", "high_limit", purpose="historical_pit", as_of="2030-01-01T00:00:00Z")
+        with self.assertRaises(SourceUseDenied):
+            reader.read("sh600000", "2010-01-05", "is_paused", as_of="2030-01-01T00:00:00Z")
+        with self.assertRaises(SourceUseDenied):
+            reader.read("sh600000", "2010-01-04", "high_limit", as_of="2010-01-04T18:00:00Z")
+        audit = reader.read("sh600000", "2010-01-04", "high_limit", purpose="source_audit")
+        self.assertFalse(audit["calculation_value_exposed"])
+
 
 if __name__ == '__main__':unittest.main()
