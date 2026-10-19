@@ -75,6 +75,58 @@
 报告与观察版本键，公告时间精度与历史可见规则，单位字典及交易参考有效区间。
 现有 FinancialPIT 的严格/研究模式及官方源证据契约保持不变；本批源快照不会自动通过它。
 
+## 下游读取约束与异常归因
+
+规范化文件是保留源事实的交换档案，计算使用入口为
+`ashare_data.financials.expansion_access.SnapshotReader`，命令行同名模块。
+读取器验证批次身份、回执文件哈希、记录来源绑定，再按用途返回一个明确字段。
+默认 `historical_pit` 拒绝供应商快照 schema；不能通过手改快照里的认证布尔值升级为官方 PIT。
+`source_audit` 可查看完整原件和限制，不暴露“可计算值”；`source_research` 只读当前已捕获快照，
+`listed_security` 还要求报告期落在该原代码存续区间。公告发生在退市之后、但报告期在退出之前，
+不会仅因公告较晚而判为退出期外报表。已有换码关系只是证据引用，不静默重写证券代码。
+
+源公告日用上海日历日比较，不能用 UTC 截断制造未来日期。晚于请求日的日期、
+晚于捕获日而未复核的源日期都会挡住计算；仅时间经过午夜不会解除未复核限制。
+`usage-reviews.json` 被读取器实际消费，逐项绑定 `task_id + response_sha256 + source_revision_id +
+source_locator`、明确字段和值、官方证据文件哈希与捕获时钟，不能套用到其他版本或字段。
+若当前官方文件已直接核实该数值，则在证据捕获上界之后允许明确的当前研究读取；
+这是“最迟此时已观察到”而非首次发布时间，不填充 `historical_available_at`，不解锁严格 PIT。
+证据损坏、版本不符、字段未核证或查询早于证据捕获时刻，仍然拒绝。
+
+2026-10-19 对固定核查范围的归因：
+
+- 7 条源日期为10月20日的记录，分别来自600176和600318。官方三季报落款10月19日，
+  巨潮索引日为10月20日，文件在19日已公开可得。2条是本期，5条是后来报表中的比较列；
+  20个已映射金额均匹配当前官方表格。不能把这些日期当成2025年对应期间的首次披露日，
+  也没有证据把所有比较列都称为更正。原日期、更新时钟和版本原样保留。
+- 130 条股本相加异常集中在有B/H股的5个主体。源HTML原列即如此，金额换算和列对齐未出错；
+  “流通A股”经常接近全部流通股份，分类不能直接相加。读取器考虑打印精度，避免舍入误报；
+  对确有重叠的记录拒绝分类股份计算，仍保留总股份用于源研究。不通过减去H/B股编造A股。
+- 1,218 条退出代码后报告属于34个原代码：393条对应已核证换码，147条属于长油退出后及
+  重新上市的发行人历史（57条停留在退出至重上市间隔，90条在601975重上市之后），
+  其余678条仍待逐条确认报表法律主体及口径。全部保留；不能因此延长旧代码上市区间，
+  也不能把换股吸收合并后的主体、子公司和新上市母公司直接拼在一起。
+
+正式根 `investigations/20261019-anomalies/attribution.json` 给出分组及限制，
+`classified-records.jsonl.gz` 保存1,355条精确异常定位，不复制完整报表。
+官方证据只保存少量压缩源件与回执。运行中的采集器仍加载原代码；新增读取器不要求重启采集。
+
+```sh
+# 默认严格PIT：应返回 allowed=false，进程退出码2。
+PYTHONPATH=src /Users/yinming/Workspace/ashare-local/.venv/bin/python -B \
+  -m ashare_data.financials.expansion_access \
+  --root /Users/yinming/Workspace/ashare-data-local/financial-reference/batches/20261019-public-v1 \
+  --task sina_income-sh600176 --period 2025-09-30 --field net_profit \
+  --as-of 2026-10-19T12:30:00+00:00
+
+# 只有明确选择当前源研究、且查询在绑定证据捕获之后，才返回已复核字段。
+PYTHONPATH=src /Users/yinming/Workspace/ashare-local/.venv/bin/python -B \
+  -m ashare_data.financials.expansion_access \
+  --root /Users/yinming/Workspace/ashare-data-local/financial-reference/batches/20261019-public-v1 \
+  --task sina_income-sh600176 --period 2025-09-30 --field net_profit \
+  --purpose source_research --as-of 2026-10-19T12:30:00+00:00
+```
+
 ## 运行、断点与验收
 
 使用正式安装环境的 Python，并通过独立工作树 `PYTHONPATH=src` 载入新增模块；不改正式安装包。
