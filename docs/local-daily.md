@@ -1,6 +1,6 @@
 # 维护与查询本地日线库
 
-本地库保存显式采集的多来源原文、来源行和修订，适合长期日线维护。默认根为 `~/.local/share/ashare-data`，已有库始终通过 `--root`/构造参数指定；改源码不会自动搬库、更新数据或启动后台服务。
+本地库保存显式采集的多来源原文、来源行和修订，适合长期日线维护。维护 CLI 的显式 `--root` 优先；未提供时读取共享部署清单的日线资产。只有完全未配置清单时才使用 `~/.local/share/ashare-data`。SDK 的构造参数继续显式选择库；发现配置不会搬库、更新数据或启动后台服务。
 
 ## 本地日线
 
@@ -105,7 +105,7 @@ coverage = view.read_coverage()
 
 **价格诊断**仍可显式选择 `mode="price_only_no_limits"`：排除公司行动现金/股份和价限，不能解释为总收益或完整经济回测。该模式保留源 `tradestatus`；缺标记时正成交量只支持“事后已发生交易”模型，零量不推断停牌。未配置参考包仍可查价格和主动选择诊断，但不能得到普通发布。
 
-同一 `ashare-deployment.v1` 清单可同时供 AD/AQ/web 选库。AD 独立入口的优先级为 `--deployment` > `ASHARE_DEPLOYMENT` > `ASHARE_DATA_ROOT/deployment.json`，显式 `--root` 则直接选择主库。`data_root` 相对清单目录解析，资产相对 `data_root` 解析；正式主库可登记为原位绝对路径，无须复制。`LocalDailyStore` 原有采集默认目录保持不变，不受该产品清单影响。
+同一 `ashare-deployment.v1` 清单可同时供 AD/AQ/web 选库。AD 独立入口的优先级为 `--deployment` > `ASHARE_DEPLOYMENT` > `ASHARE_DATA_ROOT/deployment.json` > `$XDG_CONFIG_HOME/ashare/deployment.json`（默认 `~/.config/ashare/deployment.json`），显式 `--root` 则直接选择主库。`data_root` 相对清单目录解析，资产相对 `data_root` 解析；正式主库可登记为原位绝对路径，无须复制。维护 CLI 与产品 CLI 共享发现规则，损坏清单不会回退旧库；直接构造 `LocalDailyStore()` 的 SDK 默认目录保持不变。
 
 ```json
 {
