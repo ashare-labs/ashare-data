@@ -7,6 +7,7 @@ unmatched or capped responses leave the original network fallback untouched.
 from __future__ import annotations
 
 from collections import Counter, defaultdict
+from decimal import Decimal
 import fcntl
 import gzip
 import json
@@ -133,10 +134,32 @@ def select_rows(task, source_task, rows, coverage):
             or not set(ts.request_fields(task["url"]).split(",")) <= set(ts.request_fields(source_task["url"]).split(","))):
         return [], "incompatible_scope_or_fields"
     selected = [row for row in rows if not params.get("ex_date") or row["fields"]["ex_date"]["value"] == e.day(params["ex_date"])]
-    if not selected or any(not any(g.dividend_matches(row, event) for row in selected) for event in task["matching_events"]):
+    if not selected or any(not any(query_event_compatible(row, event) for row in selected) for event in task["matching_events"]):
         return [], "event_not_matched"
     # Keep every returned version on the date, including ambiguous matches.
     return selected, None
+
+
+def query_event_compatible(row, event):
+    """Reuse a date query without pretending missing provider anchors are zero.
+
+    Date, registration and gross cash must match; other present anchors cannot
+    conflict. Missing source anchors stay missing and the stricter cross-source
+    reconciliation still reports an unresolved binding. A date network request
+    would return the same provider nulls, not establish the missing relationship.
+    """
+    if (event.get("cash_basis") != "gross_pre_tax_per_old_eligible_share" or not row["implemented"]
+            or row["fields"]["ex_date"]["value"] != event["date"]):
+        return False
+    for key, expected in event["anchors"].items():
+        actual = row["fields"].get(key, {}).get("value")
+        if expected is None or actual is None:
+            if key in {"record_date", "cash_div_tax"}:
+                return False
+            continue
+        if (expected != actual if key == "record_date" else Decimal(expected) != Decimal(actual)):
+            return False
+    return True
 
 
 def normalize_reused(raw, task, receipt):
@@ -150,9 +173,11 @@ def normalize_reused(raw, task, receipt):
     for row in selected:
         row.update(source_batch=proof["batch"], original_task_id=task["id"],
                    local_projection=True, source_receipt_sha256=proof["receipt_sha256"])
+    matched = sum(any(g.dividend_matches(row, event) for row in selected) for event in task["matching_events"])
     return selected, coverage | dict(target_rows=len(selected), reused_from_whole_code=True,
         original_query_executed=False, original_task_id=task["id"], source_task_id=proof["source_task"]["id"],
-        source_batch=proof["batch"], matched_event_count=len(task["matching_events"]))
+        source_batch=proof["batch"], matched_event_count=matched,
+        unresolved_event_bindings=len(task["matching_events"]) - matched, missing_anchors_imputed=False)
 
 
 def apply(root):

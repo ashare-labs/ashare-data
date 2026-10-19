@@ -193,3 +193,35 @@ def test_boundary_lock_and_failed_atomic_write_preserve_evidence(source, tmp_pat
         e.atomic(target, b"preserve partial output")
     saved = list(tmp_path.glob("checkpoint.json.*.tmp"))
     assert len(saved) == 1 and saved[0].read_bytes() == b"preserve partial output"
+
+
+def test_null_stock_anchors_reuse_date_query_but_do_not_certify_event_binding(source, tmp_path):
+    root, _, _, tasks = source
+    capture = tmp_path / "capture"
+    d.prepare(capture, root)
+    rows = [row(date) | {"stk_bo_rate": None, "stk_co_rate": None} for date in ("20100701", "20110701", "20120701")]
+    run(capture, rows)
+    assert d.apply(capture)["net_network_requests_saved_so_far"] == 2
+    for task in tasks:
+        reused = receipt(root, task)
+        assert reused["coverage"]["matched_event_count"] == 0
+        assert reused["coverage"]["unresolved_event_bindings"] == 1
+        assert reused["coverage"]["missing_anchors_imputed"] is False
+        actual = g.normalized(root, reused)
+        date = ts.request_identity(task["url"])[1]["ex_date"]
+        expected, _ = g.f.observations(body(task["url"], [r for r in rows if r["ex_date"] == date]), task)
+        assert [r["fields"] for r in actual] == [r["fields"] for r in expected]
+        assert actual[0]["fields"]["stk_bo_rate"]["value"] is None
+    ledger = list(g.reconciliation_rows({"existing_fields": []}, [root]))
+    assert all(item["state"] == "unresolved_ambiguous_event_match" for item in ledger)
+
+
+@pytest.mark.parametrize("anchor", ["record_date", "cash_div_tax"])
+def test_null_required_event_anchor_still_falls_back(source, tmp_path, anchor):
+    root, _, _, tasks = source
+    capture = tmp_path / "capture"
+    d.prepare(capture, root)
+    run(capture, [row(date) | {anchor: None} for date in ("20100701", "20110701", "20120701")])
+    result = d.apply(capture)
+    assert result["original_network_requests_avoided"] == 0
+    assert result["states"]["fallback_event_not_matched"] == len(tasks)
