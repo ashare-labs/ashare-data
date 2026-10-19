@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import sys
+import warnings
 
 from ashare_data.financials import tushare_reference as ts
 from ashare_data.financials.expansion import atomic, encoded, now
@@ -37,9 +38,14 @@ def main():
     if args.prompt_token:
         if not sys.stdin.isatty():
             parser.error("Hidden credential input requires the user's local terminal")
-        token = getpass.getpass("Tushare token（隐藏输入，仅本次进程使用，不保存）: ")
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", getpass.GetPassWarning)
+            try:
+                token = getpass.getpass("Tushare token（隐藏输入，仅本次进程使用，不保存）: ")
+            except getpass.GetPassWarning:
+                parser.error("Terminal cannot disable echo; no credential was requested in plain text")
     else:
-        token = os.environ.get(args.token_env)
+        token = os.environ.pop(args.token_env, None)
     if not token:
         parser.error("No configured Tushare credential; use a local hidden prompt or existing environment reference")
     transport = ts.Transport(token)
@@ -76,6 +82,8 @@ def collect(root, baseline, transport, prompted, calendar, limits, capped):
             break
         if prepare:
             prepare()
+        atomic(root / "progress.json", encoded({"at": now(), "pid": os.getpid(), "phase": batch.name,
+               "state": "collecting", "credential_saved": False}))
         roots.append(batch)
         share_source_restrictions(batch, roots)
         supervise(batch, lambda b: ts.run(b, transport, stop_paths=(root / "STOP",)), stop_paths=(root / "STOP",))

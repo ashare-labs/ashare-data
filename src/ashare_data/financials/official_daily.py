@@ -116,7 +116,36 @@ def _after(sessions, exchange, day):
     }
 
 
-def reader(root, review, *, reference_root, reference_tasks):
+def _correction_scopes(indices, reviewed_fields, specification):
+    if specification is None:
+        return {}
+    if specification.get("schema") != "ad.official-correction-scope-review.v1":
+        raise ValueError("Unknown correction scope review")
+    evidence_root = Path(specification["evidence_root"]).resolve()
+    exclusions = {}
+    for item in specification["items"]:
+        index, _ = indices[item["symbol"]]
+        notice = next(a for a in index["announcements"] if a["announcement_id"] == item["announcement_id"])
+        if (not item.get("layout_reviewed") or not isinstance(item.get("page"), int) or item["page"] < 1
+                or not notice["revision_label"] or notice["period_end"] is not None
+                or item["index_response_sha256"] != notice["index_response_sha256"]):
+            raise ValueError("Correction scope lacks exact reviewed index/page binding")
+        pdf = verified_source(evidence_root, "pdf-" + item["announcement_id"])
+        if pdf["sha256"] != item["document_sha256"] or pdf["request"]["url"] != notice["source_url"]:
+            raise ValueError("Correction scope original PDF differs")
+        for field in item["unaffected_fields"]:
+            key = (index["security"], field["period_end"], field["field"])
+            if key not in reviewed_fields:
+                raise ValueError("Correction exclusion must bind an existing reviewed field and period")
+            exclusions[key + (item["announcement_id"],)] = dict(
+                announcement_id=item["announcement_id"], document_sha256=pdf["sha256"], page=item["page"],
+                source_url=notice["source_url"], review_sha256=e.digest(e.encoded(item)),
+                reviewed_change=item["reviewed_change"], field_scope="explicitly_unaffected",
+            )
+    return exclusions
+
+
+def reader(root, review, *, reference_root, reference_tasks, correction_reviews=None):
     """Build FinancialPIT with verified day-level source and known-version boundaries.
 
     Review binds exact PDF/page/field/scope and replacement notices. Known missing
@@ -135,6 +164,7 @@ def reader(root, review, *, reference_root, reference_tasks):
         reviewed_fields.setdefault(key, set()).update(
             [item["announcement_id"]] + [s.removeprefix("pdf-") for s in item.get("supporting_receipts", [])]
         )
+    exclusions = _correction_scopes(indices, reviewed_fields, correction_reviews)
     blockers = {}
     for item in review["fields"]:
         cell = ledger.by_id[item["record_id"]]
@@ -172,12 +202,15 @@ def reader(root, review, *, reference_root, reference_tasks):
             "historical_capture_asserted": False,
         })
         key = (cell["security"], cell["period_end"], cell["field"])
+        report["daily_visibility"]["reviewed_unrelated_corrections"] = [v for k, v in exclusions.items() if k[:3] == key]
         for candidate in index["announcements"]:
             aid = candidate["announcement_id"]
             relevant = (candidate["period_end"] == cell["period_end"] and (
                 candidate["full_report_candidate"] or candidate["revision_label"]))
             unscoped = (candidate["period_end"] is None and candidate["revision_label"] and
                         re.search(r"财务|报表|会计差错|定期报告|^更正公告$", candidate["title"]))
+            if unscoped and key + (aid,) in exclusions:
+                continue
             if (not (relevant or unscoped) or aid in reviewed_fields[key]
                     or candidate["published_date"] < cell["period_end"]):
                 continue

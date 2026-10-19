@@ -101,10 +101,15 @@ def reviewed_fixture(tmp_path):
     source("index-notice", encoded({"announcements": [raw_notice]}))
     source("index-empty", encoded({"announcements": None}))
     indexed.append(report_identity(raw_notice) | {"index_receipt": "index-notice"})
+    raw_unscoped = dict(raw_notice, announcementId="unscoped", adjunctUrl="unscoped.pdf", announcementTitle="更正公告",
+                       announcementTime=int(datetime.fromisoformat("2015-07-23T00:00:00+08:00").timestamp() * 1000))
+    source("index-unscoped", encoded({"announcements": [raw_unscoped]}))
+    source("pdf-unscoped", b"synthetic unrelated date correction", "https://static.cninfo.com.cn/unscoped.pdf")
+    indexed.append(report_identity(raw_unscoped) | {"index_receipt": "index-unscoped"})
     (tmp_path / "indices").mkdir(exist_ok=True)
     (tmp_path / "indices/sh600000.json.gz").write_bytes(gzip.compress(encoded(dict(
         security="600000.XSHG", issuer=issuer, announcements=indexed,
-        sources=["identity-sh600000", "index-one", "index-two", "index-notice", "index-empty"],
+        sources=["identity-sh600000", "index-one", "index-two", "index-notice", "index-empty", "index-unscoped"],
         queries=[dict(kind=k, pagination_complete_for_query=True)
                  for k in ("periodic", "correction", "revision")],
     ))))
@@ -225,6 +230,27 @@ def test_same_day_explicit_correction_orders_daily_versions_without_clock(review
     row = FinancialLedger(pack).select("600000.XSHG", "net_operate_cash_flow", "2015-03-31",
                                        as_of="2015-04-30T00:00:00+08:00", mode=DAILY_MODE)
     assert row["value"] == "90.00"
+
+
+def test_reviewed_unrelated_correction_removes_only_bound_field_blocker(reviewed_fixture, monkeypatch):
+    from ashare_data.financials import official_daily
+    from ashare_data.financials.ledger import DAILY_MODE
+
+    root, review = reviewed_fixture
+    view = daily_view(reviewed_fixture, monkeypatch)
+    query = dict(securities="600000.XSHG", fields="net_operate_cash_flow", period="2015-03-31", as_of="2015-07-24", mode=DAILY_MODE)
+    assert view.query(**query)["rows"][0]["status"] == "visibility_unproven"
+    pdf = json.loads((root / "receipts/pdf-unscoped.json").read_text())
+    index = json.loads((root / "receipts/index-unscoped.json").read_text())
+    scopes = dict(schema="ad.official-correction-scope-review.v1", evidence_root=str(root), items=[dict(
+        symbol="sh600000", announcement_id="unscoped", layout_reviewed=True, page=1,
+        document_sha256=pdf["sha256"], index_response_sha256=index["sha256"], reviewed_change="unrelated notice date",
+        unaffected_fields=[dict(period_end="2015-03-31", field="net_operate_cash_flow")])])
+    view = official_daily.reader(root, review, reference_root=root, reference_tasks=[], correction_reviews=scopes)
+    assert view.query(**query)["rows"][0]["value"] == "90.00"
+    scopes["items"][0]["document_sha256"] = "changed"
+    with pytest.raises(ValueError, match="PDF differs"):
+        official_daily.reader(root, review, reference_root=root, reference_tasks=[], correction_reviews=scopes)
 
 
 def test_offline_replay_preserves_exact_reviewed_documents(reviewed_fixture):

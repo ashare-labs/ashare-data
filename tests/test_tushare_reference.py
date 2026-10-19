@@ -3,6 +3,7 @@
 import gzip
 import json
 import sqlite3
+from pathlib import Path
 
 import pytest
 
@@ -192,3 +193,39 @@ def test_capped_day_only_creates_missing_target_code_supplement(tmp_path, baseli
     ts.prepare_capped_targets(target, baseline, limit_root)
     tasks = e.load_batch(target)[2]
     assert len(tasks) == 1 and ts.request_identity(tasks[0]["url"])[1]["ts_code"] == "600000.SH"
+
+
+def runner(monkeypatch):
+    import importlib.util
+    scripts = Path(__file__).parents[1] / "scripts"
+    monkeypatch.syspath_prepend(str(scripts))
+    spec = importlib.util.spec_from_file_location("tushare_runner_fixture", scripts / "run_tushare_reference.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_hidden_prompt_fails_closed_when_echo_cannot_be_disabled(monkeypatch, tmp_path, baseline):
+    import warnings
+    module = runner(monkeypatch)
+    root = tmp_path / "runtime"
+    monkeypatch.setattr(module.sys, "argv", ["runner", "--root", str(root), "--baseline", str(baseline), "--prompt-token"])
+    monkeypatch.setattr(module.sys.stdin, "isatty", lambda: True)
+    def unsafe_prompt(_):
+        warnings.warn("synthetic echo failure", module.getpass.GetPassWarning)
+        pytest.fail("Plain-text fallback must never be reached")
+    monkeypatch.setattr(module.getpass, "getpass", unsafe_prompt)
+    with pytest.raises(SystemExit) as error:
+        module.main()
+    assert error.value.code == 2 and not (root / "worker.json").exists()
+
+
+def test_existing_token_environment_is_removed_from_process_and_never_persisted(monkeypatch, tmp_path, baseline):
+    module = runner(monkeypatch)
+    root, secret = tmp_path / "runtime", "synthetic-secret-value-123456"
+    monkeypatch.setattr(module.sys, "argv", ["runner", "--root", str(root), "--baseline", str(baseline), "--token-env", "TEST_AUTH_REFERENCE"])
+    monkeypatch.setenv("TEST_AUTH_REFERENCE", secret)
+    monkeypatch.setattr(module, "collect", lambda *a: None)
+    assert module.main() == 0
+    assert "TEST_AUTH_REFERENCE" not in module.os.environ
+    assert all(secret.encode() not in p.read_bytes() for p in root.rglob("*") if p.is_file())
