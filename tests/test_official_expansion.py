@@ -11,6 +11,7 @@ from ashare_data.financials.official_expansion import (
     SourceExhausted,
     index_security,
     report_identity,
+    replay,
     select_documents,
     statement_cells,
 )
@@ -62,6 +63,7 @@ def reviewed_fixture(tmp_path):
             currency="CNY",
             unit="CNY",
             review_status="native_text_candidate_requires_layout_review",
+            provider_matches=[],
         )
         document = dict(
             report=report,
@@ -125,6 +127,35 @@ def test_review_cannot_approve_changed_or_unreviewed_evidence(reviewed_fixture):
         reviewed_ledger(root, review)
 
 
+def test_offline_replay_preserves_exact_reviewed_documents(reviewed_fixture):
+    root, review = reviewed_fixture
+    (root / "field-reviews.json").write_bytes(encoded(review))
+    (root / "manifest.json").write_bytes(encoded({"source_batch": str(root), "target_codes": 1}))
+    (root / "indices").mkdir()
+    (root / "indices/sh600000.json.gz").write_bytes(
+        gzip.compress(
+            encoded(
+                {
+                    "announcements": [
+                        dict(
+                            announcement_id=aid,
+                            announcement_time_raw=epoch,
+                            full_report_candidate=True,
+                            period_end="2015-03-31",
+                        )
+                        for aid, epoch in [("one", 1430236800000), ("two", 1433520000000)]
+                    ]
+                }
+            )
+        )
+    )
+    before = {p.name: p.read_bytes() for p in (root / "documents").glob("*.gz")}
+    # No extractor or network can be used for these already reviewed documents.
+    assert replay(root, None)["selected_documents_captured"] == 2
+    assert before == {p.name: p.read_bytes() for p in (root / "documents").glob("*.gz")}
+    reviewed_ledger(root, review)
+
+
 def announcement(title="2024年第一季度报告", aid="SYNTHETIC"):
     return dict(
         announcementTitle=title,
@@ -176,6 +207,8 @@ def test_statement_scope_unit_and_column_gates():
     assert not statement_cells(
         {"pages": [{"page": 1, "text": source}]}, {"period_end": "2024-09-30"}
     )
+    # Older parent-only statements may omit the explicit parent-company prefix.
+    assert parse(source.replace("母公司利润表", "利 润 表")) == rows
 
 
 def test_cache_integrity_and_no_duplicate_network(tmp_path):

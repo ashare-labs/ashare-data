@@ -47,7 +47,10 @@ METRICS = {
     "TOTLIAB": ("total_liabilities", "负债合计"),
     "FINALCASHBALA": ("cash_equivalents_at_end", "期末现金及现金等价物余额"),
 }
-TITLE_ALIASES = {"PARENETP": {"归属于母公司的净利润"}}
+TITLE_ALIASES = {
+    "PARENETP": {"归属于母公司的净利润"},
+    "NETPROFIT": {"含少数股东损益的净利润"},
+}
 
 
 def now():

@@ -77,6 +77,17 @@ class ReferenceParserTests(unittest.TestCase):
             with self.assertRaises(DataError):
                 p.parse(e.encoded(payload), TASK)
 
+    def test_empty_response_without_identity_is_only_unknown(self):
+        rows, coverage = p.parse(e.encoded({"code": 200, "data": {"count": 0, "list": []}}), TASK)
+        self.assertEqual(rows, [])
+        self.assertEqual(coverage["source_status"], "empty_unknown")
+        self.assertEqual(coverage["response_identity"], "omitted_by_source_request_bound_only")
+        self.assertFalse(coverage["absence_proved"])
+        payload = json.loads(body())
+        payload["data"].pop("ts_code")
+        with self.assertRaises(DataError):
+            p.parse(e.encoded(payload), TASK)
+
     def test_requests_cannot_cross_scope_or_change_adjustment(self):
         with self.assertRaises(ValueError):
             p.url_for("sh600000", "2010-01-01", "2012-09-27")

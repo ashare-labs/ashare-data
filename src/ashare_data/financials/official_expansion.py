@@ -458,7 +458,7 @@ def statement_cells(text, report):
             if any(
                 name in compact
                 for name in ("母公司资产负债表", "母公司利润表", "母公司现金流量表", "财务报表附注")
-            ):
+            ) or compact in {"资产负债表", "利润表", "现金流量表"}:
                 section = None
             for heading, kind in (
                 ("合并资产负债表", "balance"),
@@ -612,11 +612,25 @@ def collect_document(client, symbol, report, extractor, source_batch, force=Fals
 
 
 def replay(root, extractor):
-    """Rebuild only this batch's derivatives from cached original responses."""
+    """Rebuild cached derivatives while preserving exactly reviewed documents."""
     root = Path(root).resolve()
     manifest = json.loads((root / "manifest.json").read_text())
     with (root / "writer.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        reviewed = set()
+        review_path = root / "field-reviews.json"
+        if review_path.exists():
+            review = json.loads(review_path.read_text())
+            if review.get("schema") != "ad.official-field-review.v1":
+                raise ValueError("Unknown field review; replay stopped")
+            for item in review["fields"]:
+                name = item["symbol"] + "-" + item["announcement_id"] + ".json.gz"
+                path = (root / "documents" / name).resolve()
+                if not path.is_relative_to(root):
+                    raise ValueError("Reviewed document path escaped batch")
+                if digest(path.read_bytes()) != item["document_derivative_sha256"]:
+                    raise ValueError("Reviewed derivative changed before replay")
+                reviewed.add(name)
         client = Client(
             root,
             transport=lambda *_: (_ for _ in ()).throw(
@@ -642,6 +656,8 @@ def replay(root, extractor):
                     root / "documents" / (symbol + "-" + report["announcement_id"] + ".json.gz")
                 )
                 if not target.exists():
+                    continue
+                if target.name in reviewed:
                     continue
                 receipt = json.loads(
                     (root / "receipts" / ("pdf-" + report["announcement_id"] + ".json")).read_text()

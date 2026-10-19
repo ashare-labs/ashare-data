@@ -100,6 +100,20 @@ class FinancialParserTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Ambiguous"):
             self.parse(payload)
 
+    def test_total_net_profit_alias_keeps_parent_profit_separate(self):
+        payload = response()
+        fields = payload["result"]["data"]["report_list"]["20200331"]["data"]
+        fields.extend([
+            {"item_field": "NETPROFIT", "item_title": "含少数股东损益的净利润", "item_value": "10.00"},
+            {"item_field": "PARENETP", "item_title": "归属于母公司的净利润", "item_value": "7.50"},
+        ])
+        rows, _ = self.parse(payload)
+        self.assertEqual(rows[0]["metrics"]["net_profit"]["value"], "10.00")
+        self.assertEqual(rows[0]["metrics"]["parent_net_profit"]["value"], "7.50")
+        fields[-2]["item_title"] = "不含少数股东损益的净利润"
+        with self.assertRaisesRegex(ValueError, "Ambiguous"):
+            self.parse(payload)
+
 
 class BatchTests(unittest.TestCase):
     def setUp(self):

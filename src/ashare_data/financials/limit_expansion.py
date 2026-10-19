@@ -204,6 +204,23 @@ def parse(raw, task):
     s = validate_url(task["url"])
     if s != scope(task["symbol"], task["start"], task["end"]):
         raise ValueError("Task/request identity mismatch")
+    payload = _json(raw)
+    if (
+        payload == {"code": 200, "data": {"count": 0, "list": []}}
+        and type(payload["data"]["count"]) is int
+    ):
+        # This observed empty form omits the response identity. It proves only
+        # that this request returned no rows, never historical nonexistence.
+        return [], {
+            "source_status": "empty_unknown",
+            "request_start": task["start"],
+            "request_end": task["end"],
+            "source_rows": 0,
+            "response_identity": "omitted_by_source_request_bound_only",
+            "full_history_proven": False,
+            "missing_dates_are_not_suspensions": True,
+            "absence_proved": False,
+        }
     # Reuse original adapter's exact JSON number, row identity, count/order validation.
     source = _rows(
         {
