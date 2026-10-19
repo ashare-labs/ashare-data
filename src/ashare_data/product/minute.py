@@ -33,6 +33,36 @@ class LocalMinuteProduct:
             )
         self.default_source = selected.get("default_minute_source", "tdx")
         self.registry = selected.get("minute_sources", {})
+        if self.frozen_market_config is not None:
+            from ashare_data.product.market_release import open_release
+
+            release = open_release(self.frozen_market_config)
+            with release.metadata() as db:
+                if db.execute(
+                    "select 1 from sqlite_master where type='table' and name='release_contracts'"
+                ).fetchone():
+                    frozen = db.execute(
+                        "select body from release_contracts where name='source_observation_readers'"
+                    ).fetchone()
+                    if frozen:
+                        readers = json.loads(frozen[0])
+                        # Audit files travel with a restored release. Resolve by the
+                        # frozen content hash, not the former deployment location.
+                        evidence = {v["sha256"]: v for v in release.manifest.get("evidence", [])}
+                        for item in readers["minute_sources"].values():
+                            for name in ("manifest", "review"):
+                                binding = item.get(name)
+                                if binding:
+                                    require(
+                                        binding["sha256"] in evidence,
+                                        "PRODUCT_MINUTE_CONFIGURATION",
+                                        "Frozen native audit evidence is absent from this release",
+                                    )
+                                    binding["path"] = str(
+                                        release.verify(evidence[binding["sha256"]])
+                                    )
+                        self.registry = {**self.registry, **readers["minute_sources"]}
+                        self.document["assets"].update(readers["assets"])
         require(
             isinstance(self.registry, dict),
             "PRODUCT_MINUTE_CONFIGURATION",
@@ -119,9 +149,15 @@ class LocalMinuteProduct:
                     "historical_pit": False,
                     "strict_execution_admitted": False,
                 }
-                for source, series in (("canonical", 2), ("neigezhu", 2), ("tdx", 3))
+                for source, series in (("canonical", 2), ("free_stockdb", 4), ("tdx", 3))
             ]
-        for source in () if self.market_release is not None else self.registry:
+        for source in (
+            ["neigezhu"]
+            if self.market_release is not None and "neigezhu" in self.registry
+            else self.registry
+            if self.market_release is None
+            else []
+        ):
             try:
                 rows.append({**self._binding(source), "status": "registered_unopened"})
             except DataError as exc:
@@ -155,7 +191,7 @@ class LocalMinuteProduct:
             "Choose one security and at most 60 days",
         )
         source = self.default_source if source == "auto" else source
-        if self.market_release is not None and source in {"canonical", "neigezhu", "tdx"}:
+        if self.market_release is not None and source in {"canonical", "tdx", "free_stockdb"}:
             from ashare_data.product.market_release import minute_prices
 
             return minute_prices(self.frozen_market_config, security, a, b, source)
@@ -164,6 +200,7 @@ class LocalMinuteProduct:
             if binding["reader"] == "neigezhu-native":
                 view = NeigezhuMinuteView(
                     entry=self.entry,
+                    source_root=binding["path"],
                     manifest=binding["manifest"]["path"],
                     expected_manifest_sha256=binding["manifest"]["sha256"],
                     review=binding["review"]["path"],

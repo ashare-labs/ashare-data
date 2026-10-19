@@ -3,12 +3,13 @@
 from contextlib import contextmanager
 from pathlib import Path
 import sqlite3
+import re
 
 from ashare_data.core.model import DataError, day, digest, require
 from ashare_data.market.client import _security
 from ashare_data.storage.local_daily import LocalDailyStore
 
-SOURCES = ("auto", "canonical", "baostock", "eastmoney", "sina", "sohu", "tencent")
+SOURCES = ("auto", "canonical", "baostock", "eastmoney", "sina", "sohu", "tencent", "free_stockdb")
 MAX_SECURITIES = 100
 MAX_SECURITY_SESSIONS = 100_000
 LIMITATIONS = [
@@ -23,7 +24,15 @@ LIMITATIONS = [
 
 
 def _sid(symbol):
+    if symbol.startswith("bj"):
+        return "BJ." + symbol[2:]
     return symbol[2:] + (".XSHG" if symbol.startswith("sh") else ".XSHE")
+
+
+def _native_security(security):
+    if isinstance(security, str) and re.fullmatch(r"BJ\.[0-9]{6}", security):
+        return "bj" + security[3:]
+    return _security(security)
 
 
 def _selection(securities, start, end, source):
@@ -32,7 +41,7 @@ def _selection(securities, start, end, source):
         "PRODUCT_RESOURCE_LIMIT",
         "Provide 1..100 securities per bounded request",
     )
-    symbols = [_security(s) for s in securities]
+    symbols = [_native_security(s) for s in securities]
     require(
         len(set(symbols)) == len(symbols), "PRODUCT_DUPLICATE_SECURITY", "Use unique securities"
     )
@@ -65,6 +74,7 @@ class LocalDailyProduct:
         config = resolve(deployment, profile=profile, reference_set=reference_set)
         if config.get("market_release"):
             from ashare_data.product.market_release import ReleasedDailyProduct
+
             return ReleasedDailyProduct(config)
         return cls(config["daily_root"], references=config["references"])
 
@@ -207,6 +217,11 @@ class LocalDailyProduct:
             }
 
     def _prices(self, store, securities, start, end, source, *, selected_sources=None):
+        require(
+            source != "free_stockdb" or hasattr(store, "release"),
+            "MARKET_SOURCE_SCOPE",
+            "free_stockdb daily reads require a pinned market release",
+        )
         calendar = [
             dict(r)
             for r in store.db.execute(
@@ -230,7 +245,7 @@ class LocalDailyProduct:
                 }
             )
         for sid in securities:
-            native = _security(sid)
+            native = _native_security(sid)
             facts = [
                 dict(r)
                 for r in store.db.execute(
@@ -247,6 +262,11 @@ class LocalDailyProduct:
             for row in converted:
                 row.pop("symbol", None)
             rows.extend(converted)
+            require(
+                len(rows) <= MAX_SECURITY_SESSIONS,
+                "PRODUCT_RESOURCE_LIMIT",
+                "Request exceeds 100000 observed security days; narrow the scope",
+            )
             returned = {r["date"] for r in records}
             expected = set(store.expected(native, start, end, days))
             if not facts:
