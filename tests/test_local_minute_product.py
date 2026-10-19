@@ -225,3 +225,62 @@ def test_native_reader_keeps_pinned_root_after_entry_asset_changes(deployment):
     actual = query(owner, source="neigezhu")
     assert actual["rows"] == expected["rows"]
     assert actual["binding"] == expected["binding"]
+
+
+def test_frozen_native_audit_resolves_inside_restored_release(deployment, tmp_path, monkeypatch):
+    import sqlite3
+    from ashare_data.storage.market_release import ReleaseWriter, MarketRelease
+    from test_market_release import metadata
+
+    original_root = tmp_path / "original-market"
+    document = json.loads(deployment.read_text())
+    native = document["profiles"]["product"]["minute_sources"]["neigezhu"]
+    native = json.loads(json.dumps(native))
+    with ReleaseWriter(original_root, free_reserve_bytes=0) as writer:
+        evidence = []
+        for name in ("manifest", "review"):
+            src = deployment.parent / "assets" / native[name]["path"]
+            evidence.append(writer.object(src, src.suffix.lstrip(".")))
+            native[name]["path"] = "/retired-deployment/" + src.name
+        spec = {
+            "minute_sources": {"neigezhu": native},
+            "assets": {
+                "minute-hf-download": {
+                    "kind": "reference",
+                    "path": str(deployment.parent / "assets"),
+                }
+            },
+        }
+        initial = metadata(writer)
+        meta_path = writer.root / "work/frozen-readers.sqlite3"
+        shutil.copyfile(writer.root / initial["path"], meta_path)
+        with sqlite3.connect(meta_path) as db:
+            db.execute("CREATE TABLE release_contracts(name TEXT PRIMARY KEY,body TEXT)")
+            db.execute(
+                "INSERT INTO release_contracts VALUES('source_observation_readers',?)",
+                (json.dumps(spec),),
+            )
+            db.commit()
+        writer.publish(
+            dict(
+                metadata=writer.object(meta_path, "sqlite3"),
+                files=[],
+                evidence=evidence,
+                input_dispositions={"source": {"input_rows": 0}},
+            ),
+            expected_parent=None,
+        )
+    restored_root = tmp_path / "restored-market"
+    shutil.copytree(original_root, restored_root)
+    release = MarketRelease(restored_root)
+    pin = {"root": str(restored_root), "release_id": 1, "manifest_sha256": release.sha256}
+    document["profiles"]["product"]["market_release"] = pin
+    document["assets"]["minute-hf-download"]["path"] = "unrelated-current-download"
+    deployment.write_text(json.dumps(document))
+    monkeypatch.setattr(
+        "ashare_data.product.configuration.resolve", lambda *a, **k: {"market_release": pin}
+    )
+    result = query(LocalMinuteProduct(deployment), source="neigezhu")
+    assert len(result["rows"]) == 4
+    assert result["binding"]["manifest"]["path"].startswith(str(restored_root / "objects"))
+    assert result["rows"][1]["use_decision"]["execution"] == "deny"

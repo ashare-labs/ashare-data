@@ -46,6 +46,21 @@ class LocalMinuteProduct:
                     ).fetchone()
                     if frozen:
                         readers = json.loads(frozen[0])
+                        # Audit files travel with a restored release. Resolve by the
+                        # frozen content hash, not the former deployment location.
+                        evidence = {v["sha256"]: v for v in release.manifest.get("evidence", [])}
+                        for item in readers["minute_sources"].values():
+                            for name in ("manifest", "review"):
+                                binding = item.get(name)
+                                if binding:
+                                    require(
+                                        binding["sha256"] in evidence,
+                                        "PRODUCT_MINUTE_CONFIGURATION",
+                                        "Frozen native audit evidence is absent from this release",
+                                    )
+                                    binding["path"] = str(
+                                        release.verify(evidence[binding["sha256"]])
+                                    )
                         self.registry = {**self.registry, **readers["minute_sources"]}
                         self.document["assets"].update(readers["assets"])
         require(
