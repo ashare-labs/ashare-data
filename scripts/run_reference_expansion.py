@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 from pathlib import Path
@@ -9,6 +10,29 @@ import time
 from urllib.parse import urlparse
 
 from ashare_data.financials.expansion import atomic, audit, encoded, load_batch, now, run
+
+
+def share_source_restrictions(root, roots):
+    """A new batch must not bypass another batch's host block or cooldown."""
+    merged = {}
+    for batch in roots:
+        path = batch / "source-state.json"
+        if not path.exists():
+            continue
+        for host, state in json.loads(path.read_text()).items():
+            target = merged.setdefault(host, {})
+            if state.get("blocked"):
+                target["blocked"] = state["blocked"]
+            for key in ("cooldown_until", "interval"):
+                if key in state:
+                    target[key] = max(target.get(key, 0), state[key])
+    with (root / "writer.lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        path = root / "source-state.json"
+        current = json.loads(path.read_text()) if path.exists() else {}
+        for host, state in merged.items():
+            current.setdefault(host, {}).update(state)
+        atomic(path, encoded(current))
 
 
 def supervise(root):
@@ -49,7 +73,9 @@ def supervise(root):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", required=True, type=Path, action="append")
-    for root in parser.parse_args().root:
+    roots = [root.resolve() for root in parser.parse_args().root]
+    for root in roots:
+        share_source_restrictions(root, roots)
         supervise(root)
         exited = root / "worker-exit.json"
         if (root / "STOP").exists() or (exited.exists() and json.loads(exited.read_text()).get("stop_requested")):
