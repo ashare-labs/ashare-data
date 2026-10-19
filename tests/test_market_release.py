@@ -257,3 +257,122 @@ def test_incremental_revision_and_duplicate_input_are_idempotent(tmp_path):
     plan["parent_manifest_sha256"] = current.sha256
     assert apply(current, plan)["unchanged"]
     assert MarketRelease(tmp_path).release_id == 2
+
+
+def test_increment_refreshes_expected_and_new_days_then_delete(tmp_path, monkeypatch):
+    import json
+    import shutil
+    import ashare_data.storage.market_release as module
+    from ashare_data.product.release_cli import apply
+    from ashare_data.storage.market_release import sha_file, sql_literal
+
+    c = connection(memory="128MB", threads=1)
+    with ReleaseWriter(tmp_path, free_reserve_bytes=0) as w:
+        meta = metadata(w)
+        first = chunk(w, 10)
+        check = w.parquet(
+            c,
+            "select 1 series_id,1 instrument_id,date '2024-01-02' trade_date,'expected' expected_state,1::BIGINT expected_count,1::BIGINT observed_count,0::BIGINT missing_count,0 missing_day",
+            [],
+            "coverage",
+        )
+        check.update(kind="bar_day_checks", series_id=1, instrument_id=1)
+        value = {
+            **manifest(meta, [first]),
+            "evidence": [check],
+            "coverage": {"obsolete": True},
+            "created_at": "old",
+            "capacity": {"obsolete": True},
+        }
+        w.publish(value, expected_parent=None)
+    r1 = MarketRelease(tmp_path)
+    proposed = tmp_path / "work/proposed.sqlite3"
+    shutil.copyfile(tmp_path / meta["path"], proposed)
+    with sqlite3.connect(proposed) as db:
+        db.execute("insert into data_batches values(2,2)")
+    replacement = tmp_path / "work/new-days.parquet"
+    old = "select * from read_parquet(" + sql_literal(tmp_path / first["path"]) + ")"
+    c.execute(
+        "copy ("
+        + old
+        + " union all select * replace(date '2024-01-03' as trade_date,2::INTEGER as batch_id) from ("
+        + old
+        + ")) to "
+        + sql_literal(replacement)
+        + " (format parquet)"
+    )
+    proof = tmp_path / "work/proof.json"
+    proof.write_text('{"test_only":true}')
+    key = {"table": "bars_1d", "series_id": 1, "instrument_id": 1}
+    plan = {
+        "schema": "ad-market-replacement-plan.v1",
+        "parent_manifest_sha256": r1.sha256,
+        "change_reason": "isolated append test",
+        "chunks": [{**key, "parquet": str(replacement), "sha256": sha_file(replacement)}],
+        "metadata": {"path": str(proposed), "sha256": sha_file(proposed)},
+        "evidence": [{"path": str(proof), "sha256": sha_file(proof)}],
+        "input_dispositions": {"patch": {"input_rows": 1, "adopted": 1}},
+    }
+    with pytest.raises(DataError, match="One replacement"):
+        apply(r1, {**plan, "chunks": plan["chunks"] * 2})
+    real = module.atomic_write
+
+    def crash(path, body):
+        if Path(path).name == "CURRENT.json":
+            raise OSError("injected pointer failure")
+        return real(path, body)
+
+    monkeypatch.setattr(module, "atomic_write", crash)
+    with pytest.raises(OSError, match="pointer failure"):
+        apply(r1, plan)
+    assert MarketRelease(tmp_path).release_id == 1
+    monkeypatch.setattr(module, "atomic_write", real)
+    assert apply(r1, plan)["release_id"] == 2
+    r2 = MarketRelease(tmp_path)
+
+    def coverage_rows(release):
+        item = next(x for x in release.manifest["evidence"] if x.get("kind") == "bar_day_checks")
+        return c.execute(
+            "select cast(trade_date as varchar),expected_state,expected_count,observed_count,missing_day from read_parquet("
+            + sql_literal(release.verify(item))
+            + ") order by trade_date"
+        ).fetchall()
+
+    assert coverage_rows(r2) == [
+        ("2024-01-02", "expected", 1, 1, 0),
+        ("2024-01-03", "unknown", None, 1, 0),
+    ]
+    assert coverage_rows(r1) == [("2024-01-02", "expected", 1, 1, 0)]
+    assert r2.manifest["coverage"]["counts_by_series"]["1"]["unknown_observed_rows"] == 1
+    assert "obsolete" not in r2.manifest["capacity"]
+    assert r2.manifest["created_at"] != "old"
+    with r2.metadata() as db:
+        assert (
+            json.loads(
+                db.execute("select body from release_contracts where name='coverage'").fetchone()[0]
+            )
+            == r2.manifest["coverage"]
+        )
+    deletion = {
+        **plan,
+        "parent_manifest_sha256": r2.sha256,
+        "chunks": [{**key, "delete": True}],
+        "metadata": {
+            "path": str(tmp_path / r2.manifest["metadata"]["path"]),
+            "sha256": r2.manifest["metadata"]["sha256"],
+        },
+        "input_dispositions": {"patch": {"input_rows": 0}},
+    }
+    assert apply(r2, deletion)["release_id"] == 3
+    r3 = MarketRelease(tmp_path)
+    assert coverage_rows(r3) == [
+        ("2024-01-02", "expected", 1, 0, 1),
+        ("2024-01-03", "unknown", None, 0, 0),
+    ]
+    assert r3.manifest["target_unique_keys"]["bars_1d"] == 0
+    assert r3.manifest["coverage"]["counts_by_series"]["1"]["expected_missing_days"] == 1
+    assert len(r1.read("bars_1d", "000001.XSHE", "2024-01-02", "2024-01-03")) == 1
+    assert len(r2.read("bars_1d", "000001.XSHE", "2024-01-02", "2024-01-03")) == 2
+    deletion["parent_manifest_sha256"] = r3.sha256
+    assert apply(r3, deletion)["unchanged"]
+    c.close()

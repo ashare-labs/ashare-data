@@ -5,6 +5,9 @@ objects and old release manifests are retained; no whole-market copy is created.
 """
 
 import argparse
+from datetime import datetime, timezone
+import resource
+import hashlib
 import json
 from pathlib import Path
 import shutil
@@ -116,17 +119,39 @@ def apply(release, plan):
     )
     with ReleaseWriter(release.root) as writer:
         writer.budget()
+        pending = (
+            writer.root
+            / "work"
+            / ("pending-replacement-" + hashlib.sha256(canonical(plan)).hexdigest() + ".json")
+        )
+        if pending.exists():
+            candidate = json.loads(pending.read_bytes())
+            for item in candidate.get("evidence", []):
+                require(
+                    sha_file(writer.root / item["path"]) == item["sha256"],
+                    "MARKET_INTEGRITY",
+                    "Pending evidence changed",
+                )
+            return writer.publish(candidate, expected_parent=release.release_id)
         c = connection(writer.root / "work/spill")
         files = {(f["table"], f["series_id"], f["instrument_id"]): f for f in release.files}
         changes = []
+        supplied_keys = set()
         for number, change in enumerate(plan["chunks"]):
             key = (change["table"], change["series_id"], change["instrument_id"])
             require(key[0] in ("bars_1d", "bars_1m"), "MARKET_TABLE", "Unknown fact table")
+            require(
+                key not in supplied_keys,
+                "MARKET_PLAN_DUPLICATE",
+                "One replacement per logical chunk",
+            )
+            supplied_keys.add(key)
             original = files.get(key)
             if change.get("delete"):
-                require(original is not None, "MARKET_DELETE_KEY", "Cannot delete an absent chunk")
+                if original is None:
+                    continue
                 del files[key]
-                changes.append({"key": key, "deleted_rows": original["rows"]})
+                changes.append({"key": key, "old": original, "deleted_rows": original["rows"]})
                 continue
             source = Path(change["parquet"]).resolve()
             require(
@@ -235,6 +260,11 @@ def apply(release, plan):
                         "MARKET_BATCH",
                         "New batches belong to the next release",
                     )
+        require(
+            all(f["instrument_id"] in instruments for f in files.values()),
+            "MARKET_REFERENCE",
+            "Retained facts reference a missing instrument",
+        )
         for change in changes:
             if "new" not in change:
                 continue
@@ -297,8 +327,25 @@ def apply(release, plan):
                 "MARKET_BATCH_HISTORY",
                 "Changed values require a new batch; unchanged values retain the old batch",
             )
+        from ashare_data.storage.market_coverage import refresh
+
+        metadata, evidence, coverage = refresh(writer, c, release, changes, evidence, metadata)
+        plan_copy = writer.root / "work/replacement-plan.json"
+        plan_copy.write_bytes(canonical(plan))
+        evidence.append({**writer.object(plan_copy, "json"), "kind": "replacement_plan"})
         value = {
             **release.manifest,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "coverage": coverage,
+            "capacity": {
+                "asset_budget_bytes": writer.budget_bytes,
+                "free_reserve_bytes": writer.free_reserve_bytes,
+                "current_owned_bytes": writer.budget(),
+                "fact_bytes": sum(f["bytes"] for f in files.values()),
+                "evidence_bytes": sum(f["bytes"] for f in evidence),
+                "metadata_bytes": metadata["bytes"],
+                "observed_batch_peak_rss_bytes": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
+            },
             "files": list(files.values()),
             "metadata": metadata,
             "evidence": evidence,
@@ -309,7 +356,10 @@ def apply(release, plan):
                 for table in ("bars_1d", "bars_1m")
             },
         }
+        if "daily_key_reconciliation" in value:
+            value["initial_build_daily_key_reconciliation"] = value.pop("daily_key_reconciliation")
         c.close()
+        atomic_write(pending, canonical(value))
         return writer.publish(value, expected_parent=release.release_id)
 
 

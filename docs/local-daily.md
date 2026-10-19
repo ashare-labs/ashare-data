@@ -239,7 +239,7 @@ python -m ashare_data.product.release_cli --root "$BACKUP" restore --destination
 
 全量恢复演练校验 27,931 个正式对象、46,568,960,157 字节，在同一隔离目标复制两个对象后主动中断，再续跑完成。随后仅对一条真实行作明确标记的合成修订，验证旧 R1、新 R2 与重复提交无变化；正式 R1 未变。整个演练约 159.103 秒，演练副本在验收后清理，报告保留。合成修订没有写回正式行情。
 
-后续增量使用 `release_cli apply --plan plan.json`。计划 schema 为 `ad-market-replacement-plan.v1`，必须包含父清单摘要、变更原因、来源证据文件及其 SHA256、新元数据文件及其 SHA256、互斥输入去向和 `chunks`。每个 chunk 明确 table/series_id/instrument_id，以及完整替换 Parquet 路径和 SHA256，或显式 `delete: true`。只重写受影响证券分块。旧来源/批次登记不可改；变更值使用属于下一 release 的新批次，未变化值保留原批次。全行相同的重复输入为无变化操作。
+后续增量使用 `release_cli apply --plan plan.json`。计划 schema 为 `ad-market-replacement-plan.v1`，必须包含父清单摘要、变更原因、来源证据文件及其 SHA256、新元数据文件及其 SHA256、互斥输入去向和 `chunks`。每个 chunk 明确 table/series_id/instrument_id，以及完整替换 Parquet 路径和 SHA256，或显式 `delete: true`。只重写受影响证券分块。旧来源/批次登记不可改；变更值使用属于下一 release 的新批次，未变化值保留原批次。全行相同的重复输入为无变化操作。 同一计划不得重复指定一个逻辑分块。增量会重算受影响证券日的观察数，并保留上版冻结的预期；新增日期的预期仍标为 unknown，删除行情不会删除其缺失记录。覆盖正文同步写入新元数据，容量与创建时间重新记录。发布候选在切换指针前持久化，同一计划中断后重跑可继续提交完全相同的候选，旧 release 的覆盖和数值不变。
 
 文件清单保留被替换块，从而重现旧版本；本实现没有混用稀疏行历史后删除旧文件。发布时检查重复逻辑键、引用、输入去向、逐值回转和父版本 CAS。这是受控管道保证，事实文件没有数据库物理 PK/FK 索引。局部修订会保留旧块，有明确容量代价。
 
