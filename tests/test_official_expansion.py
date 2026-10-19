@@ -231,6 +231,41 @@ def test_cross_issuer_and_pagination_counts_fail_closed(tmp_path):
                 obj = dict(totalAnnouncement=2, hasMore=False, announcements=[announcement()])
             return json.dumps(obj).encode(), {"observed_at": "2026-10-19T00:00:00+00:00"}
 
-    with pytest.raises(ValueError, match="total disagrees"):
+    with pytest.raises(ValueError, match="count disagrees"):
         index_security(Fake(), "sh600000", dict(target_start="2010-01-01", target_end="2026-10-19"))
     assert not (tmp_path / "indices/sh600000.json.gz").exists()
+
+
+def test_same_day_pagination_tie_uses_bounded_repair(tmp_path):
+    calls = []
+
+    class Fake:
+        root = tmp_path
+
+        def fetch(self, key, url, data):
+            calls.append(data)
+            if key.startswith("identity"):
+                obj = [dict(code="600000", category="A股", orgId="synthetic")]
+            elif "-tie-" in key:
+                assert data["seDate"] == "2024-04-30~2024-04-30"
+                obj = dict(
+                    totalAnnouncement=2,
+                    hasMore=False,
+                    announcements=[announcement(aid="a"), announcement(aid="b")],
+                )
+            elif "-periodic-" in key:
+                obj = dict(
+                    totalAnnouncement=2,
+                    hasMore=False,
+                    announcements=[announcement(aid="a"), announcement(aid="a")],
+                )
+            else:
+                obj = dict(totalAnnouncement=0, hasMore=False, announcements=[])
+            return json.dumps(obj).encode(), {"observed_at": "2026-10-19T00:00:00+00:00"}
+
+    result = index_security(
+        Fake(), "sh600000", dict(target_start="2010-01-01", target_end="2026-10-19")
+    )
+    assert {row["announcement_id"] for row in result["announcements"]} == {"a", "b"}
+    assert len(result["queries"][0]["tie_date_repairs"]) == 1
+    assert len(calls) == 5

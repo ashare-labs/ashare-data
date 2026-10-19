@@ -310,6 +310,7 @@ def index_security(client, symbol, manifest):
         ("revision", "", "修订"),
     ):
         total, seen, pages = None, set(), 0
+        source_rows, duplicate_dates = 0, set()
         for page in range(1, 201):
             form = {
                 "pageNum": page,
@@ -335,6 +336,7 @@ def index_security(client, symbol, manifest):
                 raise ValueError("Index count changed while paging")
             total = count
             rows = payload.get("announcements") or []
+            source_rows += len(rows)
             if not rows and payload.get("hasMore"):
                 raise ValueError("Empty index page claims more results")
             for row in rows:
@@ -343,7 +345,7 @@ def index_security(client, symbol, manifest):
                 item = report_identity(row)
                 aid = item["announcement_id"]
                 if aid in seen:
-                    raise ValueError("Repeated announcement within pagination")
+                    duplicate_dates.add(item["published_date"])
                 seen.add(aid)
                 item.update(index_receipt=key, index_observed_at=receipt["observed_at"])
                 if aid in found:
@@ -361,10 +363,51 @@ def index_security(client, symbol, manifest):
                 break
         else:
             raise ValueError("Index exceeds reviewed pagination cap")
+        if source_rows != total:
+            raise ValueError("Index count disagrees with returned page rows")
+        repairs = []
+        # Time sorting can move same-day ties across page boundaries. Repair
+        # only affected dates, retaining every response and checking the union.
+        for day in sorted(duplicate_dates):
+            repair_form = dict(form, pageNum=1, seDate=day + "~" + day)
+            key = f"index-{symbol}-{label}-tie-{day}"
+            raw, receipt = client.fetch(key, ORIGIN + "/new/hisAnnouncement/query", repair_form)
+            payload = json.loads(raw)
+            rows = payload.get("announcements") or []
+            identities = {str(row["announcementId"]) for row in rows}
+            if (
+                payload.get("hasMore") is not False
+                or payload.get("totalAnnouncement") != len(rows)
+                or len(identities) != len(rows)
+            ):
+                raise ValueError("Same-day index repair is incomplete or duplicated")
+            for row in rows:
+                if (row["secCode"], row["orgId"]) != (code, issuer["orgId"]):
+                    raise ValueError("Cross-issuer same-day index row")
+                item = report_identity(row)
+                if item["published_date"] != day:
+                    raise ValueError("Same-day index repair returned a different date")
+                aid = item["announcement_id"]
+                item.update(index_receipt=key, index_observed_at=receipt["observed_at"])
+                if aid in found and any(
+                    found[aid][k] != item[k]
+                    for k in ("title", "source_url", "period_end", "published_date")
+                ):
+                    raise ValueError("Conflicting announcement version during same-day repair")
+                found.setdefault(aid, item)
+                seen.add(aid)
+            evidence.append(key)
+            repairs.append({"date": day, "records": len(rows), "receipt": key})
         if len(seen) != total:
             raise ValueError("Index total disagrees with distinct records")
         queries.append(
-            {"kind": label, "pages": pages, "records": total, "pagination_complete_for_query": True}
+            {
+                "kind": label,
+                "pages": pages,
+                "records": total,
+                "tie_date_repairs": repairs,
+                "pagination_complete_for_query": True,
+            }
         )
     result = {
         "schema": "ad.official-report-index.v1",
@@ -655,7 +698,7 @@ def audit(root, write=False):
     return result
 
 
-def run(root, extractor, max_codes=0):
+def run(root, extractor, max_codes=0, retry_parse_failed=False):
     root = Path(root).resolve()
     manifest = json.loads((root / "manifest.json").read_text())
     scope_raw = (root / "scope.json").read_bytes()
@@ -675,6 +718,26 @@ def run(root, extractor, max_codes=0):
     with (root / "writer.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         client = Client(root, should_stop)
+        if retry_parse_failed:
+            for symbol in scope["symbols"]:
+                status_path = root / "securities" / (symbol + ".json")
+                if not status_path.exists():
+                    continue
+                status = json.loads(status_path.read_text())
+                if status.get("state") != "parse_failed":
+                    continue
+                review_path = root / "parse-reviews" / (symbol + ".json")
+                reviews = json.loads(review_path.read_text()) if review_path.exists() else []
+                reviews.append(
+                    {
+                        "at": now(),
+                        "prior_status": status,
+                        "normalizer_sha256": digest(Path(__file__).read_bytes()),
+                        "action": "retry_existing_source_cache_after_parser_review",
+                    }
+                )
+                atomic(review_path, encoded(reviews))
+                atomic(status_path, encoded({"state": "pending", "symbol": symbol}))
         completed = 0
         try:
             while not should_stop():
@@ -774,11 +837,12 @@ def main():
     parser.add_argument("--document-codes", type=int, default=120)
     parser.add_argument("--extractor", type=Path)
     parser.add_argument("--max-codes", type=int, default=0)
+    parser.add_argument("--retry-parse-failed", action="store_true")
     args = parser.parse_args()
     if args.command == "prepare":
         result = prepare(args.root, args.source_batch, args.document_codes)
     elif args.command == "run":
-        result = run(args.root, args.extractor, args.max_codes)
+        result = run(args.root, args.extractor, args.max_codes, args.retry_parse_failed)
     elif args.command == "replay":
         result = replay(args.root, args.extractor)
     else:
