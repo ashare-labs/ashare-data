@@ -567,3 +567,31 @@ Tushare再投资因子与Sina hfq不是可直接衔接的同一序列；缺日�
 上述接口适配及合成协议回归不代表鉴权实采成功。账户未配置时仅完成代码、源契约、库存及请求预览；
 鉴权实采、实际金额单位证据、各源全历史覆盖、稳定主体/换码映射与审定数据库结构导入仍分别验收。
 `suspend_d`、VIP以及权限冲突的股本接口不按当前积分擅自启用。
+
+### 与统一行情发布的接入接口
+
+统一行情现有 `ad-market-release.v1` 使用不可变Parquet对象、SQLite元数据和固定清单，
+`MarketRelease.read/sql` 目前只接受 `bars_1d/bars_1m`。财务源采集不能把这两个事实表当作通用入口，
+也不能通过改写已发布元数据绕过新release。`merge_market` 已确认来源修订与解析版本分离，
+事实context绑定 `report_version/extraction_version/context_id`；尚未定义下表的正式DDL和发布接口。
+以下是具体接入契约，表名是待协调的逻辑名，不表示已建表或已导入。
+
+| 逻辑表/接口 | 已有字段与必须保持的键 | 接入端需明确的部分 |
+| --- | --- | --- |
+| `meta.source_assets` / `meta.ingest_batches` | 原响应SHA、字节数、源定位、请求批次、捕获时间、parser/mapping摘要 | 复用现有asset/batch ID分配，外部原件原位引用及恢复策略 |
+| `reference.security_bindings` | 源代码、交易所、有效区间、身份审核证据、目标release摘要 | 接受哪个冻结instrument ID映射；未核实换码的逐项状态，不能按同名并主体 |
+| `financial.report_versions` | 来源、官方公告ID（若有）、源版本/投影摘要、report_type、报告期、修订标记 | 官方报告与供应商投影的独立版本键；不得把未知报告ID补成官方ID |
+| `financial.extractions` | report_version、parser_sha256、mapping_sha256、抽取版本 | 同原文重新解析产生新抽取版本；不改来源版本或旧事实 |
+| `financial.contexts` | report_version、extraction_version、context_id；主体、合并口径、instant或duration、YTD/单季、币种、单位、维度 | context主键及维度字典；缺单位仍未知，不默认为元 |
+| `financial.observations` | context、原字段名/标题、canonical_field、source_locator、ordinal、原十进制文本、value/state | 数值类型和唯一键，原始精度的往返对账；不折叠不同投影/修订/可比列 |
+| `financial.visibility` | 公告日、实际公告日、精度、captured_at、历史可见证据、已知更正范围 | 日频可见模式与精确时刻模式；未知时刻不得取采集时间替代 |
+| `reference.exchange_calendar` / `reference.price_limits` | 交易所/证券、日期、来源版本、开市标记/原上下限价 | 来源优先级和缺口合并；缺限价不推出无限价或停牌，保留原日线状态 |
+| `corporate_action.events` / `reference.share_observations` / `reference.factor_observations` | 事件日期角色、税前/税后、股份基数、来源精度、因子basis | 明确事件配对键；Tushare与Sina因子分系列，禁止拼接或猜补 |
+| `financial.derived_indicators` | 公式及版本、输入事实ID、报告期、单位、可见依据 | 仅已核实基础科目派生的常用指标；缺输入、口径冲突或单位未知逐项返回 |
+| `meta.coverage` / 候选发布 | 目标证券/日期/字段、成功/空/失败/截断/未采、逐字段对账、父清单摘要 | 发布器如何登记新增逻辑表，原子提交/回滚与读者固定版本协议 |
+
+接入前可继续通过 `SnapshotReader`、`ReferenceReader` 和 `official_daily.reader` 使用各自已支持的源，
+沿用其逐字段、日期精度和已核查修订边界。新增Tushare规范记录保留独立源分区和字段对账，
+不能仅因API成功就让旧读者把未支持schema作为已有能力。正式接入验证须覆盖原件→规范字段→
+目标表→公共读者的键/值/单位/版本对应及缺口数量；旧行情release和现有账户测试应保持可重现。
+只处理已完成或已明确封闭的批次；仍在写入的分区不能冒充不可变全范围交付。
