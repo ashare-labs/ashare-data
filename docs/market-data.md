@@ -94,3 +94,71 @@ CLI 的 `price` 支持 --as-of/--visibility/--coverage-contract/--require-comple
 | get_all_securities | 未支持，不生成历史股票池 |
 
 `ashare_data.providers.joinquant_style.JQStyle` 另提供绑定明确 Snapshot 的高级离线适配，返回带 snapshot_id 的字典，见 [固定快照](snapshots.md)。其用户声明的分钟契约不能直接套到新浪源；它不加载账号、策略或回测引擎。已有 JQ 固定响应的导入和限制见 [观察数据](observations.md)。
+
+## Registered local minute queries
+
+The installed product CLI and `LocalMinuteProduct` expose the same read-only
+minute registry. The default source is `tdx`; HF requires an explicit registered
+source, normally `neigezhu`. Unknown or unavailable sources never fall back.
+
+```sh
+ashare-data product --deployment /path/to/deployment.json minute-sources
+ashare-data product --deployment /path/to/deployment.json minute \
+  --source neigezhu --security 600000.XSHG \
+  --start 2026-06-03T09:40:00+08:00 --end 2026-06-03T09:42:00+08:00
+```
+
+`python -m ashare_data.product` accepts the same arguments. The API is:
+
+```python
+from ashare_data.product import LocalMinuteProduct
+
+owner = LocalMinuteProduct("/path/to/deployment.json", profile="product")
+sources = owner.sources()
+result = owner.prices("600000.XSHG", "2026-06-03T09:40:00+08:00",
+                      "2026-06-03T09:42:00+08:00", source="neigezhu")
+```
+
+Use the existing `ashare-deployment.v1` manifest and a product profile. Register
+read-only assets under `assets`, then add `minute_sources` to that profile:
+
+```json
+{
+  "tdx": {
+    "reader": "tdx-session", "asset": "minute-tdx",
+    "content": {"sha256": "<externally reviewed session JSON SHA256>"},
+    "coverage": "<actual securities and days>", "limits": ["<source limitations>"]
+  },
+  "neigezhu": {
+    "reader": "neigezhu-native", "asset": "minute-hf-download",
+    "manifest": {"path": "assets/minute/neigezhu/file_manifest.csv", "sha256": "<reviewed SHA256>"},
+    "review": {"path": "assets/minute/neigezhu/quality_overlay.json", "sha256": "<reviewed SHA256>"},
+    "coverage": {"basis": "sealed audit", "last_day_partial": true},
+    "limits": ["<actual audit and remaining semantic limitations>"]
+  }
+}
+```
+
+Asset `kind` is `reference`. The HF asset retains its existing
+`minute-hf-download` key and points to the single original library. Relative
+asset/evidence paths are relative to `data_root`, which is relative to the
+deployment file. The registry does not require a Codex directory, working
+directory, manual `PYTHONPATH`, data copy, or new service configuration.
+
+Discovery reports `registered_unopened`: coverage is the operator's registered
+audit scope, not a fresh scan or a promise of every security/day. A malformed
+source registration is reported separately and does not disable other sources.
+The selected query checks its pinned content. HF requires both the sealed
+manifest and the sealed quality overlay; neither is optional at this product
+entry. Single-security calls retain the reader's 60-day / 15,000-row bounds.
+
+The response contains `source`, `binding`, `rows`, and `report`. HF rows/reports
+are the native reader's unchanged output, including exceptional numeric values,
+physical row identity, diagnostics, review evidence, and separate execution and
+fresh-valuation denials. TDX rows retain the session package's existing evidence
+and time semantics. Empty windows remain empty. Discovery and queries neither
+repair data nor initialize state nor grant matching/valuation permission.
+
+The existing daily product catalogue, source selection and publication contract
+are unchanged. Minute reads do not require daily reference coverage. See
+[native semantics](research-data.md#native-neigezhu-minute-research) before constructing bounded research inputs.

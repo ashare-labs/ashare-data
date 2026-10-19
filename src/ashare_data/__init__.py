@@ -42,6 +42,7 @@ from ashare_data.providers.joinquant_observations import (
 from ashare_data.providers.joinquant_queries import JQQueryView
 from ashare_data.providers.tdx_points import TDXPointInput, TDXPointView
 from ashare_data.providers.tdx_bars import TDXBarSource, TDXBarView
+from ashare_data.providers.neigezhu import NeigezhuMinuteView
 from ashare_data.market.minute_session import TDXMinuteSessionView, TDXSessionSource
 from ashare_data.reference.bounded_calendar import BoundedCalendarView
 from ashare_data.research.independent_queries import IndependentQueryView
@@ -168,6 +169,7 @@ __all__ += ["JQObservationInput", "JQObservationRead", "JQObservationView"]
 __all__ += ["JQQueryView"]
 __all__ += ["TDXPointInput", "TDXPointView"]
 __all__ += ["TDXBarSource", "TDXBarView"]
+__all__ += ["NeigezhuMinuteView"]
 __all__ += ["TDXMinuteSessionView", "TDXSessionSource"]
 __all__ += ["BoundedCalendarView"]
 __all__ += ["IndependentQueryView"]

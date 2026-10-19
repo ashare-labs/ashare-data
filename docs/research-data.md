@@ -196,3 +196,153 @@ opt-in 包含、opt-out 不包含选择；日期快照只接受其绑定日期�
 引擎与策略用途分离：`market(... role=matching)` 只给截至读数时已观察的原始分钟；`retrospective_capacity` 只给同日全日 volume；`retrospective_minute` 明确允许事后读取已固定的精确分钟用于有限重建。它们不证明历史 PIT。`engine_quote` 仅对存在精确分钟的时点，将该 close 与同日更早已观测限价合并，明确记录限价沿用假设与来源，不延续缺失的最新价。策略 current/query 不接触事后通道。角色是调用契约，不是进程安全沙箱。
 
 独立日线、发行人报告继续通过既有 `IndependentQueryView` 读取。数据缺口由 AD 返回 unavailable；AQ 不维护第二份行情账本。软件包与公开源码不包含本地原始行情或回测账户记录。
+
+## Native neigezhu minute research
+
+`NeigezhuMinuteView` reads the `minute-hf-download` asset registered in an existing
+`ashare-local/deployment.json`. It does not create a data home, install anything,
+fetch data, change the deployment, copy a full library, or modify Parquet files.
+
+The caller supplies an externally pinned `file_manifest.csv` from a completed
+byte/integrity audit. Each queried source file is hashed on first use and after
+any size/mtime/inode change. Calls select one security and at most 60 days / 15,000
+observed labels. Hashes certify source identity, not market correctness.
+
+```python
+from ashare_data import NeigezhuMinuteView
+
+view = NeigezhuMinuteView(
+    entry="/path/to/ashare-local/deployment.json",
+    manifest="/path/to/review/file_manifest.csv",
+    expected_manifest_sha256="<externally reviewed SHA256>",
+    review="/path/to/review/quality_overlay.json",       # optional, paired with pin
+    expected_review_sha256="<externally reviewed overlay SHA256>",
+)
+result = view.get_price(
+    "600000.XSHG",
+    mode="retrospective",
+    start="2026-06-02T09:30:00+08:00",
+    end="2026-06-02T15:00:00+08:00",
+)
+```
+
+The query is inclusive on source labels. It retains 09:30, zero-volume rows,
+invalid prices, native binary values, exact physical row numbers and source file
+hashes. It neither folds the opening observation nor assumes a 240-bar day.
+BJ securities use explicit source identities such as `BJ.920000`; they are not
+mapped into an execution consumer's unsupported exchange identity.
+
+`labels=[...]` optionally reports exact requested omissions. A range-only query
+does not guess an expected trading calendar, suspension state, or complete
+history. An empty result stays empty.
+
+Asset paths follow the shared deployment convention: a relative `data_root`
+is relative to the deployment file, and a relative asset path is relative to
+that resolved root. Moving a small deployment fixture does not depend on cwd.
+
+`coverage_basis` distinguishes requested-label omissions, publisher calendar /
+listing-span expectations, and actual missing trading days (unknown). The
+145,243 published-expected missing security-days are not verified lost trading
+days: 68,658 have existing source-reported suspension, 76,585 lack an existing
+daily reference; 62,161 of the latter are only publisher trading-day claims.
+The 243 dates after known official delisting overlap those groups. Another 412
+observed-span gaps lie outside the publisher's expected span. These are separate
+contexts, not additive error counts or a certified historical universe.
+
+Every row has separate quality information:
+
+| Field | Meaning |
+| --- | --- |
+| `price_status` | `invalid` for structural/nonpositive failures, `conflict` for a pinned scoped reference conflict, otherwise `unverified` |
+| `price_structurally_usable` | Basic OHLC checks only; this is not a permission to trade or value |
+| `activity_status` | Positive, zero, invalid (negative/noninteger), or unknown volume; none proves liquidity or suspension |
+| `diagnostics` | Fixed storage-envelope findings and separately named rounding hypotheses |
+| `review_evidence` | Optional range restriction, bound to file hash and physical positions |
+| `permission_status` | The reader grants no execution/valuation permission; an explicit bounded consumer profile can grant otherwise eligible uses |
+| `use_decision` | `deny` versus `not_granted` independently for execution and fresh valuation; known price invalid/conflict denies both, hard quantity errors deny execution |
+| `execution_admitted`, `new_valuation_admitted` | Legacy constant false means no reader grant, not a whole-library denial |
+
+Nulls, NaN/Inf, negative quantity/amount and noninteger quantity are explicitly
+diagnosed. Nonfinite prices cannot be structurally usable. The DataFrame retains
+IEEE values; `to_dict()` encodes NaN/+Infinity/-Infinity as strings and original
+nulls as JSON null, with `null_fields` retaining their distinction. Nothing is
+replaced by a zero or dropped.
+
+Price structure is checked independently of volume and amount. A finite
+`close < low` still makes the price invalid when volume is NaN or amount is
+null; both the price and activity diagnostics remain visible. Normal prices
+with invalid activity keep their own structural status: activity defects deny
+execution without inventing a price defect or granting fresh valuation.
+
+OHLC/volume/amount, interval semantics, daily state, corporate actions, and
+historical availability are separate dependencies. Float32 compatibility does
+not prove the original encoding. Integer-yuan or cumulative-100 feasibility is
+not a vendor-algorithm certificate or an enlarged acceptance tolerance.
+
+A quality overlay only denies use on exact ranges; it cannot authorize a row,
+repair values, remove securities, or liquidate holdings. A bad/missing quote
+must leave account quantity intact and require explicit stale-mark/state
+handling. Reverting the overlay changes review classification, not raw data.
+
+`export_minute_research` derives `minute-row-use.v1` from the stored native
+observation and binds it to the source contract and stored row hashes. Keep the
+complete `native_observation` in the imported row; substituting another label,
+source hash or six-field value is rejected. AQ independently checks this binding
+(including legacy nested observations), and research opt-in cannot override a
+deny. Conditional VWAP/extrema warnings never produce a hard deny.
+
+The default export still rejects missing slots. For a reviewed partial snapshot,
+explicit metadata `gap_policy="explicit_unavailable"` exports separate
+`unavailable_minutes` backed by the snapshot coverage report. It does not create
+OHLC rows, infer suspension, or claim a lost trade. Publish only the coverage
+that actually passed Store validation. Unknown calendar, excluded quality rows
+and source conflicts still reject export. AQ requires exactly the union of
+observed rows and declared missing slots, forbids matching at denied/missing
+slots, and preserves quantity with the last usable mark explicitly `stale`.
+The normal quote after the gap resumes marking/matching. Account positions and
+`get_current_data()[security].valuation` expose the mark status and source label.
+
+Execution isolation does not filter historical indicator windows. The native
+reader keeps invalid/conflict values together with their quality columns. AQ's
+historical `get_price` returns the observed raw six fields without a historical
+`use_policy` column; it may return a conflict price even while the current
+account mark is stale at an earlier usable quote. Missing quotes add no rows,
+and `count` counts observations, not necessarily consecutive trading minutes.
+
+There is no automatic quality-filtered historical research API in this change.
+An indicator or signal must explicitly use a reviewed input/window selection,
+inspect native `price_status`, `diagnostics` and `use_decision`, and verify the
+remaining label coverage before computing an aggregate. `labels=[...]` selects
+only the caller's named native labels; it does not review or certify them.
+Excluding a denied row must remain an explicit missing observation, not silently
+compress time or fill a value. A non-denied or `unverified` row is not a grant.
+
+For bounded AQ research, use an explicitly reviewed scope and the public AD
+Store / `export_minute_research` APIs. Store's decimal contract can reject native
+values with more than six decimal places; this reader never rounds them to make
+an import pass. Preserve the native observation in source evidence. Keep source
+interval/availability unknown, use the explicit retrospective replay model,
+review the calendar/state/actions, and audit every fill against source open,
+capacity, fees, T+1 and account conservation. A successful backtest is not a data
+acceptance result. Do not export the whole library into that bounded interface.
+
+The optional `cumulative_100_feasible` diagnostic is a mathematical existence
+test for integer true volumes whose cumulative sum rounds half-up to reported
+100-share cumulative volume. It requires the reported lattice and checks all
+prefixes jointly, starting true and reported day cumulative volume at zero.
+An empty integer-volume interval is explicitly infeasible under the hypothesis;
+unsupported numeric bounds/lattices remain separately inapplicable. It never
+reconstructs or overwrites true volume.
+
+The extrema diagnostics additionally ask whether at least one share could have
+traded at each distinct high/low. They use actual-trade/same-interval/exact-share
+assumptions. A separate +/-99-share and one-yuan branch remains a counterfactual.
+These warnings never change a row to a certain error or increase admission.
+
+The envelope also requires price, volume and amount to describe the same trade
+set, units and interval. Existing JQ raw data is itself a counterexample to
+treating this as unconditional truth: 600000, 2026-06-04 10:04 has low=9.21,
+volume=683000 and money=6289257, below low×volume=6290430 by 1173 CNY; HF has
+the same volume/low and amount one yuan lower. This neither authenticates either
+source nor identifies the mechanism. Repeated agreement or a cumulative-volume
+fit cannot repair or admit the whole library. No warning threshold is widened.

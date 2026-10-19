@@ -5,17 +5,23 @@ import json
 import sys
 
 from ashare_data.core.model import DataError
-from ashare_data.product import LocalDailyProduct
+from ashare_data.product import LocalDailyProduct, LocalMinuteProduct
 from ashare_data.product.configuration import resolve
 from ashare_data.product.daily import SOURCES
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--deployment")
     parser.add_argument("--profile", default="product")
     parser.add_argument("--root", help="Explicit existing local-daily root overrides the manifest")
     commands = parser.add_subparsers(dest="operation", required=True)
+    commands.add_parser("minute-sources", help="List registered minute sources without reading bars")
+    minute = commands.add_parser("minute", help="Read a registered minute source; default remains TDX")
+    minute.add_argument("--source", default="tdx")
+    minute.add_argument("--security", required=True)
+    minute.add_argument("--start", required=True)
+    minute.add_argument("--end", required=True)
     catalogue = commands.add_parser("catalogue")
     catalogue.add_argument("--query", default="")
     catalogue.add_argument("--limit", type=int, default=100)
@@ -37,8 +43,17 @@ def main():
                 choices=("covered_research", "price_only_no_limits"),
                 default="covered_research",
             )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     try:
+        if args.operation in {"minute", "minute-sources"}:
+            if args.root:
+                raise DataError("PRODUCT_MINUTE_CONFIGURATION", "Use a deployment for minute sources")
+            owner = LocalMinuteProduct(args.deployment, profile=args.profile)
+            result = owner.sources() if args.operation == "minute-sources" else owner.prices(
+                args.security, args.start, args.end, source=args.source
+            )
+            print(json.dumps(result, ensure_ascii=False, sort_keys=True, allow_nan=False))
+            return 0
         configuration = (
             None
             if args.root and not args.deployment

@@ -8,7 +8,8 @@ from ashare_data.core.model import DataError, digest, require
 from ashare_data.product.references import KINDS, normalize
 
 
-def resolve(deployment=None, *, profile="product", reference_set=None):
+def load_profile(deployment=None, *, profile="product"):
+    """Read only the common manifest envelope; consumers resolve their own assets."""
     selected = deployment or os.environ.get("ASHARE_DEPLOYMENT")
     if selected is None and os.environ.get("ASHARE_DATA_ROOT"):
         selected = Path(os.environ["ASHARE_DATA_ROOT"]).expanduser() / "deployment.json"
@@ -36,6 +37,17 @@ def resolve(deployment=None, *, profile="product", reference_set=None):
             "PRODUCT_CONFIGURATION",
             "Select a product profile; evaluation data is not a product fallback",
         )
+        return path, root, value, selected_profile
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        raise DataError(
+            "PRODUCT_CONFIGURATION", "Cannot resolve the selected deployment manifest",
+            {"reason": str(exc)},
+        ) from exc
+
+
+def resolve(deployment=None, *, profile="product", reference_set=None):
+    path, root, value, selected_profile = load_profile(deployment, profile=profile)
+    try:
         result = {"data_root": root, "profile": profile, "deployment": path}
         selected_assets = {}
         for setting, key, kind in (

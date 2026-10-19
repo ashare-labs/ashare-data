@@ -10,6 +10,7 @@ from decimal import Context, localcontext
 import json
 
 from ashare_data.core.model import digest, require, timestamp
+from ashare_data.research.minute_policy import row_use_policy
 
 SCHEMA = "ad-minute-research.v1"
 
@@ -28,7 +29,9 @@ def export_minute_research(snapshot, metadata):
         "A published snapshot and explicit real/synthetic flag are required",
     )
     require(
-        not ({"minute", "producer", "content_sha256", "schema"} & doc.keys()),
+        not (
+            {"minute", "unavailable_minutes", "producer", "content_sha256", "schema"} & doc.keys()
+        ),
         "MINUTE_RESEARCH_RESERVED_FIELDS",
         "The exporter owns schema, producer, minute rows and content identity",
     )
@@ -50,7 +53,13 @@ def export_minute_research(snapshot, metadata):
         "Distinct batches must have distinct source identities",
     )
     annotations = doc.pop("bar_annotations", {})
-    consumed, rows = set(), []
+    gap_policy = doc.get("gap_policy", "reject")
+    require(
+        gap_policy in {"reject", "explicit_unavailable"},
+        "MINUTE_RESEARCH_GAP_POLICY",
+        "Unknown gap policy",
+    )
+    consumed, rows, gaps = set(), [], []
     policy = "research" if doc["real_market_data"] else "synthetic"
     for day in days:
         sessions = doc["sessions"][day]
@@ -75,7 +84,7 @@ def export_minute_research(snapshot, metadata):
                     start,
                     end,
                     quality=policy,
-                    strict=True,
+                    strict=gap_policy == "reject",
                     as_of=None,
                     adjustment=None,
                     frequency="1m",
@@ -85,6 +94,31 @@ def export_minute_research(snapshot, metadata):
                 "MINUTE_RESEARCH_UNITS",
                 "Raw CNY prices/amount and share volume required",
             )
+            coverage = read["coverage"]
+            require(
+                not any(
+                    coverage[k]
+                    for k in ("unknown_calendar_dates", "unexpected", "excluded", "duplicate_keys")
+                ),
+                "MINUTE_RESEARCH_UNRESOLVED_COVERAGE",
+                "Only explicit missing quote slots may continue",
+            )
+            for missing in coverage["missing"]:
+                label = timestamp(missing["bar_start"], minute=True) + timedelta(minutes=1)
+                gaps.append(
+                    {
+                        "security": missing["symbol"],
+                        "source_label": label.isoformat(),
+                        "reason": "no_quote_in_selected_snapshot",
+                        "execution": "deny",
+                        "fresh_valuation": "deny",
+                        "evidence": {
+                            "snapshot_id": snapshot.snapshot_id,
+                            "coverage": coverage,
+                            "coverage_sha256": digest(coverage),
+                        },
+                    }
+                )
             for original in read["rows"]:
                 source = sources[original["source_id"]]
                 require(
@@ -106,6 +140,7 @@ def export_minute_research(snapshot, metadata):
                         k: str(raw[k]) for k in ("open", "high", "low", "close", "volume", "amount")
                     },
                     "quality": raw["quality"],
+                    "use_policy": row_use_policy(raw, source),
                     "bar_start": None,
                     "bar_end": None,
                     "available_at": None,
@@ -147,6 +182,8 @@ def export_minute_research(snapshot, metadata):
         },
         minute=rows,
     )
+    if gap_policy == "explicit_unavailable":
+        doc["unavailable_minutes"] = gaps
     doc.setdefault("source_refs", {})["ad_lineage"] = lineage
     doc["content_sha256"] = digest(doc)
     return doc
