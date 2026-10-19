@@ -17,9 +17,12 @@ Use the registered market, audit and deployment paths. Complete early daily proc
 ```sh
 python scripts/repair_market_coverage.py --root MARKET --audit AUDIT --entry ENTRY
 python scripts/repair_stockdb_coverage.py --root MARKET --audit AUDIT --entry ENTRY --old-audit ORIGINAL_STOCKDB_AUDIT --tooling MSGPACK_TOOLING
+python scripts/audit_coverage_repair.py --root MARKET --audit AUDIT
 python scripts/finalize_coverage_repair.py --root MARKET --audit AUDIT --entry ENTRY
 python scripts/finalize_coverage_repair.py --root MARKET --audit AUDIT --entry ENTRY --publish
 ```
+
+The independent input audit checks unique original keys and reconciles each exclusive disposition, recording exact source/year/reason scopes. The finalizer also requires the original explicit-source query restoration report from the retained acceptance run.
 
 These are R2 repair scripts for the sealed R1 source inventory, not arbitrary ingestion commands. Publication verifies all changed keys and values in bounded instrument groups, retained old rows and batches, disjoint supplemental days, unique target keys, exhaustive input dispositions, metadata references and source versions. CURRENT changes atomically. Consumers separately pin the new release and manifest SHA in deployment.json. Rollback restores the prior consumer entry and paired runtime; it never deletes objects.
 

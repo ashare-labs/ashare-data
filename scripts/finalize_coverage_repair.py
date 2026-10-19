@@ -214,6 +214,9 @@ def build(a, writer):
         return json.loads(pending.read_bytes())
     stock_summary = json.loads((a.audit / "stockdb-repair-summary.json").read_bytes())
     assert stock_summary["complete"]
+    independently_checked = json.loads((a.audit / "input-disposition-audit.json").read_bytes())
+    assert independently_checked["passed"] and independently_checked["batches"] == 13169
+    assert independently_checked["input_rows"] == 7348840 + 570743678
     with sqlite3.connect(
         (a.audit / "repair-checkpoint.sqlite3").as_uri() + "?mode=ro", uri=True
     ) as journal:
@@ -357,6 +360,8 @@ def build(a, writer):
         )
     for name in [
         "r2-verification.json",
+        "input-disposition-audit.json",
+        "source-query-restoration.json",
         "early-repair-summary.json",
         "stockdb-repair-summary.json",
         "stockdb-semantics-sample.json",
