@@ -1,5 +1,6 @@
 """Synthetic regression tests: financial data loss and resumability boundaries."""
 import copy
+import fcntl
 import gzip
 import json
 from pathlib import Path
@@ -174,6 +175,13 @@ class BatchTests(unittest.TestCase):
         self.assertTrue(result["checksums_verified"])
         self.assertEqual(result["integrity_errors"], [])
 
+    def test_report_writer_cannot_race_active_collector(self):
+        with (self.root / "writer.lock").open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            with self.assertRaises(BlockingIOError):
+                e.audit(self.root, write=True)
+            self.assertEqual(e.audit(self.root, write=False)["planned_tasks"], 5)
+
 
 class CalendarTests(unittest.TestCase):
     def payload(self):
@@ -191,11 +199,17 @@ class CalendarTests(unittest.TestCase):
         self.assertFalse(rows[3]["is_open"])  # Synthetic closed Tuesday is preserved.
         self.assertIsNone(rows[0]["historical_available_at"])
 
-    def test_missing_day_duplicate_and_unsupported_enum_rejected(self):
+    def test_missing_day_preserves_other_observations_without_guessing(self):
         data = self.payload()
-        data["data"].pop()
-        with self.assertRaises(ValueError):
-            self.parse(data)
+        data["data"].pop(0)
+        rows, coverage = self.parse(data)
+        self.assertEqual(len(rows), 19)
+        self.assertEqual(coverage["source_missing_dates"], ["2020-02-01"])
+        self.assertEqual(coverage["source_status"], "partial_source_month")
+        self.assertFalse(coverage["source_month_complete"])
+        self.assertFalse(any(r["date"] == "2020-02-01" for r in rows))
+
+    def test_duplicate_and_unsupported_enum_rejected(self):
         data = self.payload()
         data["data"][-1] = data["data"][0]
         with self.assertRaises(ValueError):

@@ -36,7 +36,7 @@ NORMALIZER_SHA256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 CORPORATE_PARSER_SHA256 = hashlib.sha256(
     (Path(__file__).parents[1] / "corporate_actions/sources.py").read_bytes()
 ).hexdigest()
-TERMINAL = {"complete", "empty_unknown", "parse_failed", "failed_exhausted"}
+TERMINAL = {"complete", "partial_source", "empty_unknown", "parse_failed", "failed_exhausted"}
 METRICS = {
     "BIZTOTINCO": ("total_operating_revenue", "营业总收入"),
     "BIZINCO": ("operating_revenue", "营业收入"),
@@ -277,8 +277,9 @@ def parse_calendar(raw, task, start, end):
     year, month = map(int, task["month"].split("-"))
     expected = {f"{year:04}-{month:02}-{d:02}" for d in range(1, calendar.monthrange(year, month)[1] + 1)}
     dates = [v["jyrq"] for v in values]
-    if len(dates) != len(set(dates)) or set(dates) != expected:
-        raise ValueError("Official month has missing, duplicate or escaped dates")
+    if len(dates) != len(set(dates)) or not set(dates) <= expected:
+        raise ValueError("Official month has duplicate or escaped dates")
+    missing = sorted(expected - set(dates))
     if any(v.get("jybz") not in {"0", "1"} for v in values):
         raise ValueError("Unknown official trading-day flag")
     rows = [{"schema": "ad.exchange-calendar-observation.v1", "exchange": "XSHE",
@@ -287,7 +288,9 @@ def parse_calendar(raw, task, start, end):
              "published_at": None, "historical_available_at": None,
              "historical_pit_certified": False, "security_tradability_proven": False}
             for i, value in enumerate(values) if start <= value["jyrq"] <= end]
-    return rows, {"source_status": "complete_source_month", "source_month": task["month"],
+    return rows, {"source_status": "partial_source_month" if missing else "complete_source_month",
+                  "source_missing_dates": missing, "source_month_complete": not missing,
+                  "source_month": task["month"],
                   "source_natural_days": len(values), "target_natural_days": len(rows),
                   "target_open_days": sum(r["is_open"] for r in rows),
                   "target_earliest_date": min(r["date"] for r in rows) if rows else None,
@@ -475,7 +478,10 @@ def normalize_saved(root, manifest, task, receipt, raw=None):
             row["response_sha256"] = receipt["attempts"][-1]["response_sha256"]
         payload = gzip.compress(b"".join(encoded(row) for row in rows), mtime=0)
         receipt["normalized"] = artifact(root, "normalized/" + task["id"] + ".jsonl.gz", payload)
-        receipt.update(state="complete" if rows else "empty_unknown", row_count=len(rows), coverage=coverage)
+        state = "complete" if rows else "empty_unknown"
+        if str(coverage.get("source_status", "")).startswith("partial_"):
+            state = "partial_source"
+        receipt.update(state=state, row_count=len(rows), coverage=coverage)
         receipt.pop("parse_error", None)
     except Exception as error:
         receipt.update(state="parse_failed", parse_error=f"{type(error).__name__}: {error}"[:500])
@@ -498,7 +504,7 @@ def replay(root, all_captured=False):
             if receipt.get("raw") and (all_captured or receipt["state"] in {"parse_failed", "captured"}):
                 normalize_saved(root, manifest, task, receipt)
                 atomic(path, encoded(receipt))
-        return audit(root, verify=True, write=True)
+        return audit(root, verify=True, write=True, _writer_owned=True)
 
 
 def load_batch(root):
@@ -519,13 +525,13 @@ def run(root, max_jobs=0, interval=2.0):
     stop = {"requested": False}
     def stop_signal(signum, frame):
         stop["requested"] = True
-    previous = {s: signal.signal(s, stop_signal) for s in (signal.SIGTERM, signal.SIGINT)}
     attempted = 0
     with (root / "writer.lock").open("a") as lock:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             raise RuntimeError("Another expansion worker is active") from None
+        previous = {s: signal.signal(s, stop_signal) for s in (signal.SIGTERM, signal.SIGINT)}
         try:
             # Only this collector's abandoned atomic temporaries are disposable.
             for sub in ("receipts", "raw", "normalized"):
@@ -613,8 +619,8 @@ def run(root, max_jobs=0, interval=2.0):
                        "last_task": task["id"], "last_state": receipt["state"], "requests_this_run": attempted}))
                 print(json.dumps({"task": task["id"], "state": receipt["state"], "rows": receipt.get("row_count")}), flush=True)
                 if attempted and attempted % 50 == 0:
-                    audit(root, verify=False, write=True)
-            return audit(root, verify=False, write=True)
+                    audit(root, verify=False, write=True, _writer_owned=True)
+            return audit(root, verify=False, write=True, _writer_owned=True)
         finally:
             atomic(root / "worker-exit.json", encoded({"at": now(), "pid": os.getpid(), "requests": attempted,
                                                        "stop_requested": stop["requested"]}))
@@ -622,8 +628,12 @@ def run(root, max_jobs=0, interval=2.0):
                 signal.signal(sig, handler)
 
 
-def audit(root, verify=False, write=False):
+def audit(root, verify=False, write=False, _writer_owned=False):
     root, manifest, tasks = load_batch(root)
+    if write and not _writer_owned:
+        with (root / "writer.lock").open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return audit(root, verify, write, _writer_owned=True)
     states, families, errors = Counter(), defaultdict(lambda: Counter()), []
     rows_out = []
     for task in tasks:
@@ -646,7 +656,7 @@ def audit(root, verify=False, write=False):
               "planned_tasks": len(tasks), "task_states": dict(states),
               "families": dict(families), "checksums_verified": verify, "integrity_errors": errors,
               "pending_or_retryable": sum(states[s] for s in ("pending", "running", "captured", "failed_retryable")),
-              "all_tasks_have_source_results": all(r["state"] in {"complete", "empty_unknown"} for r in rows_out),
+              "all_tasks_have_source_results": all(r["state"] in {"complete", "partial_source", "empty_unknown"} for r in rows_out),
               "full_history_complete": False, "historical_pit_certified": False,
               "unified_database_imported": False}
     if write:
