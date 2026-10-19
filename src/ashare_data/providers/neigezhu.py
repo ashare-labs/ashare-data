@@ -64,13 +64,22 @@ class NeigezhuMinuteView:
     """
 
     def __init__(
-        self, *, entry, manifest, expected_manifest_sha256, review=None, expected_review_sha256=None
+        self,
+        *,
+        entry,
+        manifest,
+        expected_manifest_sha256,
+        review=None,
+        expected_review_sha256=None,
+        source_root=None,
     ):
         self.entry = Path(entry).expanduser().resolve()
         doc = json.loads(self.entry.read_bytes())
         root = Path(doc.get("data_root", ".")).expanduser()
         root = (root if root.is_absolute() else self.entry.parent / root).resolve()
-        target = Path(doc["assets"]["minute-hf-download"]["path"]).expanduser()
+        target = Path(
+            source_root if source_root is not None else doc["assets"]["minute-hf-download"]["path"]
+        ).expanduser()
         self.root = (target if target.is_absolute() else root / target).resolve()
         self.manifest = Path(manifest).resolve()
         raw = self.manifest.read_bytes()

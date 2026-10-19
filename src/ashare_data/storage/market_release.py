@@ -400,7 +400,7 @@ class MarketRelease:
                 if f["table"] == table and (ids is None or f["instrument_id"] in ids)
             ]
             require(bool(items), "MARKET_EMPTY_SCOPE", "No files in the requested table/scope")
-            if table == "bars_1d":
+            if table == "bars_1d" and len({f["series_id"] for f in items}) == 1:
                 paths = ",".join(sql_literal(self.verify(f)) for f in items)
                 c.execute(
                     "CREATE VIEW market."
@@ -410,7 +410,7 @@ class MarketRelease:
                     + "], union_by_name=true)"
                 )
                 continue
-            # One logical minute table, with lossless tagged numeric values. Consumers
+            # Mixed physical series use lossless tagged numeric values. Consumers
             # choose a series before numeric arithmetic and extract its declared tag.
             parts = []
             for series_id in sorted({f["series_id"] for f in items}):
@@ -424,7 +424,7 @@ class MarketRelease:
                     "series_id",
                     "instrument_id",
                     "trade_date",
-                    "label_at",
+                    *(["label_at"] if table == "bars_1m" else []),
                     "batch_id",
                     "volume_shares",
                 ]

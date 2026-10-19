@@ -376,3 +376,41 @@ def test_increment_refreshes_expected_and_new_days_then_delete(tmp_path, monkeyp
     deletion["parent_manifest_sha256"] = r3.sha256
     assert apply(r3, deletion)["unchanged"]
     c.close()
+
+
+def test_daily_supplement_float_and_decimal_remain_exact(tmp_path):
+    from decimal import Decimal
+
+    files = []
+    with ReleaseWriter(tmp_path, free_reserve_bytes=0) as w:
+        meta = metadata(w)
+        c = connection(memory="128MB", threads=1)
+        for series, price in [
+            (1, "8.350000381469727::DOUBLE"),
+            (5, "'123456789.123456789012'::DECIMAL(38,12)"),
+        ]:
+            query = f"""select {series}::INTEGER series_id,1::INTEGER instrument_id,date '2024-01-02' trade_date,
+              {price} open_price,{price} high_price,
+              {price} low_price,{price} close_price,100::BIGINT volume_shares,{price} turnover_cny,1::INTEGER batch_id"""
+            obj = w.parquet(c, query, [], f"series-{series}")
+            files.append(
+                {
+                    **obj,
+                    "table": "bars_1d",
+                    "series_id": series,
+                    "instrument_id": 1,
+                    "rows": 1,
+                    "first_date": "2024-01-02",
+                    "last_date": "2024-01-02",
+                    "duplicate_keys": 0,
+                }
+            )
+        c.close()
+        w.publish(manifest(meta, files), expected_parent=None)
+    r = MarketRelease(tmp_path)
+    rows = r.read("bars_1d", "000001.XSHE", "2024-01-02", "2024-01-02")
+    assert rows[0]["close_price"] == 8.350000381469727
+    assert rows[1]["close_price"] == Decimal("123456789.123456789012")
+    with r.sql(tables=("bars_1d",)) as c:
+        values = c.execute("select close_price from market.bars_1d order by series_id").fetchall()
+        assert values == [(8.350000381469727,), (Decimal("123456789.123456789012"),)]

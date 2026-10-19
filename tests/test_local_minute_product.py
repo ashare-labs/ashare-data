@@ -204,3 +204,24 @@ def test_auto_means_fixed_default_and_never_falls_back(deployment):
     with pytest.raises(DataError):
         query(owner, source="auto")
     assert query(owner, source="tdx")["rows"]
+
+
+def test_explicit_native_research_survives_canonical_release_selection(deployment):
+    owner = LocalMinuteProduct(deployment)
+    owner.market_release = {"release_id": 2}
+    owner.frozen_market_config = {"market_release": "must not be used for explicit native research"}
+    result = query(owner, source="neigezhu")
+    assert len(result["rows"]) == 4
+    assert result["rows"][1]["high"] == 9
+    assert result["rows"][1]["use_decision"]["execution"] == "deny"
+
+
+def test_native_reader_keeps_pinned_root_after_entry_asset_changes(deployment):
+    owner = LocalMinuteProduct(deployment)
+    expected = query(owner, source="neigezhu")
+    document = json.loads(deployment.read_text())
+    document["assets"]["minute-hf-download"]["path"] = "unrelated-new-download"
+    deployment.write_text(json.dumps(document))
+    actual = query(owner, source="neigezhu")
+    assert actual["rows"] == expected["rows"]
+    assert actual["binding"] == expected["binding"]

@@ -1,8 +1,9 @@
-"""Product compatibility over one immutable market release; no raw-source fallback."""
+"""Canonical facts and explicit source observations pinned to one immutable release."""
 
 from contextlib import contextmanager
 from decimal import Decimal
 import sqlite3
+import json
 
 import pandas as pd
 
@@ -13,7 +14,7 @@ from ashare_data.storage.market_release import MarketRelease, FIELDS
 
 LIMITATIONS = [
     "Whole daily observations follow the release-frozen source priority; conflicts remain in the disposition ledger.",
-    "Pre-2010 units/basis and unresolved invalid observations remain quarantined in preserved source assets.",
+    "Only evidence-supported early observations are admitted; unresolved values retain exact source locators and restrictions.",
     "Minute labels, including 09:30, are preserved; interval boundaries and strict historical PIT are unverified.",
     "A frozen local release reproduces values, identifiers, calendar and rules; it does not certify historical market availability.",
     "Missing and zero-volume observations do not prove suspension. Quarantined values are not fabricated or filled.",
@@ -34,6 +35,8 @@ class FrozenDailyStore(LocalDailyStore):
         self.release = release
         self.root = release.root
         self._code_events = None
+        self._source_context = None
+        self._source_store = None
         self.db = sqlite3.connect(release.metadata_path.as_uri() + "?mode=ro&immutable=1", uri=True)
         self.db.row_factory = sqlite3.Row
 
@@ -49,10 +52,42 @@ class FrozenDailyStore(LocalDailyStore):
         return sorted(expected)
 
     def get_price(self, security, start="2010-01-01", end=None, source="auto", **unused):
-        rows = self.release.read("bars_1d", security, start, end, series_id=1)
         selected = "canonical" if source in ("auto", "canonical") else source
         if selected != "canonical":
-            rows = [r for r in rows if r["source"] == selected]
+            require(
+                not security.startswith("BJ."),
+                "MARKET_SOURCE_SCOPE",
+                "This frozen SQLite source has no Beijing daily observations; use canonical",
+            )
+            from ashare_data.storage.source_observations import daily_source
+
+            if self._source_store is None:
+                row = self.db.execute(
+                    "select body from source_assets where asset_id='daily-sqlite'"
+                ).fetchone()
+                require(
+                    row is not None,
+                    "MARKET_SOURCE_SNAPSHOT",
+                    "Frozen original source metadata is required",
+                )
+                self._source_context = daily_source(json.loads(row[0]))
+                self._source_store = self._source_context.__enter__()
+            frame = self._source_store.get_price(security, start, end, source=selected)
+            frame.attrs.update(
+                release=self.release.receipt(),
+                access="explicit_frozen_source_observation",
+                canonical=False,
+                source_asset_id="daily-sqlite",
+            )
+            return frame
+        rows = self.release.read("bars_1d", security, start, end, series_id=1)
+        rows.extend(self.release.read("bars_1d", security, start, end, series_id=5))
+        rows.sort(key=lambda row: row["trade_date"])
+        require(
+            len({row["trade_date"] for row in rows}) == len(rows),
+            "MARKET_DUPLICATE_KEY",
+            "Canonical daily supplements must not overlap selected daily facts",
+        )
         public = []
         for r in rows:
             row = {
@@ -106,13 +141,21 @@ class FrozenDailyStore(LocalDailyStore):
             "price_unit": "CNY/share",
             "volume_unit": "shares",
             "amount_unit": "CNY",
-            "numeric_storage": "exact Decimal(38,12)/BIGINT",
+            "numeric_storage": "Series 1 exact Decimal(38,12); series 5 original binary64; integral share volume",
             "release": self.release.receipt(),
             "priority_frozen_for_entire_release": True,
             "no_request_window_reranking": True,
             "historical_pit_verified": False,
         }
         return frame
+
+    def close(self):
+        try:
+            if self._source_context is not None:
+                self._source_context.__exit__(None, None, None)
+                self._source_context = None
+        finally:
+            self.db.close()
 
 
 class ReleasedDailyProduct(LocalDailyProduct):
@@ -144,6 +187,45 @@ class ReleasedDailyProduct(LocalDailyProduct):
         value = super()._prices(*args, **kwargs)
         value["limitations"] = list(LIMITATIONS)
         value["market_release"] = self.release.receipt()
+        if value["source"] in ("auto", "canonical"):
+            known = set(value["calendar"])
+            missing_listing = {
+                gap["security"] for gap in value["gaps"] if gap["code"] == "SECURITY_UNAVAILABLE"
+            }
+            for gap in value["gaps"]:
+                if gap["code"] == "OUTSIDE_LISTING" and gap["security"] in missing_listing:
+                    gap.update(
+                        code="LISTING_STATE_UNKNOWN",
+                        detail="Historical listing state is unavailable in this release",
+                    )
+            for item in value["coverage"]:
+                outside = sorted(
+                    {
+                        row["date"]
+                        for row in value["rows"]
+                        if row["security"] == item["security"] and row["date"] not in known
+                    }
+                )
+                if outside:
+                    item["observed_dates_outside_frozen_calendar"] = outside
+                    item["expected_days"] = None
+                    item["missing_days"] = None
+                    item["expected_state"] = "partly_unknown"
+                    value["gaps"].append(
+                        {
+                            "code": "EXPECTED_COVERAGE_UNKNOWN",
+                            "security": item["security"],
+                            "first": outside[0],
+                            "last": outside[-1],
+                            "detail": "Source observations exist outside the frozen calendar; expected sessions are not inferred from their presence",
+                        }
+                    )
+        if value["source"] not in ("auto", "canonical"):
+            value["access"] = "explicit_frozen_source_observation"
+            value["limitations"] = [
+                "Explicit source observations retain the original provider values and listing/calendar filters.",
+                "These records are not silently promoted to canonical facts; historical PIT is unverified.",
+            ]
         return value
 
     def catalogue(self, query="", limit=100, offset=0):
@@ -195,28 +277,64 @@ class ReleasedDailyProduct(LocalDailyProduct):
 
 def minute_prices(config, security, start, end, source="canonical"):
     release = open_release(config)
-    series = {"canonical": 2, "neigezhu": 2, "tdx": 3}.get(source)
+    series = {"canonical": 2, "neigezhu": 2, "tdx": 3, "free_stockdb": 4}.get(source)
     require(
         series is not None, "PRODUCT_MINUTE_SOURCE_UNKNOWN", "Choose a registered released source"
     )
     a, b = timestamp(start, minute=True), timestamp(end, minute=True)
     raw = release.read("bars_1m", security, a, b, series_id=series, max_rows=15000)
+    if source == "canonical":
+        supplement = release.read("bars_1m", security, a, b, series_id=4, max_rows=15000)
+        require(
+            not ({r["trade_date"] for r in raw} & {r["trade_date"] for r in supplement}),
+            "MARKET_MINUTE_SCOPE",
+            "Supplements must use separate security days, without guessing label alignment",
+        )
+        raw.extend(supplement)
+        raw.sort(key=lambda row: row["label_at"])
+        require(len(raw) <= 15000, "MARKET_QUERY_BOUND", "Narrow the requested range")
+    restrictions = {}
+    with release.metadata() as db:
+        if db.execute(
+            "select 1 from sqlite_master where type='table' and name='release_row_restrictions'"
+        ).fetchone():
+            for record in db.execute(
+                "select * from release_row_restrictions where instrument_id=?",
+                (release.identifiers[security],),
+            ):
+                restrictions[(record["series_id"], record["label_at"])] = dict(record)
     rows = []
     for row in raw:
         value = {
             "security": security,
             "instrument_id": row["instrument_id"],
-            "series_id": series,
+            "series_id": row["series_id"],
+            "source": "free_stockdb"
+            if row["series_id"] == 4
+            else "neigezhu"
+            if row["series_id"] == 2
+            else "tdx",
             "trade_date": str(row["trade_date"]),
             "source_label": row["label_at"].isoformat(),
             "label_at": row["label_at"].isoformat(),
             "batch_id": row["batch_id"],
-            "price_status": "source_reported",
+            "price_status": "unverified",
             "interval_status": "unknown",
             "historical_pit": False,
         }
         for field, column in zip(("open", "high", "low", "close", "volume", "amount"), FIELDS):
             value[field] = str(row[column]) if isinstance(row[column], Decimal) else row[column]
+        restriction = restrictions.get((row["series_id"], row["label_at"].isoformat()))
+        value["diagnostics"] = []
+        if restriction:
+            value["price_status"] = restriction["price_status"]
+            value["diagnostics"].append(restriction["rule"])
+        for field in ("volume", "amount"):
+            if value[field] is None:
+                value["diagnostics"].append("null_" + field)
+        from ashare_data.research.minute_policy import native_denials
+
+        value["use_decision"] = native_denials(value)
         rows.append(value)
     return {
         "schema": "ad-local-minute-prices.v1",
