@@ -167,7 +167,7 @@ def test_keychain_collector_reads_only_bound_helper_and_reports_persistent_origi
     calls = []
     monkeypatch.setattr(keychain, "read_token", lambda path: calls.append(path) or SECRET)
     captured = []
-    monkeypatch.setattr(runner, "collect", lambda *args: captured.append(args))
+    monkeypatch.setattr(runner, "collect", lambda *args, **kwargs: captured.append(args))
     monkeypatch.setattr(runner.sys, "argv", ["run", "--root", str(root), "--baseline", str(tmp_path),
                                            "--keychain", "--keychain-helper", str(helper)])
     assert runner.main() == 0 and calls == [helper]

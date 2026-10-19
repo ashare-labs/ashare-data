@@ -14,6 +14,7 @@ import gzip
 import json
 import os
 from pathlib import Path
+from uuid import uuid4
 
 from ashare_data.financials import expansion as e
 from ashare_data.financials import tushare_reference as ts
@@ -403,7 +404,8 @@ def reconciliation_rows(plan, roots):
             receipt = read(root / "receipts" / (leaf["id"] + ".json"), {})
             receipts.append(dict(task_id=leaf["id"], state=receipt.get("state", "pending"), coverage=receipt.get("coverage", {})))
             if receipt.get("normalized"):
-                rows.extend(r | dict(source_task_id=leaf["id"], source_batch=str(root)) for r in normalized(root, receipt))
+                rows.extend(r | dict(source_task_id=r.get("source_task_id", leaf["id"]),
+                                     source_batch=r.get("source_batch", str(root))) for r in normalized(root, receipt))
         api = task["kind"].removeprefix("tushare_")
         expected = (sorted(set(task.get("expected_sessions", [])) | {r["trade_date"] for r in rows})
                     if api == "adj_factor" else sorted(set(task.get("periods", [])) | {r["period_end"] for r in rows})
@@ -449,7 +451,8 @@ def reconcile(plan, roots, output):
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
     path = output / "field-reconciliation.jsonl.gz"
-    temporary = path.with_name(path.name + ".tmp")
+    retained = e.PRESERVE_TEMPORARIES.get()
+    temporary = path.with_name(path.name + ("." + uuid4().hex if retained else "") + ".tmp")
     counts, total = Counter(), 0
     try:
         with temporary.open("wb") as stream:
@@ -462,7 +465,8 @@ def reconcile(plan, roots, output):
             os.fsync(stream.fileno())
         os.replace(temporary, path)
     finally:
-        temporary.unlink(missing_ok=True)
+        if not retained:
+            temporary.unlink(missing_ok=True)
     artifact = dict(path=path.name, sha256=e.digest(path.read_bytes()), bytes=path.stat().st_size)
     result = dict(schema="ad.tushare-field-reconciliation.v1", at=e.now(), plan_sha256=e.digest(e.encoded(plan)),
                   states=dict(counts), artifact=artifact, records=total, full_history_complete=False,

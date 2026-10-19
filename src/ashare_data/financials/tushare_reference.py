@@ -230,6 +230,12 @@ def normalize(root, manifest, task, receipt, raw=None):
         elif task["kind"] == "tushare_stk_limit":
             rows, coverage = limit_rows(raw, task, json.loads((root / "universe.json").read_text()))
             partial = coverage["row_cap_reached"]
+        elif receipt.get("source_reuse"):
+            from ashare_data.financials import tushare_dividends
+            rows, coverage = tushare_dividends.normalize_reused(raw, task, receipt)
+            receipt["coalescing_normalizer_sha256"] = e.digest(Path(tushare_dividends.__file__).read_bytes())
+            receipt["fundamentals_normalizer_sha256"] = e.digest(Path(tushare_dividends.f.__file__).read_bytes())
+            partial = False
         else:
             from ashare_data.financials import tushare_fundamentals
             rows, coverage = tushare_fundamentals.observations(raw, task)
@@ -342,6 +348,7 @@ def prepare_capped_targets(root, baseline, limit_root):
                     "source_receipts": sources, "cap_repair": "missing_target_codes_only; no_offset_assumption"})
 
 
-def run(root, transport, max_jobs=0, *, stop_paths=()):
+def run(root, transport, max_jobs=0, *, stop_paths=(), retain_temporaries=False):
     return e.run(root, max_jobs, 1.0, fetcher=transport, normalizer=normalize,
-                 authenticated=True, minimum_interval=1.0, stop_paths=stop_paths)
+                 authenticated=True, minimum_interval=1.0, stop_paths=stop_paths,
+                 retain_temporaries=retain_temporaries)
