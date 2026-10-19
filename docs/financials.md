@@ -438,10 +438,34 @@ PYTHONPATH=src python -B scripts/run_tushare_reference.py \
 
 如已有安全注入的环境变量，可用 `--token-env TUSHARE_TOKEN` 代替 `--prompt-token`。
 `--prepare-only` 不读取凭据或联网，只写不可变清单。隐藏输入必须在用户自己的终端完成；
-凭据只留在工作进程内存，拒绝跳转和降级到HTTP，源响应若回显凭据则拒绝保存。
+默认凭据只留在工作进程内存；用户明确授权持久保存时，可使用下述限定服务的macOS钥匙串入口。
+拒绝跳转和降级到HTTP，源响应若回显凭据则拒绝保存。
 隐藏输入若不能关闭终端回显会直接失败；已有环境变量仅在本进程读取并移出其环境，避免传给子进程。
 不搜索密钥存储、不新开权限、付费、升级或接受协议；权限错误停源并保留可恢复状态。
 批次总根的 `STOP` 在当前请求保存完后生效，等待冷却时也检查；总根及各子批次写锁防止重复启动。
+
+后台启动通过 `subprocess.Popen` 执行全新的Python解释器并建立新会话，不在多线程进程中调用
+Python级 `os.fork()` 后继续采集，也不用preexec_fn。单次凭据经匿名管道传递，不放在argv或子进程环境。
+已运行批次在询问凭据前被拒绝；子进程取得批次锁并写初始化回执后才回传启动确认。
+启动确认明确标为 `authentication_unverified`，不是鉴权或数据成功证明。
+握手超时且子进程仍在时保留进程、报告不确定状态，不能自动再启动或杀掉可能正在采集的进程。
+
+用户批准持久配置后，编译 `scripts/tushare-keychain.swift` 为固定位置的本机helper，使用
+`scripts/configure_tushare_keychain.py --helper HELPER --status-file BATCH_ROOT/keychain-status.json`
+在用户终端隐藏输入。它仅新增服务 `ashare-data.tushare`、账户 `tushare` 的通用密码项，
+已有项目直接保留，不能覆盖。也可由用户在钥匙串访问的登录钥匙串中手工创建同名项目。
+不通过security命令行的密码参数、不写明文配置、不经聊天；macOS权限交互由用户在本机处理。
+本批次的 `configure-tushare-keychain.command` 封装该一次性配置，保存后重试不要求再次输入token。
+手工保存的项目如需本机helper访问许可，可由用户运行 `HELPER authorize` 触发系统授权；
+只读取该项并丢弃值，输出仅含授权状态，不修改ACL或解锁其他项目。后台读取禁止弹窗。
+采集使用 `--keychain --keychain-helper HELPER`；新解释器核对 `credential-policy.json` 中的服务、账户、
+helper绝对路径及SHA256后读取。helper将秘密写入限定匿名管道，stdout只用于非秘密状态，状态查询不读取秘密。
+钥匙串锁定/访问拒绝单独报告；不能为恢复访问绕过系统保护或偷偷改到明文存储。
+旧不可变请求清单保留准备时的存储注释，后来用户批准的变更由父批次 `credential-policy.json` 和worker中的实际来源单独记录。
+
+依据：[Python 3.12 fork约束](https://docs.python.org/3.12/library/os.html#os.fork)、
+[subprocess进程/管道接口](https://docs.python.org/3.12/library/subprocess.html)、
+[Apple Keychain查询](https://developer.apple.com/documentation/security/secitemcopymatching(_:_:))。
 
 首阶段为沪深各年 `trade_cal`，再按实际返回交易日采 `stk_limit`。最新日作为普通首任务，
 随后连续采全部历史日期；没有额外小批批准门槛。目标证券仍由原始历史主板基线及代码存续区间限定。

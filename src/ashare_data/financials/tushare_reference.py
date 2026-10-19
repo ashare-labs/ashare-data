@@ -253,11 +253,18 @@ def _prepare(root, baseline, tasks, extra):
     if root == baseline:
         raise ValueError("Independent source partition required")
     raw = (baseline / "universe.json").read_bytes()
+    credential_policy = "request_identity_and_source_files_never_contain_credentials; storage_policy_is_explicit_in_parent_worker"
+    if (root / "manifest.json").exists():
+        previous = json.loads((root / "manifest.json").read_text())
+        if previous.get("credential_policy") == "runtime_reference_or_local_hidden_prompt; never_stored":
+            # Preserve the immutable earlier request plan. An explicit parent
+            # credential-policy.json records any later user-approved storage change.
+            credential_policy = previous["credential_policy"]
     manifest = dict(schema=e.SCHEMA, baseline_batch=str(baseline), target_start=original["target_start"],
                     target_end=original["target_end"], baseline_codes=original["baseline_codes"],
                     target_codes=original["target_codes"], source="tushare", source_families=sorted({t["kind"] for t in tasks}),
                     universe_sha256=e.digest(raw), tasks_sha256=e.digest(e.encoded(tasks)), planned_tasks=len(tasks),
-                    credential_policy="runtime_reference_or_local_hidden_prompt; never_stored", endpoint=ENDPOINT,
+                    credential_policy=credential_policy, endpoint=ENDPOINT,
                     local_request_interval_seconds=1.0, documented_general_requests_per_minute=200,
                     documented_daily_per_api_ceiling=100000, required_points=2000,
                     auth_is_existing_user_permission=True, data_license="local_research; no_raw_redistribution",
