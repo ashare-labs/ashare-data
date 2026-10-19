@@ -27,6 +27,8 @@ def main():
     spec = json.loads(raw)
     if spec.get("schema") != "ad.reference-followup-plan.v1":
         parser.error("An explicit follow-up plan is required")
+    if spec.get("finish_policy") != "current_batch_only":
+        parser.error("The supervisor must stop after this explicit batch; finish_policy=current_batch_only required")
     stop = {"requested": False}
     def stopped(*_):
         stop["requested"] = True
@@ -37,9 +39,15 @@ def main():
         atomic(root / "worker.json", encoded(dict(pid=os.getpid(), started_at=now(), plan_sha256=digest(raw),
                code_sha256=digest(Path(follow.__file__).read_bytes()), credentials_loaded=False, source_requests=0)))
         state = follow.read(root / "progress.json", {})
+        if state.get("plan_sha256") != digest(raw):
+            state = {}  # Do not inherit terminal results from another explicit plan.
+        state["plan_sha256"] = digest(raw)
         try:
             while not stop["requested"] and not (root / "STOP").exists():
                 state = follow.tick(spec, state, root)
+                if state.get("completion", {}).get("exit_ready"):
+                    atomic(root / "completion.json", encoded(dict(at=now(), plan_sha256=digest(raw), **state["completion"])))
+                    break
                 if args.once:
                     break
                 until = time.monotonic() + args.interval

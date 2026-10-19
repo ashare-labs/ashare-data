@@ -23,14 +23,37 @@ FIELDS = {
     "trade_cal": "exchange,cal_date,is_open,pretrade_date",
     "stk_limit": "trade_date,ts_code,pre_close,up_limit,down_limit,asset_type,exchange",
 }
+FINANCIAL_ID = "ts_code,ann_date,f_ann_date,end_date,report_type,comp_type,end_type,update_flag"
+FIELDS.update({
+    "income": FINANCIAL_ID + ",total_revenue,revenue,n_income,n_income_attr_p,basic_eps,diluted_eps",
+    "balancesheet": FINANCIAL_ID + ",total_assets,total_liab,total_hldr_eqy_exc_min_int,total_share",
+    "cashflow": FINANCIAL_ID + ",n_cashflow_act,n_cashflow_inv_act,n_cash_flows_fnc_act,c_cash_equ_end_period",
+    "fina_indicator": "ts_code,ann_date,end_date,update_flag,eps,roe,roa,current_ratio,quick_ratio,netprofit_margin,debt_to_assets",
+    "dividend": "ts_code,end_date,ann_date,div_proc,stk_div,stk_bo_rate,stk_co_rate,cash_div,cash_div_tax,record_date,ex_date,pay_date,div_listdate,imp_ann_date,base_date,base_share",
+    "adj_factor": "ts_code,trade_date,adj_factor",
+})
 ROW_CAP = 5800
 MAX_BODY = 16 * 1024 * 1024
 
 
-def request_url(api, params):
+def request_url(api, params, fields=None):
     if api not in FIELDS:
         raise ValueError("Unapproved Tushare API")
-    return ENDPOINT + "/?" + urlencode({"api_name": api, **params})
+    query = {"api_name": api, **params}
+    if fields is not None:
+        query["fields"] = fields if isinstance(fields, str) else ",".join(fields)
+    url = ENDPOINT + "/?" + urlencode(query)
+    request_identity(url)
+    return url
+
+
+def request_fields(url):
+    values = parse_qs(urlparse(url).query, keep_blank_values=True)
+    api = values.get("api_name", [None])[0]
+    selected = values.get("fields", [FIELDS.get(api, "")])[0].split(",")
+    if not selected or len(selected) != len(set(selected)) or not set(selected) <= set(FIELDS.get(api, "").split(",")):
+        raise ValueError("Unapproved or duplicate fields")
+    return ",".join(selected)
 
 
 def request_identity(url):
@@ -42,6 +65,8 @@ def request_identity(url):
         raise ValueError("Duplicate request parameter")
     params = {k: v[0] for k, v in values.items()}
     api = params.pop("api_name", None)
+    params.pop("fields", None)
+    request_fields(url)
     if api == "trade_cal":
         if set(params) != {"exchange", "start_date", "end_date"} or params["exchange"] not in {"SSE", "SZSE"}:
             raise ValueError("Explicit exchange and bounded dates required")
@@ -54,6 +79,9 @@ def request_identity(url):
         e.day(params["trade_date"])
         if "ts_code" in params and not re.fullmatch(r"\d{6}\.(SH|SZ)", params["ts_code"]):
             raise ValueError("Invalid target code")
+    elif api in {"income", "balancesheet", "cashflow", "fina_indicator", "dividend", "adj_factor"}:
+        from ashare_data.financials.tushare_fundamentals import validate_params
+        validate_params(api, params)
     else:
         raise ValueError("Unapproved Tushare API")
     return api, params
@@ -78,7 +106,7 @@ class Transport:
 
     def __call__(self, url):
         api, params = request_identity(url)
-        body = e.encoded(dict(api_name=api, params=params, fields=FIELDS[api], token=self.__token))
+        body = e.encoded(dict(api_name=api, params=params, fields=request_fields(url), token=self.__token))
         req = Request(ENDPOINT, body, {"Content-Type": "application/json", "Accept": "application/json",
                                      "User-Agent": "ashare-local-research/1.0"}, method="POST")
         try:
@@ -199,9 +227,14 @@ def normalize(root, manifest, task, receipt, raw=None):
         if task["kind"] == "tushare_trade_cal":
             rows, coverage = calendar_rows(raw, task)
             partial = bool(coverage["missing_calendar_dates"])
-        else:
+        elif task["kind"] == "tushare_stk_limit":
             rows, coverage = limit_rows(raw, task, json.loads((root / "universe.json").read_text()))
             partial = coverage["row_cap_reached"]
+        else:
+            from ashare_data.financials import tushare_fundamentals
+            rows, coverage = tushare_fundamentals.observations(raw, task)
+            partial = coverage["row_cap_reached"]
+            receipt["fundamentals_normalizer_sha256"] = e.digest(Path(tushare_fundamentals.__file__).read_bytes())
         for row in rows:
             row.update(observed_at=receipt["observed_at"], response_sha256=e.digest(raw),
                        task_id=task["id"], historical_pit_certified=False)

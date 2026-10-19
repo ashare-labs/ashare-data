@@ -456,7 +456,7 @@ PYTHONPATH=src python -B scripts/run_tushare_reference.py \
 在Tushare同范围产生可用数据前，既有zzshare进程保持运行。交接在原请求边界进行，
 保留既有源分区，重新核对缺口后仅保留必要补采；不能继续双份全量请求，也不能把限价成功
 扩大为停复牌/ST/复权因子全部已替代。新浪财务和巨潮原文继续提供互补字段和版本证据。
-后续普通财务接口须逐股保留 `ann_date/f_ann_date/report_type/update_flag`，各表日期参数分别核源；
+普通财务接口逐股保留 `ann_date/f_ann_date/report_type/update_flag`，各表日期参数分别核源；
 不使用5000积分VIP、权限有冲突的 `share_float`、独立分钟权限或全因子库。
 
 官方依据：[stk_limit](https://tushare.pro/document/2?doc_id=183)、
@@ -464,6 +464,52 @@ PYTHONPATH=src python -B scripts/run_tushare_reference.py \
 [权限频次](https://tushare.pro/document/2?doc_id=290)、
 [积分权限](https://tushare.pro/document/1?doc_id=108)、
 [财务修订FAQ](https://tushare.pro/document/2?doc_id=122)。
+
+### 财务、分红和因子的按字段补采
+
+同一入口在限价及截断目标补采结束后，等待原公开源批次自然结束并安全回放失败缓存，
+再冻结 `fundamentals/gap-plan.json`。等待期间凭据仍仅在进程内存；STOP和信号均可停止。
+已有计划恢复时沿用原任务与回执，不重新生成全量请求。各接口继续共享限流/封禁状态，串行实采。
+
+`scripts/plan_tushare_gaps.py --baseline PUBLIC_BATCH --root GAP_ROOT` 可先离线预览。
+它只读本次扩采的回执及规范数据，以回执和代码哈希缓存紧凑字段清单，不扫描日线或分钟大表。
+在途源任务标为 `pending_existing_source`；预览不能被当作已冻结或已采集清单。
+三张基础报表只对现有合并口径、CNY金额的实际字段缺口补采type 1金额；已有金额仅取缺失版本元数据。
+缺失报告期以其他已采基础报表的实际期间为候选，不把季度列表当作强制披露义务。
+普通元数据响应若返回此前未见的期间，再据该回执生成一次对应期间的金额补采；新披露不会因旧库存没有该季而被丢弃。
+type 4与5分别补已调整比较期、调整前合并报表；不把这些类型当作完整修订链或擅自确定supersedes关系。
+
+| 接口 | 参数日期含义及边界 | 保留和缺口规则 |
+| --- | --- | --- |
+| `income`、`balancesheet`、`cashflow` | start/end按公告日期；period按报告期。资产负债表不传未记载的f_ann_date输入 | 限定合并type 1/4/5；每条返回版本、原序号和字段投影哈希分别保留 |
+| `fina_indicator` | start/end按报告期；单次100行 | 仅基础输入仍缺失的常用指标；已有兼容基础科目先派生净利率、资产负债率，不扩全因子库 |
+| `dividend` | 没有start/end参数；优先逐股ex_date事件 | 补已知事件缺失的付款、实施公告、基准股本等字段；仅现有分红记录为零时取单股源历史，并限定目标日期 |
+| `adj_factor` | 逐股有界交易日期，单窗口最多366个自然日 | 通过显式已有覆盖清单仅采缺口尾段；不重取已有2010年至覆盖截止日的因子历史 |
+
+财务amount原值保留十进制，未有足够金额单位证据时标记 `provider_native_amount_unit_unverified`，
+对账仍列为单位待核，不进行猜测缩放。`ann_date/f_ann_date`只证明供应商返回日期；
+不能仅凭股票+报告期把新日期绑定到另一来源的旧金额，也不自动进入历史PIT读取。
+同一版本内、同币种同口径且分母非零时派生的两项比率标为当前源研究值；零分母保持未定义。
+
+财务三表暂以100行为本地保守截断警戒，并非声称官方统一上限；触顶或has_more时二分公告日期。
+指标按报告期二分，最多18层；单日或单期间仍触顶时留明确未解决缺口，不猜offset。
+分红的2000行上限单列；`cash_div`税后、`cash_div_tax`税前，不互换；`base_share`万股精确转股。
+已实施状态、除权日、登记日、税前现金及送转比率全部相符且匹配唯一，才可对账原事件；
+多版本/多事件歧义保留，预案和未实施记录不转成已发生行动。
+Tushare再投资因子与Sina hfq不是可直接衔接的同一序列；缺日不前填，不据复权因子反推行动事实。
+
+因子覆盖通过 `--factor-inventory FACTOR_INVENTORY.json` 传入，schema为
+`ad.existing-factor-inventory.v1`，绑定universe_sha256；codes逐股提供covered_through、basis和来源证据。
+未提供或不含某股覆盖时明确延后，不能把库存未知当作从2010年重新全采的理由。
+入口输出逐字段 `field-reconciliation.jsonl.gz` 及汇总；拆分子窗口按同一缺口合并对账，
+保留已覆盖字段、研究派生值、单位待核、空值、截断、失败、主体隔离和事件歧义。
+只写独立源分区和协调清单；正式统一库导入仍需审定结构及与日线分钟任务协调。
+
+官方依据：[利润表](https://tushare.pro/document/2?doc_id=33)、
+[资产负债表](https://tushare.pro/document/2?doc_id=36)、[现金流量表](https://tushare.pro/document/2?doc_id=44)、
+[财务指标](https://tushare.pro/document/2?doc_id=79)、[分红](https://tushare.pro/document/2?doc_id=103)、
+[复权因子](https://tushare.pro/document/2?doc_id=28)。文档中分红起始日的概述与示例不完全一致，
+实际最早覆盖须以本批回执统计为准，不能由文档概述填补缺失。
 
 ### 运行中监督、缓存回放和来源交接
 
@@ -479,14 +525,21 @@ PYTHONPATH=src python -B scripts/run_tushare_reference.py \
 这证明历史和近期接口可用，不证明全历史完整；Tushare继续主批和截断补采。
 原zzshare未采任务保留原状态，ST/停复牌/复权因子及缺失限价日期仍为待核缺口，
 必须先复用正式日线与既有因子、形成明确缺口计划，才能恢复必要补采，不能重新跑双份全量。
+监督器自己写入的交接STOP如果后来被移除，不自动重建；来源已经自然结束时不再发停止指令。
+
+正式计划指定 `finish_policy: current_batch_only`：只监督该计划的原采集及本次Tushare工作进程。
+顺序执行的批次可用after和owner_pid绑定依赖；现有进程冷却时仍算在运行，不能据旧PID退出文件误判。
+所有本批次来源关闭且Tushare工作锁释放后写 `completion.json` 并退出；权限阻断、用户停止、异常退出、
+未配置凭据分别记录未完成，不改成采集成功。此后不等待未来凭据、不装系统常驻服务。
+本地隐藏输入入口可通过 `--followup-spec PLAN --followup-root ROOT` 唤起同一有限监督器，
+子进程使用显式最小环境，不接收token；不重启原网络采集器。
+计划可指定gap_preview，在原公开源完成回放后离线更新最终缺口预览，即使尚无Tushare凭据也可完成。
 
 监督计划也可绑定真实历史查询的预期状态和值，在启动及安全回放后复核。
 `official_daily.reader(..., correction_reviews=...)` 接受显式更正范围核查，
 逐项绑定官方索引原响应、原PDF哈希、审核页和具体字段×报告期。
 仅对明确不受该更正影响的字段解除泛标题造成的阻断，不能扩大到其他字段或其他公告。
 
-仍待实现的Tushare后续接入包括：普通逐股报表与指标接口的分别核源、分页/版本保留和单位映射；
-分红、复权因子接口的可恢复任务与规范化；现有日线状态及因子范围与新源的按字段缺口对账；
-全历史覆盖清单、稳定主体/换码映射与审定数据库结构的导入。
+上述接口适配及合成协议回归不代表鉴权实采成功。账户未配置时仅完成代码、源契约、库存及请求预览；
+鉴权实采、实际金额单位证据、各源全历史覆盖、稳定主体/换码映射与审定数据库结构导入仍分别验收。
 `suspend_d`、VIP以及权限冲突的股本接口不按当前积分擅自启用。
-当前入口不会在限价结束后自行扩入这些尚未实现的接口。

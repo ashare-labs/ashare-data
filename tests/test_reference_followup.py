@@ -137,3 +137,37 @@ def test_finished_followup_is_not_repeated_each_poll(tmp_path, monkeypatch):
     state = follow.tick(spec, {}, tmp_path)
     follow.tick(spec, state, tmp_path)
     assert calls == [1]
+
+
+def test_finite_monitor_closes_with_credentials_pending_without_future_watch(tmp_path, monkeypatch):
+    spec = dict(finish_policy="current_batch_only", batches=[dict(id="source", root=str(tmp_path), kind="public")])
+    monkeypatch.setattr(follow, "follow_batch", lambda *a, **k: {"state": "verified_with_explicit_gaps"})
+    result = follow.tick(spec, {}, tmp_path)
+    assert result["completion"]["exit_ready"]
+    assert result["completion"]["tushare_state"] == "credentials_pending_not_started"
+    assert not result["completion"]["future_credentials_watched"]
+    with (tmp_path / "writer.lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        assert not follow.completion(spec, result)["exit_ready"]
+
+
+def test_monitor_waits_for_tushare_and_current_source_owner(tmp_path, monkeypatch):
+    spec = dict(batches=[dict(id="source", root=str(tmp_path), kind="public")])
+    state = dict(jobs={"source": {"state": "verified_with_explicit_gaps"}}, tushare_runtime={"worker_active": True})
+    assert not follow.completion(spec, state)["exit_ready"]
+    monkeypatch.setattr(follow, "process_alive", lambda pid: pid == 42)
+    assert follow.classify_inactive(dict(root=str(tmp_path), owner_pid=42), {}) is None
+    e.atomic(tmp_path / "progress.json", e.encoded({"pid": 43}))
+    assert follow.classify_inactive(dict(root=str(tmp_path)), {})["state"] == "source_exited_incomplete"
+
+
+def test_removed_owned_stop_is_not_recreated(prepared, tmp_path):
+    _, legacy, root = prepared
+    capture(root)
+    for name in ("calendar", "limits", "capped-targets"):
+        e.atomic(root / name / "supervisor.json", e.encoded(dict(state=follow.FINISHED)))
+    record = tmp_path / "handoff.json"
+    assert follow.request_handoff(root, legacy, record)["state"] == "stop_requested"
+    (legacy / "STOP").unlink()
+    assert follow.request_handoff(root, legacy, record)["state"] == "owned_stop_removed; no_recreation"
+    assert not (legacy / "STOP").exists()

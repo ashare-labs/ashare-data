@@ -12,6 +12,7 @@ from decimal import Decimal
 import fcntl
 import gzip
 import json
+import os
 from pathlib import Path
 import time
 
@@ -23,6 +24,9 @@ from ashare_data.financials.official_access import reviewed_ledger, verified_sou
 
 FINISHED = "source_pass_finished_with_explicit_gaps"
 HANDOFF_SCHEMA = "ad.reference-handoff-stop.v1"
+TERMINAL_FOLLOWUP = {"verified_with_explicit_gaps", "integrity_failed", "followup_failed",
+                     "user_stop_preserved", "source_blocked", "source_stopped", "source_exited_incomplete",
+                     "dependency_ended_before_start"}
 
 
 def read(path, default=None):
@@ -115,6 +119,10 @@ def request_handoff(tushare_root, legacy_root, record):
     if stop.exists():
         existing = read(record, {})
         return existing if owned_handoff(legacy_root, record) else {"state": "existing_stop_preserved"}
+    if read(record, {}).get("state") == "stop_requested":
+        return {"state": "owned_stop_removed; no_recreation"}
+    if generic_ready(legacy_root):
+        return {"state": "legacy_already_finished; no_stop_needed"}
     proof = handoff_evidence(tushare_root, legacy_root)
     if proof is None:
         return {"state": "waiting_for_ordinary_tushare_results"}
@@ -144,7 +152,7 @@ def generic_ready(root, *, handoff_record=None):
     if exited["at"] < progress.get("updated_at", "") or supervisor.get("at", "") < exited["at"]:
         return False
     if (root / "STOP").exists():
-        return bool(handoff_record and owned_handoff(root, handoff_record) and supervisor.get("state") == "stopped")
+        return bool(handoff_record and owned_handoff(root, handoff_record) and supervisor.get("state") in {"stopped", FINISHED})
     return supervisor.get("state") == FINISHED and not exited.get("stop_requested")
 
 
@@ -232,21 +240,28 @@ def tick(spec, state, output):
         config = spec["handoff"]
         result["handoff"] = request_handoff(config["tushare_root"], config["legacy_root"], handoff)
         tsroot = Path(config["tushare_root"])
+        worker = read(tsroot / "worker.json", {})
+        final = read(tsroot / "completion.json", {})
+        if final.get("pid") != worker.get("pid") or final.get("at", "") < worker.get("started_at", ""):
+            final = {}
         result["tushare_runtime"] = dict(worker_metadata_exists=(tsroot / "worker.json").exists(),
             worker_active=lock_held(tsroot / "worker.lock"), credential_values_read=False,
+            progress=read(tsroot / "progress.json", {}), final=final,
             phases={name: dict(progress=read(tsroot / name / "progress.json", {}),
                                supervisor=read(tsroot / name / "supervisor.json", {}))
-                    for name in ("calendar", "limits", "capped-targets")})
+                    for name in ("calendar", "limits", "capped-targets", "fundamentals")})
     jobs = result.setdefault("jobs", {})
     transitioned = False
     for job in spec["batches"]:
         prior = jobs.get(job["id"], {})
-        if prior.get("state") in {"verified_with_explicit_gaps", "integrity_failed", "followup_failed"}:
+        if prior.get("state") in TERMINAL_FOLLOWUP:
             continue
         try:
             current = follow_batch(job["root"], job["kind"], handoff_record=handoff if job["kind"] == "limits" else None)
         except Exception as error:
             current = dict(state="followup_failed", error=f"{type(error).__name__}: {error}"[:500])
+        if spec.get("finish_policy") == "current_batch_only" and current["state"] in {"waiting_for_natural_source_boundary", "waiting_for_pending_requests"}:
+            current = classify_inactive(job, jobs) or current
         jobs[job["id"]] = dict(at=e.now(), **current)
         transitioned |= current["state"] == "verified_with_explicit_gaps"
     if spec.get("daily_validation") and ("daily_validation" not in result or transitioned):
@@ -256,6 +271,68 @@ def tick(spec, state, output):
             result["daily_validation"] = dict(at=validation["at"], all_matched=validation["all_matched"], queries=len(validation["queries"]))
         except Exception as error:
             result["daily_validation"] = dict(at=e.now(), all_matched=False, error=f"{type(error).__name__}: {error}"[:500])
+    if spec.get("gap_preview") and "closed_source_gap_preview" not in result:
+        config = spec["gap_preview"]
+        if jobs.get(config["after"], {}).get("state") == "verified_with_explicit_gaps":
+            from ashare_data.financials import tushare_gaps
+            try:
+                preview = tushare_gaps.preview(config["baseline"], config["root"], config.get("factor_inventory"))
+                result["closed_source_gap_preview"] = dict(state="prepared_offline", at=preview["at"],
+                    requests_by_api=preview["requests_by_api"], summary=str(Path(config["root"]) / "preview-summary.json"))
+            except Exception as error:
+                result["closed_source_gap_preview"] = dict(state="failed", error=f"{type(error).__name__}: {error}"[:300])
     result.update(at=e.now(), schema="ad.reference-followup-state.v1", no_network_requests=True)
+    if spec.get("finish_policy") == "current_batch_only":
+        result["completion"] = completion(spec, result)
     e.atomic(output / "progress.json", e.encoded(result))
     return result
+
+
+def process_alive(pid):
+    if not isinstance(pid, int) or pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def classify_inactive(job, jobs):
+    root = Path(job["root"])
+    progress, supervisor = read(root / "progress.json", {}), read(root / "supervisor.json", {})
+    if (lock_held(root / "writer.lock") or process_alive(progress.get("pid"))
+            or process_alive(supervisor.get("pid")) or process_alive(job.get("owner_pid"))):
+        return None  # Includes an existing collector's cooldown, not just its write section.
+    dependency = jobs.get(job.get("after"), {})
+    if job.get("after") and dependency.get("state") not in TERMINAL_FOLLOWUP:
+        return None
+    state = supervisor.get("state")
+    if state == "remaining_sources_blocked_access_or_payment":
+        return dict(state="source_blocked", reason=state, source_state=read(root / "source-state.json", {}))
+    if (root / "STOP").exists() or read(root / "worker-exit.json", {}).get("stop_requested"):
+        return dict(state="source_stopped", reason="existing_collector_stopped; no_restart")
+    if job.get("after") and not progress.get("pid"):
+        return dict(state="dependency_ended_before_start", reason="sequential_source_not_started; no_restart")
+    if progress.get("pid"):
+        return dict(state="source_exited_incomplete", reason="source_process_exited_without_completed_boundary")
+    return None
+
+
+def completion(spec, state):
+    jobs = state.get("jobs", {})
+    pending = [job["id"] for job in spec["batches"] if jobs.get(job["id"], {}).get("state") not in TERMINAL_FOLLOWUP]
+    # Do not exit while a collector still holds its writer lock, including STOP drain.
+    active = [job["id"] for job in spec["batches"] if lock_held(Path(job["root"]) / "writer.lock") or process_alive(job.get("owner_pid"))]
+    runtime = state.get("tushare_runtime", {})
+    if pending or active or runtime.get("worker_active"):
+        return dict(exit_ready=False, pending_jobs=pending, active_writers=active,
+                    tushare_active=runtime.get("worker_active", False))
+    tsstate = (runtime.get("final", {}).get("state") or
+               ("credentials_pending_not_started" if not runtime.get("worker_metadata_exists") else "worker_exited_without_final_receipt"))
+    return dict(exit_ready=True, state="current_batch_closed_with_explicit_gaps", tushare_state=tsstate,
+                jobs={name: job["state"] for name, job in jobs.items()}, full_history_complete=False,
+                stop_condition="all_current_source_writers_closed_and_tushare_inactive",
+                future_credentials_watched=False, source_collectors_restarted=False, system_service_installed=False)
