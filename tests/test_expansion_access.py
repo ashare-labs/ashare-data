@@ -59,7 +59,7 @@ class AccessPolicyTests(unittest.TestCase):
         r = row()
         r.update(historical_pit_certified=True, first_publication_proven=True)
         result = assess(r, TASK, purpose="historical_pit", as_of="2026-10-21T12:00:00+00:00", field="net_profit", review=review())
-        self.assertIn("provider_snapshot_is_not_an_official_pit_archive", result["reasons"])
+        self.assertIn("field_has_no_verified_historical_binding", result["reasons"])
         with self.assertRaisesRegex(ValueError, "unsupported input pack"):
             FinancialLedger(r)
 
@@ -165,6 +165,114 @@ class ReaderIntegrationTests(unittest.TestCase):
         result = self.read("source_audit")
         self.assertEqual(result["source_record"]["announcement_date"], "2026-10-20")
         self.assertFalse(result["calculation_value_exposed"])
+
+
+class HistoricalBindingTests(unittest.TestCase):
+    """A qualified field may work while the rest of the captured batch is unknown."""
+    setUp = ReaderIntegrationTests.setUp
+    tearDown = ReaderIntegrationTests.tearDown
+
+    def install_history(self, *, unproved_neighbor=False):
+        def ref(name, raw):
+            (self.asset / name).write_bytes(raw)
+            return {"path": name, "bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
+        evidence = ref("report.pdf", b"synthetic original report")
+        text = ref("report.txt", b"synthetic transcribed amount 123.45")
+        index = ref("index.json", b"synthetic official version inventory")
+        release = ref("archive.json", b"synthetic contemporaneous release capture")
+        report = {"security": row()["security"], "period_end": "2025-09-30",
+                  "published_date": "2025-10-31", "publication_precision": "timestamp",
+                  "published_at": "2025-10-31T18:00:00+08:00",
+                  "available_at": "2025-10-31T18:05:00+08:00",
+                  "historical_first_publication_proven": True, "complete_revision_history": True,
+                  "path": evidence["path"], "sha256": evidence["sha256"],
+                  "text_path": text["path"], "text_sha256": text["sha256"],
+                  "index_path": index["path"], "index_sha256": index["sha256"]}
+        observation = {"record_id": "official-cell", "report_id": "official-report",
+                       **{k: row()[k] for k in ("security", "period_start", "period_end", "basis", "scope")},
+                       "currency": "CNY", "unit": "CNY", "field": "net_profit",
+                       "value": "123.45", "page": 1, "replaces_in_this_pack": None}
+        pack = {"schema": "ad.financial-ledger.v1", "reports": {"official-report": report},
+                "observations": [observation], "sources": [evidence, text, index]}
+        if unproved_neighbor:
+            other = dict(report, historical_first_publication_proven=False, complete_revision_history=False)
+            pack["reports"]["unproved-other-field"] = other
+            pack["observations"].append(dict(observation, record_id="other-cell", report_id="unproved-other-field",
+                                              field="operating_revenue", value="500"))
+        ledger = ref("ledger.json", encoded(pack)); ledger["evidence_root"] = "."
+        proof = {"schema": "ad.official-report-release-proof.v1", "report_id": "official-report",
+                 "document_sha256": report["sha256"], "published_at": report["published_at"],
+                 "available_at": report["available_at"], "historical_first_publication_proven": True,
+                 "evidence_kind": "contemporaneous_release_capture",
+                 "revision_inventory_complete_through": "2026-10-19T12:00:00+00:00",
+                 "sources": [release]}
+        proof_ref = ref("release-proof.json", encoded(proof))
+        binding = {"task_id": TASK["id"], "field": "net_profit",
+                   **{k: row()[k] for k in ("response_sha256", "source_revision_id", "source_locator")},
+                   "official_record_id": "official-cell", "ledger": ledger, "release_proof": proof_ref}
+        (self.asset / "historical-bindings.json").write_bytes(encoded({
+            "schema": "ad.expansion-historical-bindings.v1", "bindings": [binding]}))
+
+    def historical(self, field="net_profit", as_of="2025-11-01T00:00:00+08:00"):
+        return SnapshotReader(self.root).read(TASK["id"], period="2025-09-30", field=field,
+                                             as_of=as_of)
+
+    def test_verified_field_is_usable_before_present_day_capture(self):
+        self.install_history()
+        result = self.historical()
+        self.assertEqual(result["value"], "123.450000")
+        self.assertTrue(result["decision"]["historical_field_evidence"]["allowed"])
+        self.assertFalse(result["decision"]["historical_pit_certified"])
+
+    def test_unknown_neighbor_field_does_not_block_verified_field(self):
+        self.install_history(unproved_neighbor=True)
+        self.assertEqual(self.historical()["field"], "net_profit")
+        with self.assertRaises(SourceUseDenied): self.historical("operating_revenue")
+
+    def test_before_release_and_after_inventory_bound_are_denied(self):
+        self.install_history()
+        with self.assertRaises(SourceUseDenied):
+            self.historical(as_of="2025-10-31T18:04:59+08:00")
+        with self.assertRaises(SourceUseDenied):
+            self.historical(as_of="2026-10-20T12:00:00+00:00")
+
+    def test_historical_release_evidence_tampering_is_rejected(self):
+        self.install_history()
+        (self.asset / "archive.json").write_bytes(b"changed")
+        with self.assertRaisesRegex(ValueError, "checksum"): self.historical()
+
+    def test_other_provider_version_cannot_inherit_field_binding(self):
+        self.install_history()
+        path = self.asset / "historical-bindings.json"; obj = json.loads(path.read_text())
+        obj["bindings"][0]["source_revision_id"] = "different-source-version"
+        path.write_bytes(encoded(obj))
+        with self.assertRaises(SourceUseDenied): self.historical()
+
+    def rewrite_bound_file(self, key, mutate):
+        registry_path = self.asset / "historical-bindings.json"
+        registry = json.loads(registry_path.read_text())
+        ref = registry["bindings"][0][key]
+        path = self.asset / ref["path"]
+        data = json.loads(path.read_text()); mutate(data)
+        raw = encoded(data); path.write_bytes(raw)
+        ref.update(bytes=len(raw), sha256=hashlib.sha256(raw).hexdigest())
+        registry_path.write_bytes(encoded(registry))
+
+    def test_official_value_mismatch_cannot_be_approved_by_release_proof(self):
+        self.install_history()
+        self.rewrite_bound_file("ledger", lambda p: p["observations"][0].update(value="999"))
+        with self.assertRaisesRegex(ValueError, "value or reporting scope mismatch"):
+            self.historical()
+
+    def test_date_only_and_current_index_are_not_precise_release_proof(self):
+        self.install_history()
+        self.rewrite_bound_file("ledger", lambda p: p["reports"]["official-report"].update(
+            publication_precision="date_only", published_at=None, available_at=None))
+        with self.assertRaises(SourceUseDenied): self.historical()
+        self.install_history()
+        self.rewrite_bound_file("release_proof", lambda p: p.update(evidence_kind="current_index_label"))
+        with self.assertRaisesRegex(ValueError, "current index labels"):
+            self.historical()
 
 
 if __name__ == "__main__":

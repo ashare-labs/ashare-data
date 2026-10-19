@@ -492,8 +492,9 @@ def normalize_saved(root, manifest, task, receipt, raw=None):
     return receipt
 
 
-def replay(root, all_captured=False):
+def replay(root, all_captured=False, *, normalizer=None):
     """Rebuild local normalized outputs from their fixed originals, never network."""
+    normalizer = normalizer or normalize_saved
     root, manifest, tasks = load_batch(root)
     with (root / "writer.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -503,7 +504,7 @@ def replay(root, all_captured=False):
                 continue
             receipt = json.loads(path.read_text())
             if receipt.get("raw") and (all_captured or receipt["state"] in {"parse_failed", "captured"}):
-                normalize_saved(root, manifest, task, receipt)
+                normalizer(root, manifest, task, receipt)
                 atomic(path, encoded(receipt))
         return audit(root, verify=True, write=True, _writer_owned=True)
 
@@ -519,7 +520,9 @@ def load_batch(root):
     return root, manifest, json.loads((root / "tasks.json").read_text())
 
 
-def run(root, max_jobs=0, interval=2.0):
+def run(root, max_jobs=0, interval=2.0, *, fetcher=None, normalizer=None):
+    fetcher = fetcher or fetch
+    normalizer = normalizer or normalize_saved
     root, manifest, tasks = load_batch(root)
     if interval < 2:
         raise ValueError("Minimum request interval is two seconds")
@@ -581,7 +584,7 @@ def run(root, max_jobs=0, interval=2.0):
                     atomic(path, encoded(receipt))
                     attempted += 1
                     try:
-                        status, raw, headers = fetch(task["url"])
+                        status, raw, headers = fetcher(task["url"])
                         attempt.update(http_status=status, received_at=now(), response_bytes=len(raw),
                                        response_sha256=digest(raw))
                         if status != 200:
@@ -613,7 +616,7 @@ def run(root, max_jobs=0, interval=2.0):
                         continue
                     finally:
                         last_request = time.monotonic()
-                normalize_saved(root, manifest, task, receipt, raw)
+                normalizer(root, manifest, task, receipt, raw)
                 atomic(path, encoded(receipt))
                 atomic(state_path, encoded(hosts))
                 atomic(root / "progress.json", encoded({"updated_at": now(), "pid": os.getpid(),

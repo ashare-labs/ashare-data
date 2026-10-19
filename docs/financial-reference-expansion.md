@@ -80,7 +80,7 @@
 规范化文件是保留源事实的交换档案，计算使用入口为
 `ashare_data.financials.expansion_access.SnapshotReader`，命令行同名模块。
 读取器验证批次身份、回执文件哈希、记录来源绑定，再按用途返回一个明确字段。
-默认 `historical_pit` 拒绝供应商快照 schema；不能通过手改快照里的认证布尔值升级为官方 PIT。
+默认 `historical_pit` 要求该字段、该源版本的官方历史证据绑定；缺少绑定时只拒绝该条输入，不能通过手改快照里的认证布尔值升级为官方 PIT。
 `source_audit` 可查看完整原件和限制，不暴露“可计算值”；`source_research` 只读当前已捕获快照，
 `listed_security` 还要求报告期落在该原代码存续区间。公告发生在退市之后、但报告期在退出之前，
 不会仅因公告较晚而判为退出期外报表。已有换码关系只是证据引用，不静默重写证券代码。
@@ -104,7 +104,7 @@ source_locator`、明确字段和值、官方证据文件哈希与捕获时钟�
   对确有重叠的记录拒绝分类股份计算，仍保留总股份用于源研究。不通过减去H/B股编造A股。
 - 1,218 条退出代码后报告属于34个原代码：393条对应已核证换码，147条属于长油退出后及
   重新上市的发行人历史（57条停留在退出至重上市间隔，90条在601975重上市之后），
-  其余678条仍待逐条确认报表法律主体及口径。全部保留；不能因此延长旧代码上市区间，
+  其余678条另在 `investigations/20261019-followup` 逐组核对官方终止上市公告、退市板主体和原始报告。全部保留；不能因此延长旧代码上市区间，
   也不能把换股吸收合并后的主体、子公司和新上市母公司直接拼在一起。
 
 正式根 `investigations/20261019-anomalies/attribution.json` 给出分组及限制，
@@ -171,3 +171,59 @@ PYTHONPATH=src /Users/yinming/Workspace/ashare-local/.venv/bin/python -B \
 再用已经可比且有完整期间输入的基础科目派生常用指标。官方全历史限价、完整停复牌/ST公告史、
 两市官方全历史日历没有在本批取得，不根据价格、涨跌比例或缺行推导。
 统一库尚待用户审定，批准后按确定键/区间契约接入，通过缺口验收再登记正式入口。
+
+## 逐字段历史证据与当前查询范围（2026-10-19续作）
+
+`expansion_history.bound_history` 消费正式根的可选 `historical-bindings.json`
+（`ad.expansion-historical-bindings.v1`），准确绑定任务、字段、源响应hash、源版本hash和定位。
+每个绑定引用带hash/字节数的官方 `ad.financial-ledger.v1` 以及单独的
+`ad.official-report-release-proof.v1`；文件均须位于该正式资产根内。
+官方严格选择器必须在请求截止时刻选中绑定的那一修订，金额、币种单位、期间、合并口径和证券一致。
+还须有同时期发布留存或已核实历史档案、精确发布/可见时钟，以及覆盖截止时刻的修订清单。
+当前页面的日期标签、当前抓到PDF、供应商布尔标志均不能代替这些证据。
+无关字段证据不足不会否决有证据字段；较新的源快照不能借旧版本绑定穿越到历史。
+
+| 入口 | 实际范围 | 时间含义 |
+| --- | --- | --- |
+| `source_audit` | 已取得的原始记录、缺失和异常 | 原始证据查看，无可计算值 |
+| `source_research` | 三表8个映射金额及参考事实；字段缺失/未核实未来日期等逐条限制 | 当前捕获快照，不能声称当时投资者已知 |
+| `listed_security` | 上项加原代码上市生命周期过滤 | 不延长旧代码，不把发行人延续视为股票延续 |
+| 现有官方ledger研究模式 | 已有18份报告、66条观察形成46个证券×字段×期间可选结果 | 官方索引日期次日的显式研究约定，无精确首发证明 |
+| `historical_pit` | 有可信发布与版本绑定的具体字段可通过；目前正式扩采根没有这样的真实绑定 | 严格截止时刻选择，缺少证据逐条拒绝 |
+
+现有官方小包只读验证了48个源文件；46个结果在研究模式可读，严格模式均为
+`visibility_unproven`。其中仅000637和603169属于本次主板基线，300124/300630仍属于既有样本，
+没有扩大本次范围。新增正例测试使用合成证据，不能算真实PIT覆盖。
+现有官方ledger桥接支持5个合并YTD金额（营业收入、营业总收入、净利润、归母净利润、经营现金流），
+资产、负债、期末现金余额尚不在该严格ledger字段集内。没有将日期补成午夜。
+
+## 历史限价与参考观察独立批次
+
+公开[zzshare源码与说明](https://github.com/zzquant/zzshare)声明日线自2005年，
+单股每次最多1000行。现有 `providers.zzshare` 的严格数字/身份/计数解析复用到
+`financials.limit_expansion`；不安装SDK或读取Token。源码的MIT仅为软件许可，
+不声称取得数据商业再分发权。只进行匿名本地研究采集，数值日配额仍未知。
+
+`20261019-limits-v1` 复用已冻结的3490代码小清单；3426个目标代码拆成18490个不重叠区间。
+每段不超过1000自然日，响应上限1000行，限定IPO至退出日期前一日；无需猜补分页偏移。
+当下目标2010年至今，不为2005声明额外扩窗。实际最早/最晚日期按任务回执记录。
+标准化只保留 `high_limit/low_limit/is_paused/is_st/factor`，类型为
+`ad.daily-reference-observation.v1`；每个数值带原数字token、状态和单位。
+零限价不是无限制交易的证据，空集不证明没有行情，缺行不推导停牌。
+不保存第二份规范化OHLCV；完整网络响应只保留一份压缩原件以可复核这些参考字段。
+供应商限价的上游和生成方法未明，固定为 `source_claimed`，不作为交易所认证价或实盘权限。
+ST/停牌仅作为第二来源观察，正式日线已有状态继续优先原位复用。
+
+已试采沪深2010年起区间9项，5402条；一次超时和一次429进入持久冷却，一小时后最低10秒间隔。
+沿用原批次引擎的写锁、最多三次尝试、访问阻断、停止文件、原件重放和临时文件清理。
+不使用新账号、积分、代理或付费来源；已核实Tushare历史限价有积分要求，因此没有调用。
+
+```sh
+PYTHONPATH=src /Users/yinming/Workspace/ashare-local/.venv/bin/python -B \
+  -m ashare_data.financials.limit_expansion prepare \
+  --root /Users/yinming/Workspace/ashare-data-local/financial-reference/batches/20261019-limits-v1 \
+  --baseline-root /Users/yinming/Workspace/ashare-data-local/financial-reference/batches/20261019-public-v1
+PYTHONPATH=src /Users/yinming/Workspace/ashare-local/.venv/bin/python -u -B \
+  scripts/run_reference_expansion.py --provider zzshare-reference \
+  --root /Users/yinming/Workspace/ashare-data-local/financial-reference/batches/20261019-limits-v1
+```

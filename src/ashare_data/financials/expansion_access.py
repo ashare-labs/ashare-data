@@ -15,6 +15,7 @@ import json
 from pathlib import Path
 
 from ashare_data.financials.expansion import load_batch, security, verify_receipt
+from ashare_data.financials.expansion_history import bound_history
 
 SHANGHAI = timezone(timedelta(hours=8))
 PURPOSES = ("historical_pit", "source_research", "listed_security", "source_audit")
@@ -57,7 +58,7 @@ def share_overlap(row):
     return excess > tolerance
 
 
-def assess(row, task, *, purpose="historical_pit", as_of=None, field=None, review=None):
+def assess(row, task, *, purpose="historical_pit", as_of=None, field=None, review=None, history=None):
     if purpose not in PURPOSES:
         raise ValueError("unknown use purpose")
     if row.get("schema") not in SCHEMAS:
@@ -77,6 +78,7 @@ def assess(row, task, *, purpose="historical_pit", as_of=None, field=None, revie
         if value is not None and Decimal(value) == Decimal(review["verified_fields"][field]["value"]):
             proof_by = timestamp(review["evidence_available_by"])
     observed_official_value = bool(proof_by and cutoff and cutoff >= proof_by)
+    historical_value = bool(purpose == "historical_pit" and history and history.get("allowed"))
     period = row.get("period_end") if financial else row.get("observation", {}).get("date")
     code_exit = bool(period and task.get("out") and period >= task["out"])
     code_before_ipo = bool(period and task.get("ipo") and period < task["ipo"])
@@ -95,19 +97,19 @@ def assess(row, task, *, purpose="historical_pit", as_of=None, field=None, revie
 
     reasons = []
     if purpose != "source_audit":
-        if cutoff < captured:
+        if cutoff < captured and not historical_value:
             reasons.append("snapshot_not_yet_captured_at_requested_time")
-        if announced and announced > cutoff.astimezone(SHANGHAI).date() and not observed_official_value:
+        if announced and announced > cutoff.astimezone(SHANGHAI).date() and not (observed_official_value or historical_value):
             reasons.append("announcement_date_after_requested_day")
-        if "source_date_label_after_capture_day" in findings and not observed_official_value:
+        if "source_date_label_after_capture_day" in findings and not (observed_official_value or historical_value):
             # A later wall clock alone cannot repair a suspect historical date/version.
             reasons.append("source_announcement_after_capture_day_requires_review")
-        if purpose == "historical_pit":
-            # No provider-snapshot boolean can promote this schema into an official archive.
-            reasons.append("provider_snapshot_is_not_an_official_pit_archive")
-        if purpose == "listed_security" and (code_exit or code_before_ipo):
+        if purpose == "historical_pit" and not historical_value:
+            # Only a checked official field/version binding can supply historical evidence.
+            reasons.append((history or {}).get("reason") or "field_has_no_verified_historical_binding")
+        if purpose in {"listed_security", "historical_pit"} and (code_exit or code_before_ipo):
             reasons.append("report_not_applicable_to_requested_code_lifetime")
-        if financial and announced is None:
+        if financial and announced is None and not historical_value:
             reasons.append("source_announcement_date_unknown")
         if not financial and period and date.fromisoformat(period) > cutoff.astimezone(SHANGHAI).date():
             reasons.append("source_effective_date_after_requested_day")
@@ -126,7 +128,9 @@ def assess(row, task, *, purpose="historical_pit", as_of=None, field=None, revie
         "official_value_observed_by": proof_by.isoformat() if proof_by else None,
         "disclosure_context": review.get("disclosure_context") if review else None,
         "date_label_overridden_for_current_research_only": observed_official_value and purpose in {"source_research", "listed_security"},
-        "time_basis": "capture cutoff for this source snapshot, not reconstructed public availability",
+        "historical_field_evidence": history if purpose == "historical_pit" else None,
+        "time_basis": ("verified official field/version historical availability" if historical_value
+                       else "capture cutoff for this source snapshot, not reconstructed public availability"),
     }
 
 
@@ -199,7 +203,10 @@ class SnapshotReader:
         if row["observed_at"] != receipt["observed_at"] or row["response_sha256"] != receipt["attempts"][-1]["response_sha256"]:
             raise ValueError("record provenance differs from its verified receipt")
         review = self._review(row, task_id)
-        decision = assess(row, task, purpose=purpose, as_of=as_of, field=field, review=review)
+        history = (bound_history(self.asset_root, row, task_id, field, as_of)
+                   if purpose == "historical_pit" and as_of is not None
+                   and row["schema"] == "ad.financial-source-report.v1" else None)
+        decision = assess(row, task, purpose=purpose, as_of=as_of, field=field, review=review, history=history)
         provenance = {"task_id": task_id, "security": row["security"],
                       "source_locator": row.get("source_locator") or row.get("observation", {}).get("locator"),
                       "source_revision_id": row["source_revision_id"],

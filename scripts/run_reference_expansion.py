@@ -35,10 +35,10 @@ def share_source_restrictions(root, roots):
         atomic(path, encoded(current))
 
 
-def supervise(root):
+def supervise(root, runner=run):
     root, _, tasks = load_batch(root)
     while not (root / "STOP").exists():
-        result = run(root)
+        result = runner(root)
         exited = json.loads((root / "worker-exit.json").read_text())
         if exited["stop_requested"] or (root / "STOP").exists():
             state = "stopped"
@@ -73,10 +73,15 @@ def supervise(root):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", required=True, type=Path, action="append")
-    roots = [root.resolve() for root in parser.parse_args().root]
+    parser.add_argument("--provider", choices=("public", "zzshare-reference"), default="public")
+    args = parser.parse_args()
+    roots = [root.resolve() for root in args.root]
+    runner = run
+    if args.provider == "zzshare-reference":
+        from ashare_data.financials.limit_expansion import run as runner
     for root in roots:
         share_source_restrictions(root, roots)
-        supervise(root)
+        supervise(root, runner)
         exited = root / "worker-exit.json"
         if (root / "STOP").exists() or (exited.exists() and json.loads(exited.read_text()).get("stop_requested")):
             break
