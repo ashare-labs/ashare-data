@@ -8,7 +8,7 @@ from ashare_data.core.model import DataError, day, digest, require
 from ashare_data.market.client import _security
 from ashare_data.storage.local_daily import LocalDailyStore
 
-SOURCES = ("auto", "baostock", "eastmoney", "sina", "sohu", "tencent")
+SOURCES = ("auto", "canonical", "baostock", "eastmoney", "sina", "sohu", "tencent")
 MAX_SECURITIES = 100
 MAX_SECURITY_SESSIONS = 100_000
 LIMITATIONS = [
@@ -63,6 +63,9 @@ class LocalDailyProduct:
         from ashare_data.product.configuration import resolve
 
         config = resolve(deployment, profile=profile, reference_set=reference_set)
+        if config.get("market_release"):
+            from ashare_data.product.market_release import ReleasedDailyProduct
+            return ReleasedDailyProduct(config)
         return cls(config["daily_root"], references=config["references"])
 
     @contextmanager

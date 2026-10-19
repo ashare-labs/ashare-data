@@ -77,6 +77,18 @@ def resolve(deployment=None, *, profile="product", reference_set=None):
             target = Path(asset["path"]).expanduser()
             result[key] = (target if target.is_absolute() else root / target).resolve()
             selected_assets[selected_profile[setting]] = {**asset, "path": str(result[key])}
+        result["market_release"] = None
+        market = selected_profile.get("market_release")
+        if market is not None:
+            asset = value["assets"][market["asset"]]
+            require(asset["kind"] == "market_release", "PRODUCT_CONFIGURATION", "Select a market_release asset")
+            target = Path(asset["path"]).expanduser()
+            target = (target if target.is_absolute() else root / target).resolve()
+            require(type(market["release_id"]) is int and market["release_id"] > 0,
+                    "PRODUCT_CONFIGURATION", "A committed release ID is required")
+            result["market_release"] = {"root": str(target), "release_id": market["release_id"],
+                                        "manifest_sha256": market["manifest_sha256"]}
+            selected_assets[market["asset"]] = {**asset, "path": str(target)}
         sets = selected_profile.get("reference_sets", {})
         require(isinstance(sets, dict), "PRODUCT_CONFIGURATION", "reference_sets must be a mapping")
         chosen = (
@@ -133,6 +145,7 @@ def resolve(deployment=None, *, profile="product", reference_set=None):
                     "daily_root": str(result["daily_root"]),
                     "release_store_root": str(result["release_store_root"]),
                     "reference_set": selection,
+                    "market_release": result["market_release"],
                     "source_bindings": bindings,
                 }
             ),

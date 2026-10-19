@@ -17,8 +17,8 @@ def main(argv=None):
     parser.add_argument("--root", help="Explicit existing local-daily root overrides the manifest")
     commands = parser.add_subparsers(dest="operation", required=True)
     commands.add_parser("minute-sources", help="List registered minute sources without reading bars")
-    minute = commands.add_parser("minute", help="Read a registered minute source; default remains TDX")
-    minute.add_argument("--source", default="tdx")
+    minute = commands.add_parser("minute", help="Read a registered minute source; configured release by default")
+    minute.add_argument("--source", default="auto")
     minute.add_argument("--security", required=True)
     minute.add_argument("--start", required=True)
     minute.add_argument("--end", required=True)
@@ -63,10 +63,9 @@ def main(argv=None):
                 reference_set=getattr(args, "reference_set", None),
             )
         )
-        product = LocalDailyProduct(
-            args.root or configuration["daily_root"],
-            references=configuration["references"] if configuration else None,
-        )
+        product = (LocalDailyProduct(args.root, references=configuration["references"] if configuration else None)
+                   if args.root else LocalDailyProduct.from_deployment(
+                       args.deployment, profile=args.profile, reference_set=getattr(args, "reference_set", None)))
         if args.operation == "catalogue":
             result = product.catalogue(args.query, args.limit, args.offset)
         elif args.operation == "prices":
