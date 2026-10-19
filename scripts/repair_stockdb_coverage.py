@@ -8,6 +8,7 @@ selection, never by guessed timestamp shifts or numeric rounding.
 import argparse
 from collections import defaultdict, Counter
 from datetime import datetime
+from functools import lru_cache
 import json
 import math
 from pathlib import Path
@@ -28,6 +29,8 @@ from ashare_data.storage.market_release import (
 from repair_market_coverage import Repair, fact, disposition_counts
 
 CORE = ("open", "high", "low", "close", "volume", "amount")
+# Labels repeat across securities; cache only the pure, unchanged datetime parser.
+_source_datetime = lru_cache(maxsize=200000)(datetime.strptime)
 
 
 def native_record(key, row, table, code):
@@ -35,7 +38,7 @@ def native_record(key, row, table, code):
     reason = None
     raw = [row.get(k) for k in CORE]
     try:
-        label = datetime.strptime(str(row["date"]), "%Y%m%d" if table == "日k" else "%Y%m%d%H%M%S")
+        label = _source_datetime(str(row["date"]), "%Y%m%d" if table == "日k" else "%Y%m%d%H%M%S")
     except (ValueError, TypeError):
         label = None
         reason = "invalid_native_label"
