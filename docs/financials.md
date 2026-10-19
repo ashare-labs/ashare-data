@@ -613,6 +613,19 @@ Tushare再投资因子与Sina hfq不是可直接衔接的同一序列；缺日�
 `--official-batch`，以及显式重复的 `--financial-task` 和 `--official-symbol`。
 只读取已有响应及其回执，校验请求、范围和摘要；不创建客户端、不下载、不改活动源批次。
 财务原文采用同盘硬链接，规范结果可直接由 `SnapshotReader` 读取。
+`--financial-task` 也接受 `sina_structure` 任务。股本页中带明确“万股”单位的负数
+单元保留原字符串、表格位置和 `negative_source_share_count` 原因，该规范字段及其
+精度为未知；同列其他有效字段、其他历史列继续解析。源页标为 `partial_source`，
+`unparsed_records` 和逐列 `field_gaps` 明示缺口。既不取绝对值或置零，也不从
+总股本、限售股、高管股或另一接口回填这一源字段。单位不明、表格错列和身份不符
+仍然拒绝解析；此前成功的正常列输出保持不变。
+
+`scripts/audit_share_structure.py --batch STRUCTURE --float-batch PUBLIC --output NEW_JSON`
+只读诊断已捕获失败页，可用带时区的 `--captured-before` 固定某次检查范围。
+按“总股本等于限售股”“股份分类扣减关系”“尚不能解释”分组，在各显示值半个
+最小单位之和内区分舍入误差，逐项绑定原回执及响应摘要。已有流通股序列只按完全
+相同日期作独立记录比较；同一供应商的两个接口不算独立供应商确认，算式吻合也不
+证明高管股与限售股互斥。上市前记录仍受既有证券存续期和PIT读取约束。
 `source_repair.recovered_announcements(root, security=...)` 按公告实际返回代码提供恢复索引，
 同时返回每类查询的缺口。共享机构ID不证明上市历史连续；新旧代码不自动合并。
 
@@ -620,7 +633,9 @@ Tushare再投资因子与Sina hfq不是可直接衔接的同一序列；缺日�
 同日跨页重复可由现有主查询和日期查询的并集核对，只有稳定总数、连续页及去重后数量均吻合才闭合。
 同ID内容冲突或不符主体的行只隔离受影响记录。恢复索引完整也不证明历史修订齐全或精确PIT可见性。
 
-发布采用独立暂存目录和原子改名，失败自动清理。`repair-manifest.json` 绑定原批次、回执、原文、
+发布采用独立暂存目录和原子改名；`--retain-temporaries` 保留失败暂存和临时文件供审查，
+默认失败自动清理。`source-receipts/` 封存被修复的完整原回执，接纳后仍可核验原始失败。
+`repair-manifest.json` 绑定原批次、回执、原文、
 解析器和产物摘要。`apply-idle` 仅在取得原批次独占写锁后幂等接纳；不完整官方索引留在恢复批次，
 不以文件存在冒充原批次完成。现有有限跟进计划可在对应任务配置 `cache_repair`（`root` 与
 `manifest_sha256`），等原采集自然结束后接纳完整修复并核验；不增加采集进程或常驻服务。

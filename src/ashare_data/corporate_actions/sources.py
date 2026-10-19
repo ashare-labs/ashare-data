@@ -258,11 +258,13 @@ def parse_sina_structure(raw, security):
     tables = {k: v for k, v in tables.items() if k.startswith("StockStructureNewTable")}
     if not tables:
         raise ValueError("Missing share-structure tables")
-    records = []
+    records, unparsed = [], []
     for table, rows in tables.items():
         values = {}
+        native_rows = {}
         for row in rows:
             label = re.sub(r"[·\s]", "", row[0]).replace("(历史记录)", "")
+            native_rows[label] = row[1:]
             if label in {
                 "变动日期",
                 "公告日期",
@@ -282,6 +284,7 @@ def parse_sina_structure(raw, security):
             raise ValueError("Missing or ragged share history")
         for i, day in enumerate(values["变动日期"]):
             fields, precision = {}, {}
+            gaps = []
             for label, field in [
                 ("总股本", "total_shares"),
                 ("流通A股", "float_a_shares"),
@@ -294,10 +297,17 @@ def parse_sina_structure(raw, security):
                 if cell in (None, "--", "", "-"):
                     fields[field], precision[field] = None, None
                 else:
-                    match = re.fullmatch(r"([\d,.]+) 万股", cell)
+                    match = re.fullmatch(r"(-?[\d,.]+) 万股", cell)
                     if not match:
                         raise ValueError("Share unit is not explicitly 万股")
                     amount = match[1].replace(",", "")
+                    if Decimal(amount) < 0:
+                        # A printed negative stock count is source evidence, not a
+                        # missing marker or a value we may repair by subtraction.
+                        fields[field], precision[field] = None, None
+                        gaps.append(dict(field=field, source_label=label, source_value=cell,
+                                         reason="negative_source_share_count"))
+                        continue
                     fields[field] = number(amount, Decimal("0.0001"))
                     decimals = len(amount.split(".")[1]) if "." in amount else 0
                     precision[field] = format(Decimal(10000) / (10**decimals), "f")
@@ -317,11 +327,22 @@ def parse_sina_structure(raw, security):
                     locator=f"{table}/column/{i + 1}",
                 )
             )
+            if gaps:
+                records[-1]["field_gaps"] = gaps
+                for gap in gaps:
+                    unparsed.append(dict(
+                        security=security, date=source_day(day),
+                        announcement_date=source_day(values["公告日期"][i]),
+                        locator=f"{table}/column/{i + 1}/field/{gap['field']}",
+                        native_fields={k: v[i] for k, v in native_rows.items() if len(v) > i},
+                        **gap,
+                    ))
     return dict(
         actions=[],
         shares=records,
         nonimplemented=[],
-        source_status="parsed_provider_tables",
+        unparsed_records=unparsed,
+        source_status="partial_provider_tables" if unparsed else "parsed_provider_tables",
         absence_proved=False,
     )
 

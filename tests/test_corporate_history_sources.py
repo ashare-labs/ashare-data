@@ -148,6 +148,37 @@ def test_share_units_precision_and_total_not_float():
     assert b["announcement_date"] == "2020-03-31"
 
 
+def test_negative_share_cell_is_explicit_gap_and_keeps_other_dates_and_fields():
+    raw = structure().replace(b"90.05", b"-10.25")
+    parsed = parse_sina_structure(raw, SEC)
+    assert parsed["source_status"] == "partial_provider_tables"
+    first, second = parsed["shares"]
+    assert first["fields"]["total_shares"] == "1002500"
+    assert first["fields"]["float_a_shares"] is None
+    assert first["source_quantum_shares"]["float_a_shares"] is None
+    assert first["native_fields"]["流通A股"] == "-10.25 万股"
+    assert second == parse_sina_structure(structure(), SEC)["shares"][1]
+    gap, = parsed["unparsed_records"]
+    assert gap["reason"] == "negative_source_share_count"
+    assert gap["source_value"] == "-10.25 万股"
+    assert gap["date"] == "2021-06-02"
+    assert gap["locator"] == first["locator"] + "/field/float_a_shares"
+    with pytest.raises(ValueError, match="unit"):
+        parse_sina_structure(raw.replace(" 万股".encode("gb18030"), b" shares"), SEC)
+
+
+@pytest.mark.parametrize("label", ["总股本", "流通A股", "流通B股", "流通H股", "优先股", "限售A股"])
+def test_negative_share_quarantine_never_changes_sign_or_assumes_zero(label):
+    rows = [["变动日期", "20200101"], ["公告日期", "20200102"], ["变动原因", "定期报告"],
+            ["总股本", "100 万股"], ["流通A股", "10 万股"]]
+    rows = [r for r in rows if r[0] != label] + [[label, "-12.34 万股"]]
+    parsed = parse_sina_structure(html(table("StockStructureNewTable1", rows)), SEC)
+    gap, = parsed["unparsed_records"]
+    assert parsed["shares"][0]["fields"][gap["field"]] is None
+    assert gap["source_value"] == "-12.34 万股"
+    assert gap["native_fields"][label] == "-12.34 万股"
+
+
 def test_float_series_not_total_and_inert_jsonp():
     raw = b'var KKE_ShareAmount_sz000001=([{"date":"2021-06-02","amount":90.05}]);'
     row = parse_sina_float(raw, SEC)["shares"][0]

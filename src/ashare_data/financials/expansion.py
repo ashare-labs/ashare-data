@@ -256,6 +256,8 @@ def parse_reference(raw, task, start, end):
         for item in parsed.get(category, []):
             values = item.get("fields", {})
             quality = []
+            if item.get("field_gaps"):
+                quality.append("source_share_fields_quarantined")
             if category == "shares" and values.get("total_shares") is not None:
                 total = Decimal(values["total_shares"])
                 components = [values.get(k) for k in ("float_a_shares", "float_b_shares", "float_h_shares")]

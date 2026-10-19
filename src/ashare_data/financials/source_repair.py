@@ -6,7 +6,7 @@ historical visibility. Canonical replacement requires the source writer lock.
 """
 
 from collections import defaultdict
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 import fcntl
 import gzip
 import json
@@ -187,7 +187,7 @@ def recover_index(root, symbol):
         network_requests=0, limitation="Only cached observed rows are recovered; incomplete queries and code continuity remain explicit.")
 
 
-def prepare(root, financial, official, financial_tasks, official_symbols):
+def prepare(root, financial, official, financial_tasks, official_symbols, *, retain_temporaries=False):
     """Publish an independent repair batch atomically; keep live sources untouched."""
     root, financial, official = (Path(p).resolve() for p in (root, financial, official))
     if root.exists() or root.is_relative_to(financial) or root.is_relative_to(official):
@@ -197,12 +197,12 @@ def prepare(root, financial, official, financial_tasks, official_symbols):
         raise ValueError("Repair staging directory already exists")
     stage.mkdir(parents=True)
     try:
-        with writer(stage):
+        with writer(stage), e.preserve_temporaries() if retain_temporaries else nullcontext():
             _, original, source_tasks = e.load_batch(financial)
             selected = {t["id"]:t for t in source_tasks if t["id"] in financial_tasks}
             if set(selected) != set(financial_tasks) or len(set(financial_tasks)) != len(financial_tasks):
                 raise ValueError("Unknown or duplicate financial repair tasks")
-            for name in ("raw", "receipts", "normalized", "official"):
+            for name in ("raw", "receipts", "source-receipts", "normalized", "official"):
                 (stage / name).mkdir()
             os.link(financial / "universe.json", stage / "universe.json")
             tasks_raw = e.encoded(list(selected.values()))
@@ -213,25 +213,30 @@ def prepare(root, financial, official, financial_tasks, official_symbols):
             e.immutable(stage / "manifest.json", e.encoded(manifest))
             repairs = []
             for tid, task in selected.items():
-                if task["kind"] not in e.STATEMENTS:
-                    raise ValueError("Only financial statement cache repairs are supported")
+                if task["kind"] not in {*e.STATEMENTS, "sina_structure"}:
+                    raise ValueError("Only financial statement and share-structure cache repairs are supported")
                 path = financial / "receipts" / (tid + ".json")
                 old = path.read_bytes()
                 receipt = json.loads(old)
                 if receipt["state"] != "parse_failed" or not receipt.get("raw"):
                     raise ValueError("Repair target is no longer a captured parse failure")
                 e.verify_receipt(financial, receipt)
+                e.immutable(stage / "source-receipts" / path.name, old)
                 raw_path = (financial / receipt["raw"]["path"]).resolve()
                 if not raw_path.is_relative_to(financial) or Path(receipt["raw"]["path"]).parent != Path("raw"):
                     raise ValueError("Invalid financial source path")
                 os.link(raw_path, stage / receipt["raw"]["path"])
                 receipt = e.normalize_saved(stage, manifest, task, receipt)
-                if receipt["state"] not in {"complete", "empty_unknown"}:
+                accepted = {"complete", "empty_unknown"}
+                if task["kind"] == "sina_structure":
+                    accepted.add("partial_source")
+                if receipt["state"] not in accepted:
                     raise ValueError("Financial cache remains unparseable: " + tid)
                 e.atomic(stage / "receipts" / (tid + ".json"), e.encoded(receipt))
                 repairs.append(dict(task_id=tid, source_receipt_sha256=e.digest(old),
                     source_provenance_sha256=e.digest(e.encoded({k:json.loads(old)[k] for k in ("task_id", "raw", "observed_at", "attempts")})),
                     original_error=json.loads(old).get("parse_error"),
+                    original_receipt_path="source-receipts/" + path.name,
                     source_raw=receipt["raw"], normalized=receipt["normalized"], rows=receipt["row_count"], new_state=receipt["state"]))
             indexes = []
             if len(set(official_symbols)) != len(official_symbols):
@@ -260,7 +265,7 @@ def prepare(root, financial, official, financial_tasks, official_symbols):
             stage.rename(root)
         return result
     finally:
-        if stage.exists():
+        if stage.exists() and not retain_temporaries:
             shutil.rmtree(stage)
 
 
@@ -275,6 +280,10 @@ def verify_inputs(root):
             raise ValueError("Repair source batch identity changed")
     financial, official = Path(manifest["financial_source"]), Path(manifest["official_source"])
     for item in manifest["financial"]:
+        if item.get("original_receipt_path"):
+            preserved = (root / item["original_receipt_path"]).resolve()
+            if not preserved.is_relative_to(root) or e.digest(preserved.read_bytes()) != item["source_receipt_sha256"]:
+                raise ValueError("Preserved source receipt changed")
         original = financial / "receipts" / (item["task_id"] + ".json")
         current = read(original)
         provenance = {k:current[k] for k in ("task_id", "raw", "observed_at", "attempts")}

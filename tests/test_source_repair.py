@@ -2,6 +2,7 @@
 
 from datetime import datetime
 import gzip
+import json
 import sqlite3
 
 import pytest
@@ -10,7 +11,7 @@ from ashare_data.financials import batch_followup as follow
 from ashare_data.financials import expansion as e
 from ashare_data.financials import official_expansion as o
 from ashare_data.financials import source_repair as repair
-from ashare_data.financials.expansion_access import SnapshotReader
+from ashare_data.financials.expansion_access import SnapshotReader, SourceUseDenied
 
 
 SYMBOL = "sh600000"
@@ -206,6 +207,58 @@ def test_failed_prepare_removes_staging_directory(tmp_path, financial, cache):
     with pytest.raises(ValueError, match="Unknown"):
         repair.prepare(tmp_path / "broken", financial[0], cache.root, ["missing"], [SYMBOL])
     assert not (tmp_path / "broken").exists() and not (tmp_path / "broken.preparing").exists()
+
+
+def test_retained_failure_keeps_staging_for_review(tmp_path, financial, cache):
+    with pytest.raises(ValueError, match="Unknown"):
+        repair.prepare(tmp_path / "retained", financial[0], cache.root, ["missing"], [], retain_temporaries=True)
+    assert (tmp_path / "retained.preparing").is_dir()
+
+
+def test_structure_partial_cache_replay_preserves_bad_cell_original_receipt_and_active_writer(tmp_path, financial, cache):
+    root = tmp_path / "structure"
+    e.prepare(root, tmp_path / "daily.sqlite3", "2010-01-01", "2026-10-19", kinds=["sina_structure"])
+    rows = [["变动日期", "20200101", "20210101"], ["公告日期", "20200102", "20210102"],
+            ["变动原因", "定期报告", "定期报告"], ["总股本", "100 万股", "100 万股"],
+            ["流通A股", "-20 万股", "30 万股"], ["限售A股", "90 万股", "70 万股"],
+            ["高管股", "30 万股", "20 万股"]]
+    raw = ('<script>var page_symbol = "sh600000";</script><table id="StockStructureNewTable1">' +
+           ''.join('<tr>' + ''.join('<td>' + value + '</td>' for value in row) + '</tr>' for row in rows) +
+           '</table>').encode("gb18030")
+    tid = "sina_structure-" + SYMBOL
+    receipt = dict(task_id=tid, state="parse_failed", parse_error="prior unit rejection", observed_at=STAMP,
+        attempts=[dict(response_sha256=e.digest(raw))],
+        raw=e.artifact(root, "raw/" + tid + ".json.gz", gzip.compress(raw, mtime=0)))
+    original = e.encoded(receipt)
+    path = root / "receipts" / (tid + ".json")
+    e.atomic(path, original)
+    output = tmp_path / "structure-repair"
+    with repair.writer(root):
+        result = repair.prepare(output, root, cache.root, [tid], [], retain_temporaries=True)
+        assert repair.apply_idle(output, root)["state"] == "writer_active"
+        assert path.read_bytes() == original
+    assert result["network_requests"] == 0
+    assert result["financial"][0]["new_state"] == "partial_source"
+    assert (output / "source-receipts" / path.name).read_bytes() == original
+    repaired = repair.read(output / "receipts" / path.name)
+    assert repaired["raw"] == receipt["raw"] and repaired["attempts"] == receipt["attempts"]
+    observations = [json.loads(line) for line in gzip.decompress((output / repaired["normalized"]["path"]).read_bytes()).splitlines()]
+    shares = [r for r in observations if r["category"] == "shares"]
+    assert [r["observation"]["fields"]["float_a_shares"] for r in shares] == [None, "300000"]
+    assert shares[0]["quality_flags"] == ["source_share_fields_quarantined"]
+    assert repaired["coverage"]["counts"] == dict(shares=2, unparsed_records=1)
+    reader = SnapshotReader(output)
+    with pytest.raises(SourceUseDenied, match="canonical_share_value_unavailable"):
+        reader.read(tid, locator="StockStructureNewTable1/column/1", field="float_a_shares",
+                    purpose="source_research", as_of=STAMP)
+    assert reader.read(tid, locator="StockStructureNewTable1/column/1", field="total_shares",
+                       purpose="source_research", as_of=STAMP)["value"] == "1000000"
+    assert repair.apply_idle(output, root)["applied"] == [tid]
+    assert repair.read(path)["state"] == "partial_source"
+    repair.verify_inputs(output)
+    (output / "source-receipts" / path.name).write_bytes(b"tampered")
+    with pytest.raises(ValueError, match="Preserved"):
+        repair.verify_inputs(output)
 
 
 def test_existing_followup_adopts_only_at_natural_boundary_and_checks_manifest(tmp_path, financial, cache, monkeypatch):

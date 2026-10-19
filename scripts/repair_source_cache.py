@@ -15,12 +15,14 @@ def main():
     build.add_argument("--official-batch", required=True)
     build.add_argument("--financial-task", action="append", default=[])
     build.add_argument("--official-symbol", action="append", default=[])
+    build.add_argument("--retain-temporaries", action="store_true")
     adopt = sub.add_parser("apply-idle")
     adopt.add_argument("--root", required=True)
     adopt.add_argument("--source", required=True)
     args = parser.parse_args()
     if args.command == "prepare":
-        result = prepare(args.root, args.financial_batch, args.official_batch, args.financial_task, args.official_symbol)
+        result = prepare(args.root, args.financial_batch, args.official_batch, args.financial_task,
+                         args.official_symbol, retain_temporaries=args.retain_temporaries)
     else:
         result = apply_idle(args.root, args.source)
     print(json.dumps(result, ensure_ascii=False))
