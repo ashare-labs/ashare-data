@@ -217,6 +217,14 @@ def build(a, writer):
     independently_checked = json.loads((a.audit / "input-disposition-audit.json").read_bytes())
     assert independently_checked["passed"] and independently_checked["batches"] == 13169
     assert independently_checked["input_rows"] == 7348840 + 570743678
+    source_research = json.loads((a.audit / "source-query-restoration.json").read_bytes())
+    native_research = json.loads((a.audit / "native-hf-restoration.json").read_bytes())
+    assert source_research["passed"] and source_research["all_original_fields_and_keys_equal"]
+    assert native_research["passed"] and native_research["restored_original_keys"] == 30581
+    assert (
+        native_research["all_six_numeric_fields_equal"]
+        and native_research["price_use_denials_preserved"]
+    )
     with sqlite3.connect(
         (a.audit / "repair-checkpoint.sqlite3").as_uri() + "?mode=ro", uri=True
     ) as journal:
@@ -362,6 +370,7 @@ def build(a, writer):
         "r2-verification.json",
         "input-disposition-audit.json",
         "source-query-restoration.json",
+        "native-hf-restoration.json",
         "early-repair-summary.json",
         "stockdb-repair-summary.json",
         "stockdb-semantics-sample.json",
