@@ -233,24 +233,19 @@ class Merge:
             r["path"].split("/")[-2].lower() + Path(r["path"]).stem for r in self.source_manifest
         )
         stock_probe = self.root.parent / "migration-20261019/stockdb-probe.json"
-        if stock_probe.exists():
+        codes = self.setting("stock_codes")
+        if codes is None and stock_probe.exists():
             raw = json.loads(stock_probe.read_text())
             codes = {
                 v for k, values in raw["股票代码"].items() if k not in ("1", "5") for v in values
             }
             codes.update(v[1] for v in raw.get("退市*", []) if v[1][0] not in ("1", "5"))
-            for code in codes:
-                symbols.add(
-                    (
-                        "sh"
-                        if code.startswith("6")
-                        else "sz"
-                        if code.startswith(("0", "3"))
-                        else "bj"
-                    )
-                    + code
-                )
-            self.setting("stock_codes", sorted(codes))
+            codes = self.setting("stock_codes", sorted(codes))
+        for code in codes or ():
+            symbols.add(
+                ("sh" if code.startswith("6") else "sz" if code.startswith(("0", "3")) else "bj")
+                + code
+            )
         self.parents = {x: x for x in symbols}
         for e in events:
             self.parents[e["new_symbol"]] = e["old_symbol"]

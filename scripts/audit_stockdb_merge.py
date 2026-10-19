@@ -286,6 +286,9 @@ def main():
                     ]
                 }
             )
+    if "日k" in report["tables"]:
+        report["tables"]["日k"]["same_label_equal_native_numeric_rows"] = None
+    report["overlap_scope"] = "Same source code/label diagnostic; daily binary versus decimal equality was not assessed. Stable identity mappings are fixed separately in the release."
     atomic_write(a.root / "report.json", canonical(report))
     print(json.dumps(report["tables"]), flush=True)
 

@@ -169,6 +169,18 @@ def stockdb(m, directory):
             db.execute("select value from metadata where key=?", (key,)).fetchone()[0]
         )
 
+    report["tables"]["日k"]["same_label_equal_native_numeric_rows"] = None
+    report["overlap_scope"] = (
+        "Same source code/label diagnostic; stable aliases are separately frozen. These quarantined inputs do not enter target duplicate selection. Daily binary values versus decimal source strings were not labeled equal or unequal."
+    )
+    report["source_aliases"] = []
+    for code in setting("equity_codes"):
+        symbol = (
+            "sh" if code.startswith("6") else "sz" if code.startswith(("0", "3")) else "bj"
+        ) + code
+        report["source_aliases"].append(
+            {"source_identifier": code, "instrument_id": m.symbol_ids[symbol]}
+        )
     source = Path(report["source_asset"]["root"])
     for name, expected in setting("source_inventory").items():
         assert fingerprint(source / name) == expected, "Stockdb source changed after audit"
@@ -178,7 +190,16 @@ def stockdb(m, directory):
     db.backup(target)
     target.close()
     db.close()
-    evidence = [m.w.object(copy, "sqlite3"), save_json(m, "stockdb-report", report)]
+    auditor = Path(__file__).with_name("audit_stockdb_merge.py")
+    audit_copy = m.work / "stockdb-audit-algorithm.py"
+    audit_copy.write_bytes(auditor.read_bytes())
+    audit_object = m.w.object(audit_copy, "py")
+    report["audit_algorithm"] = {
+        "source_object": audit_object,
+        "version": RULE,
+        "pin_scope": "Finalized reproducible algorithm; initial query process source-byte hash was not recorded. No stockdb facts are admitted by this release.",
+    }
+    evidence = [m.w.object(copy, "sqlite3"), audit_object, save_json(m, "stockdb-report", report)]
     total = Counter()
     for counts in report["tables"].values():
         total.update({key: counts.get(key, 0) for key in DISPOSITIONS})
@@ -310,6 +331,47 @@ def coverage(m, batches):
     return value
 
 
+def daily_key_reconciliation(m, batches):
+    """Reconcile multi-source input rows with old symbol-days and stable identity-days."""
+    totals = Counter()
+    reasons = Counter()
+    for key, batch in batches:
+        if batch["source"] != "daily_sqlite":
+            continue
+        item = batch["evidence"][0]
+        relation = "read_parquet(" + sql_literal(m.root / item["path"]) + ")"
+        n, source_days, stable_days = m.c.execute(
+            "select count(*),count(distinct (source_symbol,date)),count(distinct date) from "
+            + relation
+        ).fetchone()
+        totals.update(
+            input_rows=n, source_symbol_days=source_days, stable_identity_days=stable_days
+        )
+        categories = m.c.execute(
+            "select case when accepted=1 then 'adopted_keys' when quarantined then 'unresolved_keys' else 'adjudicated_unused_keys' end,count(*) "
+            "from (select date,count(*) filter(where disposition='adopted') accepted,"
+            "bool_or(disposition in ('quarantined','format_rejected')) quarantined from "
+            + relation
+            + " group by date) group by 1"
+        ).fetchall()
+        totals.update(dict(categories))
+        for disposition, reason, count in m.c.execute(
+            "select disposition,reason,count(*) from " + relation + " group by 1,2"
+        ).fetchall():
+            reasons[disposition + ":" + reason] += count
+    assert totals["input_rows"] == 38736814
+    assert totals["source_symbol_days"] == 14394671
+    assert totals["stable_identity_days"] == sum(
+        totals[k] for k in ("adopted_keys", "unresolved_keys", "adjudicated_unused_keys")
+    )
+    totals["alias_key_collapses"] = totals["source_symbol_days"] - totals["stable_identity_days"]
+    return {
+        "counts": dict(totals),
+        "input_disposition_reasons": dict(reasons),
+        "interpretation": "38,736,814 are multi-source input rows; 14,394,671 are raw symbol-days. Difference is not automatically same-value duplicates. Stable identities are reconciled before final key classification.",
+    }
+
+
 def metadata(m, files, batches, coverage_report):
     target = m.work / "published-reference.sqlite3"
     target.unlink(missing_ok=True)
@@ -326,6 +388,8 @@ def metadata(m, files, batches, coverage_report):
         CREATE TABLE release_daily_summary(instrument_id INTEGER,source TEXT,rows INTEGER,first TEXT,last TEXT,
           PRIMARY KEY(instrument_id,source));
         CREATE TABLE release_contracts(name TEXT PRIMARY KEY,body TEXT NOT NULL);
+        CREATE TABLE series(series_id INTEGER PRIMARY KEY,series_code TEXT NOT NULL UNIQUE,frequency_code TEXT NOT NULL);
+        INSERT INTO series VALUES(1,'daily_raw_research','1d'),(2,'hf_source_label_raw','1m'),(3,'tdx_source_label_raw','1m');
         """)
         d.execute(
             "update release_instruments set identity_status='provisional',identity_key=security"
@@ -421,10 +485,49 @@ def metadata(m, files, batches, coverage_report):
                     "insert into source_assets values (?,?)",
                     ("free-stockdb", canonical(batch["report"]["source_asset"]).decode()),
                 )
+                d.executemany(
+                    "insert into source_aliases values (?,?,?,?)",
+                    [
+                        (
+                            batch["report"]["scope"]["source_version"],
+                            alias["source_identifier"],
+                            alias["instrument_id"],
+                            "quarantined source snapshot alias; exchange validity is separate",
+                        )
+                        for alias in batch["report"]["source_aliases"]
+                    ],
+                )
             if source == "tdx":
+                original = json.loads((m.root / batch["evidence"][0]["path"]).read_bytes())
+                for security in sorted({row["security"] for row in original["minute"]}):
+                    symbol = ("sh" if security.endswith(".XSHG") else "sz") + security[:6]
+                    d.execute(
+                        "insert into source_aliases values (?,?,?,?)",
+                        (
+                            batch["source_assets"][0]["sha256"],
+                            security,
+                            m.symbol_ids[symbol],
+                            "immutable TDX source snapshot alias; exchange validity is separate",
+                        ),
+                    )
                 d.execute(
                     "insert into series_contracts values (?,?)",
-                    (3, canonical(batch["contract"]).decode()),
+                    (
+                        3,
+                        canonical(
+                            {
+                                "series_id": 3,
+                                "frequency": "1m",
+                                "price_basis": "unadjusted",
+                                "volume_unit": "share",
+                                "amount_unit": "CNY",
+                                "canonical_timezone": "UTC",
+                                "label_role": "unknown",
+                                "interval_closure": "unknown",
+                                "semantic_status": "partially_verified",
+                            }
+                        ).decode(),
+                    ),
                 )
             for batch_id in ids:
                 d.execute(
@@ -477,6 +580,17 @@ def main():
     with ReleaseWriter(args.root) as writer:
         m = Merge(args.entry, args.root)
         m.w = writer
+        if (m.root / "CURRENT.json").exists() and (m.work / "candidate-manifest.json").exists():
+            from ashare_data.storage.market_release import MarketRelease
+            from ashare_data.product.release_cli import verify
+
+            existing = MarketRelease(m.root, 1)
+            candidate = json.loads((m.work / "candidate-manifest.json").read_bytes())
+            assert all(existing.manifest.get(k) == v for k, v in candidate.items()), (
+                "Published first release differs from build candidate"
+            )
+            print(json.dumps({"unchanged": True, **verify(existing)}), flush=True)
+            return
         m.prepare()
         m.source_check()
         extend_identities(m)
@@ -494,6 +608,11 @@ def main():
         assert sum(x["input_dispositions"]["input_rows"] for x in hf) == sum(
             int(r["decoded_rows"]) for r in m.source_manifest
         ), "HF incomplete"
+        final_source = Path(__file__)
+        final_copy = m.work / "finalize-parser.py"
+        final_copy.write_bytes(final_source.read_bytes())
+        m.parser_sha256 = sha_file(final_source)
+        m.parser_object = m.w.object(final_copy, "py")
         tdx(m)
         stockdb(m, args.stockdb_audit)
         report, files, evidence, batches = m.report()
@@ -519,6 +638,8 @@ def main():
                     else "hf-observation-v1",
                 }
         evidence = [annotated.get(item["path"], item) for item in evidence]
+        daily_reconciliation = daily_key_reconciliation(m, batches)
+        evidence.append(save_json(m, "daily-key-reconciliation", daily_reconciliation))
         coverage_report = coverage(m, batches)
         evidence.extend(coverage_report["files"])
         evidence.extend(v["parser_object"] for _, v in batches)
@@ -534,6 +655,23 @@ def main():
         trial = m.root.parent / "migration-20261019/trial/report.json"
         if trial.exists():
             evidence.append(save_json(m, "storage-trial", json.loads(trial.read_bytes())))
+        comparison = m.root.parent / "migration-20261019/minute-daily-comparison.json"
+        if comparison.exists():
+            evidence.append(
+                save_json(m, "minute-daily-comparison", json.loads(comparison.read_bytes()))
+            )
+        import importlib.metadata
+        import platform
+
+        reproduction = {
+            "python": platform.python_version(),
+            "sqlite": sqlite3.sqlite_version,
+            "dependencies": {
+                name: importlib.metadata.version(name) for name in ("duckdb", "pandas", "numpy")
+            },
+            "scope": "Exact numerical engine/dependency versions for reproduction; per-batch parser objects and mapping hashes are separate",
+        }
+        evidence.append(save_json(m, "reproduction-runtime", reproduction))
         meta = metadata(m, files, batches, coverage_report)
         evidence = list({x["path"]: x for x in evidence}.values())
         # Verify references, keys, source/target values and every partition's row count.
@@ -564,12 +702,18 @@ def main():
         for item in evidence:
             assert sha_file(m.root / item["path"]) == item["sha256"]
         m.source_check()
+        for _, batch in batches:
+            for asset in batch.get("source_assets", []):
+                assert fingerprint(asset["path"]) == asset["fingerprint"], (
+                    "Source changed before publication"
+                )
         manifest = {
             "metadata": meta,
             "files": files,
             "evidence": evidence,
             "input_dispositions": report["input_dispositions"],
             "target_unique_keys": report["target_unique_keys"],
+            "daily_key_reconciliation": daily_reconciliation,
             "rules": m.contracts(),
             "coverage": {
                 k: v for k, v in coverage_report.items() if k not in ("files", "universe")
@@ -588,6 +732,14 @@ def main():
                 "asset_budget_bytes": writer.budget_bytes,
                 "free_reserve_bytes": writer.free_reserve_bytes,
                 "current_owned_bytes": writer.budget(),
+                "fact_bytes": sum(item["bytes"] for item in files),
+                "evidence_bytes": sum(item["bytes"] for item in evidence),
+                "metadata_bytes": meta["bytes"],
+                "observed_batch_peak_rss_bytes": max(
+                    batch["peak_rss_bytes"] for _, batch in batches
+                ),
+                "per_query_memory_limit": "2GB for imports; bounded queries have independent connections",
+                "spill_limit_bytes": 8 * 1024**3,
             },
             "integrity": {
                 "input_accounting": "exclusive dispositions for every input row",
@@ -600,7 +752,13 @@ def main():
         }
         # Keep the draft outside the default pointer; only --publish makes it visible.
         draft = m.work / "candidate-manifest.json"
-        draft.write_bytes(canonical(manifest))
+        if draft.exists():
+            prior = json.loads(draft.read_bytes())
+            for key in ("files", "metadata", "evidence", "input_dispositions", "rules"):
+                assert prior[key] == manifest[key], "Interrupted candidate changed: " + key
+            manifest = prior
+        else:
+            draft.write_bytes(canonical(manifest))
         if args.publish:
             print(json.dumps(writer.publish(manifest, expected_parent=None)), flush=True)
         else:
