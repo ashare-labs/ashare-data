@@ -132,3 +132,68 @@ def test_restored_conflict_remains_denied_in_published_minute_reader(tmp_path):
     assert row["close"] == 10
     assert row["price_status"] == "conflict"
     assert row["use_decision"]["execution"] == row["use_decision"]["fresh_valuation"] == "deny"
+
+
+@pytest.mark.parametrize("with_observation", [True, False])
+def test_missing_listing_keeps_coverage_unknown_even_on_known_calendar(
+    market_library, tmp_path, with_observation
+):
+    from ashare_data.product.market_release import ReleasedDailyProduct
+    from ashare_data.storage.market_release import MarketRelease, ReleaseWriter, connection
+
+    root, days = market_library
+    target = tmp_path / "released"
+    with ReleaseWriter(target, free_reserve_bytes=0) as writer:
+        path = writer.root / "work/metadata.sqlite3"
+        shutil.copyfile(root / "daily.sqlite3", path)
+        with sqlite3.connect(path) as db:
+            db.execute("PRAGMA journal_mode=DELETE")
+            db.execute("DELETE FROM listing_facts WHERE symbol='sz000858'")
+            db.executescript("""CREATE TABLE release_instruments(instrument_id INTEGER,security TEXT,name TEXT);
+              CREATE TABLE release_identifiers(security TEXT,instrument_id INTEGER);
+              INSERT INTO release_instruments VALUES(1,'000858.XSHE','test');
+              INSERT INTO release_identifiers VALUES('000858.XSHE',1);""")
+            db.commit()
+        facts = []
+        if with_observation:
+            c = connection(memory="128MB", threads=1)
+            item = writer.parquet(
+                c,
+                f"""SELECT 5::INTEGER series_id,1::INTEGER instrument_id,
+              DATE '{days[0]}' trade_date,10::DOUBLE open_price,11::DOUBLE high_price,
+              9::DOUBLE low_price,10::DOUBLE close_price,100::BIGINT volume_shares,
+              1000::DOUBLE turnover_cny,1::INTEGER batch_id,'sz000858' source_symbol,
+              'free_stockdb' AS source""",
+                [],
+                "observation",
+            )
+            c.close()
+            item.update(
+                table="bars_1d",
+                series_id=5,
+                instrument_id=1,
+                rows=1,
+                first_date=days[0],
+                last_date=days[0],
+                duplicate_keys=0,
+            )
+            facts.append(item)
+        writer.publish(
+            dict(
+                metadata=writer.object(path, "sqlite3"),
+                files=facts,
+                input_dispositions={"source": {"input_rows": len(facts), "adopted": len(facts)}},
+            ),
+            expected_parent=None,
+        )
+    r = MarketRelease(target)
+    owner = ReleasedDailyProduct(
+        {"market_release": {"root": str(target), "release_id": 1, "manifest_sha256": r.sha256}}
+    )
+    result = owner.prices(["000858.XSHE"], days[0], days[2])
+    assert len(result["rows"]) == int(with_observation)
+    assert len(result["calendar"]) == 3
+    item = result["coverage"][0]
+    assert item["expected_days"] is item["listing_days"] is item["missing_days"] is None
+    assert item["expected_state"] == "unknown" and item["calendar_session_count"] == 3
+    assert any(gap["code"] == "LISTING_STATE_UNKNOWN" for gap in result["gaps"])

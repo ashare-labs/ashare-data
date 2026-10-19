@@ -26,6 +26,8 @@ The independent input audit checks unique original keys and reconciles each excl
 
 These are R2 repair scripts for the sealed R1 source inventory, not arbitrary ingestion commands. Publication verifies all changed keys and values in bounded instrument groups, retained old rows and batches, disjoint supplemental days, unique target keys, exhaustive input dispositions, metadata references and source versions. CURRENT changes atomically. Consumers separately pin the new release and manifest SHA in deployment.json. Rollback restores the prior consumer entry and paired runtime; it never deletes objects.
 
+Market backup/restore retains the release chain and its data, metadata and audit objects. Explicit native-source research queries additionally require the pinned original assets; the market backup does not duplicate those originals or the independent account ledgers. A consumer rollback must restore the paired runtime and a Web checkout matching the prior catalog commit before restarting foreground services.
+
 New dates without an evidenced calendar remain queryable with unknown expected coverage. Observed dates are not invented calendar sessions. Uncorroborated early observations, minute interval endpoints, the HF partial final day, rounded reported quantities and strict historical market PIT remain explicit limitations.
 
 All repair audit artifacts, runtimes, test outputs and worktrees are retained in controlled Workspace paths. Preserve originals and every published object. This repair imports no financial samples, starts no persistent service and replays no account orders.

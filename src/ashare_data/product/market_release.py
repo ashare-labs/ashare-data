@@ -199,6 +199,12 @@ class ReleasedDailyProduct(LocalDailyProduct):
                         detail="Historical listing state is unavailable in this release",
                     )
             for item in value["coverage"]:
+                if item["security"] in missing_listing:
+                    item["calendar_session_count"] = len(known)
+                    item["expected_days"] = None
+                    item["listing_days"] = None
+                    item["missing_days"] = None
+                    item["expected_state"] = "unknown"
                 outside = sorted(
                     {
                         row["date"]
