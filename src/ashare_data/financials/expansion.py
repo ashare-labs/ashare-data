@@ -32,6 +32,10 @@ ALLOWED_KINDS = KINDS + ("sina_structure",)
 STATEMENTS = {"sina_balance": "fzb", "sina_income": "lrb", "sina_cashflow": "llb"}
 HOSTS = {"quotes.sina.cn", "vip.stock.finance.sina.com.cn", "stock.finance.sina.com.cn", "www.szse.cn"}
 MAX_BODY = 16_000_000
+NORMALIZER_SHA256 = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+CORPORATE_PARSER_SHA256 = hashlib.sha256(
+    (Path(__file__).parents[1] / "corporate_actions/sources.py").read_bytes()
+).hexdigest()
 TERMINAL = {"complete", "empty_unknown", "parse_failed", "failed_exhausted"}
 METRICS = {
     "BIZTOTINCO": ("total_operating_revenue", "营业总收入"),
@@ -476,8 +480,8 @@ def normalize_saved(root, manifest, task, receipt, raw=None):
     except Exception as error:
         receipt.update(state="parse_failed", parse_error=f"{type(error).__name__}: {error}"[:500])
     receipt["updated_at"] = now()
-    receipt["normalizer_sha256"] = digest(Path(__file__).read_bytes())
-    receipt["corporate_parser_sha256"] = digest((Path(__file__).parents[1] / "corporate_actions/sources.py").read_bytes())
+    receipt["normalizer_sha256"] = NORMALIZER_SHA256
+    receipt["corporate_parser_sha256"] = CORPORATE_PARSER_SHA256
     return receipt
 
 
