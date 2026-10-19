@@ -190,6 +190,35 @@ def test_pending_source_defers_its_requests_and_final_plan_cannot_overlap(existi
         gaps.prepare(tmp_path / "batch", root, preview)
 
 
+@pytest.mark.parametrize(("api", "target", "native", "title"), [
+    ("income", "n_income_attr_p", "NETPARECOMPPROF", "归属于母公司的净利润"),
+    ("income", "n_income_attr_p", "NETPARESHARPROF", "归属于母公司的净利润"),
+    ("cashflow", "c_cash_equ_end_period", "CASHEQUFINBALA", "期末现金及现金等价物余额"),
+    ("cashflow", "c_cash_equ_end_period", "CASHEQUFINBALA", "期末现金及现金等价物"),
+])
+def test_existing_raw_amount_aliases_are_reused_without_recollection(api, target, native, title):
+    row = dict(period_end="2010-03-31", scope="consolidated", currency="CNY", source_revision_id="source-version",
+               source_locator="report/0", metrics={}, fields=[dict(source_field=native, source_title=title,
+               ordinal=7, value="123.456789012345678901", state="source_observed")])
+    summary = gaps.summarize([row], api)
+    period = summary["periods"][0]
+    assert period["present"] == [target]
+    assert period["reused_raw_fields"][target] == dict(source_field=native, source_title=title, ordinal=7)
+    entry = dict(api=api, **summary)
+    manifest = dict(target_start="2010-01-01", target_end="2010-12-31")
+    tasks = gaps.financial_tasks(entry, dict(symbol="sh600000"), manifest, {"2010-03-31"})
+    current = [t for t in tasks if t["reason"] == "missing_current_amount_fields"]
+    assert all(target not in t["gaps"] and target not in ts.request_fields(t["url"]).split(",") for t in current)
+    assert not row["metrics"]  # The immutable original extraction remains unchanged.
+    for invalid in (row | {"fields": row["fields"] * 2},
+                    row | {"fields": [row["fields"][0] | {"source_title": "同名含义未经核实"}]},
+                    row | {"fields": [row["fields"][0] | {"value": None}]},
+                    row | {"fields": [row["fields"][0] | {"value": "NaN"}]}):
+        assert target not in gaps.summarize([invalid], api)["periods"][0]["present"]
+    for invalid in (row | {"currency": "USD"}, row | {"scope": "parent"}, row | {"period_after_code_exit": True}):
+        assert not gaps.summarize([invalid], api)["periods"]
+
+
 def test_dividend_alignment_requires_all_anchors_and_never_force_joins():
     row = f.observations(payload([dict(ts_code="600000.SH", div_proc="实施", ex_date="20100701", record_date="20100630",
                                      cash_div_tax="1.0", stk_bo_rate="0", stk_co_rate="0")]), task("dividend", dict(ex_date="20100701")))[0][0]
