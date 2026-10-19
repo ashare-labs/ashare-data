@@ -61,6 +61,7 @@ print(prices.attrs)  # 来源、单位和实际观察时间
 | 少量行情、缓存、覆盖及可见性 | [行情查询](docs/market-data.md)；Client / get_price |
 | 维护长期本地日线及早期观察 | [本地日线](docs/local-daily.md)；LocalDailyStore |
 | 搜索已有大库、查看行情、发布回测输入 | [日线产品](docs/local-daily.md#查询与发布产品)；LocalDailyProduct |
+| 固定全量行情版本、增量及恢复 | [行情发布](docs/local-daily.md#行情发布与恢复)；MarketRelease |
 | 读取停牌/ST、前收、日历、上市事实 | [参考数据](docs/reference-data.md) |
 | 历史状态、股票池及分钟证据 | [历史市场](docs/historical-market.md) |
 | 公司行动、历史股份及事件身份 | [公司行动](docs/corporate-actions.md)；CorporateHistoryView |

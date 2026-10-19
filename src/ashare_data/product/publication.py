@@ -9,7 +9,6 @@ from pathlib import Path
 import time
 
 from ashare_data.core.model import DataError, canonical, digest, require
-from ashare_data.product.daily import LIMITATIONS
 from ashare_data.product import references as reference_api
 from ashare_data.product.validation import validate_covered_input
 from ashare_data.storage.immutable import Store, identifier, immutable_write, now
@@ -43,6 +42,7 @@ def _producer():
     files = [
         *package.joinpath("product").glob("*.py"),
         package / "storage/local_daily.py",
+        package / "storage/market_release.py",
         package / "storage/immutable.py",
         package / "market/client.py",
         package / "core/model.py",
@@ -199,7 +199,10 @@ def _portfolio(bundle, securities, start, end, successor, *, ordinary=False):
                 "rows_sha256": bundle["receipt"]["rows_sha256"],
             }
         ],
-        "limitations": [*LIMITATIONS, "Price-only diagnostic; no total-return or covered mode."],
+        "limitations": [
+            *bundle["limitations"],
+            "Price-only diagnostic; no total-return or covered mode.",
+        ],
         "assumptions": list(ASSUMPTIONS),
         "price_basis": "raw",
         "volume_unit": "share",
@@ -336,7 +339,7 @@ def _ordinary(document, evidence, schedule, report):
             "status": "separate_corporate_schedule",
             "scope": "AQ must attach the frozen corporate schedule before account use",
         },
-        limitations=[x for x in LIMITATIONS if not x.startswith("Corporate actions,")]
+        limitations=[x for x in document["limitations"] if not x.startswith("Corporate actions,")]
         + list(reference_api.LIMITATIONS),
         assumptions=[
             "Source-scoped market-reference models explicitly accepted for retrospective research.",

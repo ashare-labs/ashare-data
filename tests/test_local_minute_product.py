@@ -21,37 +21,77 @@ def deployment(tmp_path):
         root = tmp_path / "layout" / "assets"
         shutil.copytree(native.root, root)
         review = root / "review.json"
-        review.write_text(json.dumps({"schema": "neigezhu-quality-overlay.v1",
-                                     "manifest_sha256": native.sha, "ranges": []}))
+        review.write_text(
+            json.dumps(
+                {
+                    "schema": "neigezhu-quality-overlay.v1",
+                    "manifest_sha256": native.sha,
+                    "ranges": [],
+                }
+            )
+        )
         tdx = root / "tdx.json"
-        tdx.write_text(json.dumps({"schema": "ad-tdx-minute-session.v1", "minute": [{
-            "security": "600000.XSHG", "source_label": "2026-06-02T09:31:00+08:00",
-            "open": "12.34", "evidence": {"source": "synthetic-routing-fixture"},
-        }]}))
+        tdx.write_text(
+            json.dumps(
+                {
+                    "schema": "ad-tdx-minute-session.v1",
+                    "minute": [
+                        {
+                            "security": "600000.XSHG",
+                            "source_label": "2026-06-02T09:31:00+08:00",
+                            "open": "12.34",
+                            "evidence": {"source": "synthetic-routing-fixture"},
+                        }
+                    ],
+                }
+            )
+        )
+
         def spec(reader, asset):
-            return {"reader": reader, "asset": asset,
-                    "coverage": "synthetic routing fixture", "limits": []}
+            return {
+                "reader": reader,
+                "asset": asset,
+                "coverage": "synthetic routing fixture",
+                "limits": [],
+            }
+
         sources = {
-            "tdx": {**spec("tdx-session", "minute-tdx"),
-                    "content": {"sha256": hashlib.sha256(tdx.read_bytes()).hexdigest()}},
-            "neigezhu": {**spec("neigezhu-native", "minute-hf-download"),
+            "tdx": {
+                **spec("tdx-session", "minute-tdx"),
+                "content": {"sha256": hashlib.sha256(tdx.read_bytes()).hexdigest()},
+            },
+            "neigezhu": {
+                **spec("neigezhu-native", "minute-hf-download"),
                 "manifest": {"path": "manifest.csv", "sha256": native.sha},
-                "review": {"path": "review.json", "sha256": hashlib.sha256(review.read_bytes()).hexdigest()}},
+                "review": {
+                    "path": "review.json",
+                    "sha256": hashlib.sha256(review.read_bytes()).hexdigest(),
+                },
+            },
         }
         entry = root.parent / "deployment.json"
-        entry.write_text(json.dumps({"schema": "ashare-deployment.v1", "data_root": "assets",
-            "assets": {"minute-tdx": {"kind": "reference", "path": "tdx.json"},
-                       "minute-hf-download": {"kind": "reference", "path": "."}},
-            "profiles": {"product": {"kind": "product", "minute_sources": sources}},
-        }))
+        entry.write_text(
+            json.dumps(
+                {
+                    "schema": "ashare-deployment.v1",
+                    "data_root": "assets",
+                    "assets": {
+                        "minute-tdx": {"kind": "reference", "path": "tdx.json"},
+                        "minute-hf-download": {"kind": "reference", "path": "."},
+                    },
+                    "profiles": {"product": {"kind": "product", "minute_sources": sources}},
+                }
+            )
+        )
         yield entry
     finally:
         native.tearDown()
 
 
 def query(owner, **kw):
-    return owner.prices("600000.XSHG", "2026-06-02T09:30:00+08:00",
-                        "2026-06-02T09:34:00+08:00", **kw)
+    return owner.prices(
+        "600000.XSHG", "2026-06-02T09:30:00+08:00", "2026-06-02T09:34:00+08:00", **kw
+    )
 
 
 def test_default_tdx_and_explicit_native_preserve_values_and_denials(deployment):
@@ -76,9 +116,13 @@ def test_selected_failure_has_no_fallback_and_does_not_disable_other_source(depl
     owner = LocalMinuteProduct(deployment)
     listing = owner.sources()
     assert listing["default_source"] == "tdx"
-    assert [s["status"] for s in listing["sources"]] == ["registered_unopened", "registration_error"]
+    assert [s["status"] for s in listing["sources"]] == [
+        "registered_unopened",
+        "registration_error",
+    ]
     assert query(owner)["rows"][0]["open"] == "12.34"
-    for source in ("neigezhu", "auto", "missing"):
+    assert query(owner, source="auto")["source"] == "tdx"
+    for source in ("neigezhu", "missing"):
         with pytest.raises(DataError):
             query(owner, source=source)
 
@@ -102,19 +146,61 @@ def test_product_cli_and_relative_layout_move(deployment, tmp_path, capsys, monk
     assert main(["product", "minute-sources"]) == 0
     listing = json.loads(capsys.readouterr().out)
     assert listing["sources"][1]["path"] == str(moved / "assets")
-    assert main(["product", "minute", "--source", "neigezhu", "--security", "600000.XSHG",
-                 "--start", "2026-06-02T09:30:00+08:00", "--end", "2026-06-02T09:34:00+08:00"]) == 0
+    assert (
+        main(
+            [
+                "product",
+                "minute",
+                "--source",
+                "neigezhu",
+                "--security",
+                "600000.XSHG",
+                "--start",
+                "2026-06-02T09:30:00+08:00",
+                "--end",
+                "2026-06-02T09:34:00+08:00",
+            ]
+        )
+        == 0
+    )
     assert len(json.loads(capsys.readouterr().out)["rows"]) == 4
-    assert main(["product", "minute", "--source", "auto", "--security", "600000.XSHG",
-                 "--start", "2026-06-02T09:30:00+08:00", "--end", "2026-06-02T09:34:00+08:00"]) == 2
-    assert json.loads(capsys.readouterr().err)["error"]["code"] == "PRODUCT_MINUTE_SOURCE_UNKNOWN"
+    assert (
+        main(
+            [
+                "product",
+                "minute",
+                "--source",
+                "auto",
+                "--security",
+                "600000.XSHG",
+                "--start",
+                "2026-06-02T09:30:00+08:00",
+                "--end",
+                "2026-06-02T09:34:00+08:00",
+            ]
+        )
+        == 0
+    )
+    assert json.loads(capsys.readouterr().out)["source"] == "tdx"
 
 
 def test_empty_window_never_falls_back_or_initializes_state(deployment):
     owner = LocalMinuteProduct(deployment)
-    result = owner.prices("600000.XSHG", "2026-06-03T09:30:00+08:00",
-                          "2026-06-03T09:31:00+08:00", source="neigezhu")
+    result = owner.prices(
+        "600000.XSHG", "2026-06-03T09:30:00+08:00", "2026-06-03T09:31:00+08:00", source="neigezhu"
+    )
     assert result["rows"] == []
     assert not list(deployment.parent.rglob("*.sqlite*"))
     with pytest.raises(DataError, match="offset"):
         owner.prices("600000.XSHG", "2026-06-02T09:30", "2026-06-02T09:31")
+
+
+def test_auto_means_fixed_default_and_never_falls_back(deployment):
+    document = json.loads(deployment.read_text())
+    document["profiles"]["product"]["default_minute_source"] = "neigezhu"
+    del document["profiles"]["product"]["minute_sources"]["neigezhu"]["review"]
+    deployment.write_text(json.dumps(document))
+    owner = LocalMinuteProduct(deployment)
+    with pytest.raises(DataError):
+        query(owner, source="auto")
+    assert query(owner, source="tdx")["rows"]

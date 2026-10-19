@@ -160,3 +160,77 @@ python scripts/verify_local_daily_product.py --deployment "$DEPLOYMENT" \
 该检查验证数据发布和冻结重读；原生账户、故障恢复与资金成交一致性由 AQ 独立验收。
 
 来源协议和解码依赖见 [提供者](providers.md)、[开发工具职责](development.md)。行情/可见性保证见 [行情查询](market-data.md)，历史股票池严格接口见 [历史市场](historical-market.md)。
+
+## 行情发布与恢复
+
+正式行情采用两个逻辑事实表：`market.bars_1d`、`market.bars_1m`。底层是按证券、系列排序的不可变 Parquet 分块，由固定文件清单定义一个 release。DuckDB 1.4.3 负责查询；SQLite 继续保存小型元数据和既有账户账本。读者打开时固定 release 和元数据摘要，构建下一版不会改变正在运行的查询或回测。
+
+### 选择依据
+
+同一有界真实样本包含全市场一个月与少量证券多年历史，共 32,860,481 行。证券优先 DuckDB 原生文件 1,166,028,800 字节，日期优先 1,223,438,336 字节，Parquet 361,699,364 字节。单股多年查询首次/暖查询分别约 0.009/0.005 秒、0.331/0.057 秒、0.023/0.019 秒；全市场日扫描分别约 0.102/0.059 秒、0.011/0.010 秒、0.282 秒。首次查询使用新进程，但没有清空操作系统缓存，不能称为物理冷盘测试。
+
+Parquet 查询进程峰值约 86 MB，两个原生布局约 821/858 MB。试验验证了逐键逐值双向对账、分块替换、旧清单读取与恢复。原生 DuckDB 写进程会阻止独立进程同时打开该库；不可变文件允许导入、API、回测各自打开只读查询连接。基于容量与进程访问方式选择 Parquet，不增加数据库服务。完整实测报告随首轮发布证据冻结，不能把样本秒数外推成全库性能承诺。
+
+### 目录与正式入口
+
+部署文件的 `assets` 登记一个 `kind: market_release` 的受控目录，产品 profile 的 `market_release` 必须同时固定 `asset`、正整数 `release_id` 和 `manifest_sha256`。`default_minute_source: canonical` 选择主分钟系列；`auto` 只表示这个冻结默认选择，不会因空结果或来源故障转用另一来源。
+
+资产目录仅包含：
+
+- `objects/`：内容摘要命名的事实分块、元数据及证据。
+- `releases/00000001.json`：不可变完整文件清单，含上一版清单摘要。
+- `CURRENT.json`：串行发布后的原子指针。未完成对象不会成为默认可见数据。
+- `work/`：可恢复批次日志与明确受控的暂存。
+
+首轮构建预算 200 GiB，保留至少 150 GiB 磁盘空闲；查询/导入限制线程、内存和溢写空间。达到预算停止新分块，已完成分块可续跑。源 SQLite、HF、free-stockdb、TDX 原件保持原位。不要删除原件、已发布对象或旧清单；备份只复制清单引用的正式对象，不产生第二套全量 raw 库。
+
+### 数据解释与输入去向
+
+日线采用冻结的全行来源顺序 baostock、eastmoney、sina、sohu、tencent。同键冲突是明确研究选择，不是交易所真值认证；不按查询窗口重新排序，不跨源填字段。每条原始输入保留互斥的去向：采用、同值重复、已裁决未用、未决隔离、格式拒绝。目标唯一键数另计。
+
+首轮日线 38,736,814 条输入：采用 10,736,431，同值重复 13,057，已裁决未用 20,638,484，隔离 7,348,842，格式拒绝 0。旧 14,394,671 是原始证券日键统计，既不是输入行数，也不是已验证目标键数。2010 年以前单位/复权尚未证实的记录及无依据修复的异常保留在原件与精确去向清单中。
+
+日线价格与金额采用无隐式舍入的 `DECIMAL(38,12)`，成交股数仅在整数无损时转 BIGINT。HF 保持原始 DOUBLE 二进制值和 BIGINT 股数，包括 FLOAT32 提升后的小数尾数；时区转换保留同一时刻，不移动 09:30 标签。来源时区、倍率、原字段解释放在冻结来源/映射契约中。目标系列只定义目标语义。TDX 十进制源另属系列 3，不与 HF 系列 2 混为已验证同区间行情。
+
+`MarketRelease.read` 返回各系列本来的 float 或 Decimal。通用 SQL 分钟视图的价格/金额使用 `UNION(binary_value DOUBLE, fixed_value DECIMAL(38,12))`，防止混合查询悄悄把十进制舍入为浮点。算术应先限定系列，再用 `union_extract(close_price, 'binary_value')` 或 `fixed_value` 提取对应类型。
+
+证券 ID 在后续发布中不复用。四条有保留发行人证据的历史代码链汇合到稳定 ID；源文件以新代码回填历史的别名与交易所代码有效期分表。其他身份保持 provisional，不把未知历史代码复用说成已核实。元数据、日历、来源契约及质量规则随发布冻结。
+
+HF 最后观察日 2026-08-07 仅到 10:21，不能当作完整日。09:30、午间、收盘边界与区间开闭仍有未决语义。零量不证明停牌，缺行不补成零量。覆盖检查包含整个交易日无行和全部缺失证券；来源已声明分母、完全缺失与分母未知分别统计，分钟预期行数保持未知，不硬套 240/241。
+
+free-stockdb 全部已登记权益代码的原始日/分钟键按块检查，并与现有源逐键比较重叠和字段。单位/标签区间没有足够合同证据的记录保留明确隔离状态，不能因为同标签或相近价格就纳入主系列。财务、交易参考、因子本轮不导入；未来源修订版本和解析版本必须分开，context 绑定报告及抽取版本。
+
+### 查询
+
+```python
+from ashare_data.storage.market_release import MarketRelease
+
+market = MarketRelease("/controlled/market", release_id=1,
+                       expected_manifest_sha256="<frozen manifest SHA256>")
+rows = market.read("bars_1d", "600036.XSHG", "2024-01-02", "2024-01-05", series_id=1)
+with market.sql(tables=("bars_1d",), securities=["600036.XSHG"]) as db:
+    values = db.execute("SELECT trade_date, close_price FROM market.bars_1d ORDER BY trade_date").fetchall()
+```
+
+`quality.bar_day_checks`、`reference.instruments`、`reference.instrument_identifiers` 和小型 `meta` 登记由同一清单加载。日线产品、分钟产品和研究发布通过 `LocalDailyProduct.from_deployment`、`LocalMinuteProduct` 实际读取这些分块。回执和研究输入含 release 摘要；账户运行时不随行情读者变更。
+
+### 构建、增量与恢复
+
+在选定受控目录运行首轮构建；重复命令从已验证的批次日志恢复，不增加重复事实。
+
+```sh
+python scripts/merge_market.py --entry "$ENTRY" --root "$MARKET" core
+python scripts/audit_stockdb_merge.py --entry "$ENTRY" --root "$AUDIT"
+python scripts/finalize_market.py --entry "$ENTRY" --root "$MARKET" --stockdb-audit "$AUDIT" --publish
+python -m ashare_data.product.release_cli --root "$MARKET" verify
+python -m ashare_data.product.release_cli --root "$MARKET" --release-id 1 backup --destination "$BACKUP"
+python -m ashare_data.product.release_cli --root "$BACKUP" restore --destination "$RESTORE"
+```
+
+首轮脚本只针对已经冻结的来源清单；原件改变会阻断恢复，不能在相同 source version 下静默接着读。备份目标带来源清单标记，可用相同命令继续未完成复制。恢复先校验全部对象，再原子发布目标指针；旧 release 和当前值都保留。原始来源另按登记的保留策略保存；正式备份不声称复制了外部原件。
+
+后续增量使用 `release_cli apply --plan plan.json`。计划 schema 为 `ad-market-replacement-plan.v1`，必须包含父清单摘要、变更原因、来源证据文件及其 SHA256、新元数据文件及其 SHA256、互斥输入去向和 `chunks`。每个 chunk 明确 table/series_id/instrument_id，以及完整替换 Parquet 路径和 SHA256，或显式 `delete: true`。只重写受影响证券分块。旧来源/批次登记不可改；变更值使用属于下一 release 的新批次，未变化值保留原批次。全行相同的重复输入为无变化操作。
+
+文件清单保留被替换块，从而重现旧版本；本实现没有混用稀疏行历史后删除旧文件。发布时检查重复逻辑键、引用、输入去向、逐值回转和父版本 CAS。这是受控管道保证，事实文件没有数据库物理 PK/FK 索引。局部修订会保留旧块，有明确容量代价。
+
+本地 release 重现不等于严格市场 PIT。修订公开可知时间未知时保持未知，不能拿本地导入时间或 bar 结束时间代替。
