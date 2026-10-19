@@ -15,6 +15,13 @@ golden = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(golden)
 
 
+@pytest.fixture(autouse=True)
+def isolated_deployment_environment(monkeypatch, tmp_path):
+    for key in ("ASHARE_DEPLOYMENT", "ASHARE_DATA_ROOT"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "user-config"))
+
+
 @pytest.fixture
 def bundle():
     return golden.bundle()

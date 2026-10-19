@@ -1204,7 +1204,9 @@ def add_parser(sub):
             "supplement",
         ],
     )
-    p.add_argument("--root", type=Path, default=DEFAULT_ROOT)
+    p.add_argument("--root", type=Path, help="Explicit library; otherwise deployment or legacy user directory")
+    p.add_argument("--deployment", help="Shared deployment manifest")
+    p.add_argument("--profile", default="product")
     p.add_argument(
         "--start",
         default=None,
@@ -1267,7 +1269,26 @@ def command(args):
         "universe",
         "factors",
     )
-    store = LocalDailyStore(args.root, readonly=readonly)
+    root = getattr(args, "root", None)
+    if root is None:
+        from ashare_data.product.configuration import deployment_path, load_profile
+
+        selected = deployment_path(getattr(args, "deployment", None))
+        if selected is None:
+            root = DEFAULT_ROOT
+        else:
+            _, data_root, document, profile = load_profile(
+                selected, profile=getattr(args, "profile", "product")
+            )
+            try:
+                asset = document["assets"][profile["daily_asset"]]
+                if asset["kind"] != "local_daily":
+                    raise ValueError("Selected daily asset must have kind local_daily")
+                target = Path(asset["path"]).expanduser()
+                root = target if target.is_absolute() else data_root / target
+            except (KeyError, TypeError) as exc:
+                raise ValueError("Selected deployment has no valid daily asset") from exc
+    store = LocalDailyStore(root, readonly=readonly)
     try:
         if args.action == "status":
             return store.summary()

@@ -26,6 +26,8 @@ dev = ["pytest==8.4.2", "ruff==0.14.0", "hatchling==1.27.0", "editables==0.5"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+tmp_path_retention_count = 0
+tmp_path_retention_policy = "none"
 
 [tool.ruff]
 line-length = 100

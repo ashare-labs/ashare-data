@@ -8,15 +8,29 @@ from ashare_data.core.model import DataError, digest, require
 from ashare_data.product.references import KINDS, normalize
 
 
+def deployment_path(deployment=None):
+    """Explicit path, environment, then shared user configuration; never create it."""
+    selected = deployment or os.environ.get("ASHARE_DEPLOYMENT")
+    if not selected and os.environ.get("ASHARE_DATA_ROOT"):
+        selected = Path(os.environ["ASHARE_DATA_ROOT"]).expanduser() / "deployment.json"
+    if selected:
+        return Path(selected).expanduser()
+    configured = os.environ.get("XDG_CONFIG_HOME")
+    home = Path(configured).expanduser() if configured else Path.home() / ".config"
+    if not home.is_absolute():
+        home = Path.home() / ".config"
+    candidate = home / "ashare" / "deployment.json"
+    # A broken link is declared configuration, so consumers must fail closed.
+    return candidate if candidate.exists() or candidate.is_symlink() else None
+
+
 def load_profile(deployment=None, *, profile="product"):
     """Read only the common manifest envelope; consumers resolve their own assets."""
-    selected = deployment or os.environ.get("ASHARE_DEPLOYMENT")
-    if selected is None and os.environ.get("ASHARE_DATA_ROOT"):
-        selected = Path(os.environ["ASHARE_DATA_ROOT"]).expanduser() / "deployment.json"
+    selected = deployment_path(deployment)
     require(
         selected is not None,
         "PRODUCT_NOT_CONFIGURED",
-        "Select --deployment, ASHARE_DEPLOYMENT or ASHARE_DATA_ROOT/deployment.json",
+        "Select --deployment, environment or the user config ashare/deployment.json",
     )
     path = Path(selected).expanduser().resolve()
     try:

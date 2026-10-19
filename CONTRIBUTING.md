@@ -24,3 +24,9 @@ python scripts/verify_wheel.py dist/ashare_data-0.10.0.dev5-py3-none-any.whl --f
 跨仓提交先交付明确接口映射和候选提交；下游在独立环境改 pin、重跑自己负责的调用链和账户测试。只在各仓验证完成后讨论发布，不能自动部署、替换冻结环境或刷新生产数据。
 
 工具职责、Node/QuickJS 的不同用途及生成命令见 [开发指南](docs/development.md)。供应商字段标识（例如 Eastmoney 的 f1/f2）是外部协议，内部命名整理不得改变；请求构造需用离线协议测试保护。
+
+
+日常回归使用 python scripts/run_tests.py -q（可追加测试文件/筛选参数）。
+它为 pytest 和子进程分配自有临时目录、隔离用户部署配置，并在成功或失败后清理本次临时目录。
+pytest 自身默认也不保留 tmp_path。确需调查失败时显式使用 --keep-temp，输出会标明保留位置；
+不把运行环境、数据库或整份 evidence 目录复制为交付。SIGKILL/断电等无法执行 finally 的中断需单独核查残留。

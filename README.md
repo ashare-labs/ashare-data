@@ -94,7 +94,7 @@ print(dataset_id, result.report)
 
 ### 本地维护与开发
 
-`ashare-data local-daily --help` 和 `scripts/local-daily.sh --help` 是维护入口，采集命令会写库并联网。默认根目录为 `~/.local/share/ashare-data`；已有库必须显式传 `--root`，升级不会寻找、搬移或覆盖旧库。
+`ashare-data local-daily --help` 和 `scripts/local-daily.sh --help` 是维护入口，采集命令会写库并联网。显式 --root 优先；否则与产品入口共用 --deployment、ASHARE_DEPLOYMENT、ASHARE_DATA_ROOT/deployment.json，最后发现 $XDG_CONFIG_HOME/ashare/deployment.json（未设置时为 ~/.config/ashare/deployment.json）。已有清单损坏或断链会报错；只有完全未配置时才使用 ~/.local/share/ashare-data。发现配置不会初始化、搬移或修改数据。
 
 开发工具统一在 `scripts/`。`python scripts/check_structure.py` 检查目录、内部导入和文档链接；完整流程见 [贡献约定](CONTRIBUTING.md)。测试只使用合成或最小协议输入，源采集需另行显式执行。
 
