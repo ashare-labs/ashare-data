@@ -26,6 +26,17 @@ META["dividend"] = ["ts_code", "end_date", "ann_date", "div_proc", "ex_date", "r
 META["adj_factor"] = ts.FIELDS["adj_factor"].split(",")
 DIV_GAPS = {"pay_date": "payment_date", "imp_ann_date": "implementation_announcement_date",
             "div_listdate": "new_shares_tradable_date", "base_date": "distribution_base_date", "base_share": "distribution_base_shares"}
+# Financial-sector templates retain these amounts in fields but older normalized
+# snapshots do not project them into metrics. Reuse the receipt-bound source
+# value only when both its native identifier and title match, without rewriting
+# source snapshots or borrowing publication evidence from another provider.
+RAW_AMOUNT_ALIASES = {
+    "income": {"n_income_attr_p": {
+        "NETPARECOMPPROF": {"归属于母公司的净利润"},
+        "NETPARESHARPROF": {"归属于母公司的净利润"},
+    }},
+    "cashflow": {"c_cash_equ_end_period": {"CASHEQUFINBALA": {"期末现金及现金等价物余额", "期末现金及现金等价物"}}},
+}
 
 
 def read(path, default=None):
@@ -83,6 +94,20 @@ def summarize(rows, api):
         metrics = row.get("metrics", {})
         present = [field for field, canonical in f.METRICS[api].items()
                    if metrics.get(canonical, {}).get("value") is not None and metrics[canonical].get("unit") == "CNY"]
+        reused_raw_fields = {}
+        for target, aliases in RAW_AMOUNT_ALIASES.get(api, {}).items():
+            if target in present:
+                continue
+            candidates = [item for item in row.get("fields", []) if item.get("source_field") in aliases]
+            if len(candidates) != 1:
+                continue  # Duplicate/ambiguous native fields remain unresolved.
+            item = candidates[0]
+            if (item.get("source_title") not in aliases[item["source_field"]]
+                    or item.get("state") != "source_observed" or item.get("value") is None
+                    or e.numeric(item["value"])[1] != "source_observed"):
+                continue
+            present.append(target)
+            reused_raw_fields[target] = {key: item[key] for key in ("source_field", "source_title", "ordinal")}
         derived = []
         if api == "income":
             value = derivation(row, "net_profit", "operating_revenue", "netprofit_margin")
@@ -93,7 +118,8 @@ def summarize(rows, api):
             if value:
                 derived.append(value)
         periods.append(dict(period=row["period_end"], present=present, source_revision_id=row["source_revision_id"],
-                            source_locator=row["source_locator"], announcement_date=row.get("announcement_date"), derived=derived))
+                            source_locator=row["source_locator"], announcement_date=row.get("announcement_date"), derived=derived,
+                            reused_raw_fields=reused_raw_fields))
     return dict(periods=periods, events=events, quarantined_reports=quarantined, distribution_observations=distributions)
 
 
@@ -210,7 +236,8 @@ def build_plan(baseline, snapshot, *, final=False, factor_inventory=None):
             for p in entry["periods"]:
                 existing.append(dict(api=api, symbol=symbol, period=p["period"], fields=p["present"],
                                      state="covered_same_scope_current_source", source_revision_id=p["source_revision_id"],
-                                     source_task=entry["task_id"], derived=p["derived"]))
+                                     source_task=entry["task_id"], derived=p["derived"],
+                                     reused_raw_fields=p.get("reused_raw_fields", {})))
                 indicator = {"income": "netprofit_margin", "balancesheet": "debt_to_assets"}.get(api)
                 if indicator and not p["derived"]:
                     indicators.setdefault((symbol, p["period"]), set()).add(indicator)
