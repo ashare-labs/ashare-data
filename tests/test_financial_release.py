@@ -233,6 +233,26 @@ def test_recovered_official_modified_derived_title_is_quarantined(tmp_path):
     assert result["validation"]["quarantined_rows"] == 1
 
 
+@pytest.mark.parametrize("compatible", [True, False])
+def test_additive_importer_accepts_only_explicitly_reviewed_previous_mapping(tmp_path, monkeypatch, compatible):
+    from ashare_data.storage import financial_release as storage
+    parent = market(tmp_path / "market")
+    source = batch(tmp_path / "source", [report()])
+    output = tmp_path / "candidate"
+    result = prepare(parent, output, [source])
+    monkeypatch.setattr(storage, "mapper_sha256", lambda: "next-additive-implementation")
+    monkeypatch.setattr(storage, "COMPATIBLE_PREPARED_MAPPINGS",
+                        frozenset({result["mapping_sha256"]}) if compatible else frozenset())
+    with ReleaseWriter(parent.root, free_reserve_bytes=0) as writer:
+        if not compatible:
+            with pytest.raises(DataError, match="Unexpected candidate implementation"):
+                compose(writer, parent, output, expected_parent_sha256=parent.sha256)
+        else:
+            manifest = compose(writer, parent, output, expected_parent_sha256=parent.sha256)
+            writer.publish(manifest, expected_parent=parent.release_id)
+    assert MarketRelease(parent.root).release_id == (2 if compatible else 1)
+
+
 def test_interrupted_import_resumes_committed_shards_without_double_counting(tmp_path, monkeypatch):
     parent = market(tmp_path / "market")
     source = batch(tmp_path / "source", [report()])
