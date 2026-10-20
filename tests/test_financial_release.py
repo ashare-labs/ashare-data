@@ -3,6 +3,7 @@
 from copy import deepcopy
 import gzip
 import json
+import shutil
 import sqlite3
 
 import pytest
@@ -396,6 +397,18 @@ def test_later_market_publication_cannot_drop_financial_tables(tmp_path):
         forgotten["financial_reference_tables"]["candidate_ids"] = []
         with pytest.raises(DataError, match="candidate history"):
             writer.publish(forgotten, expected_parent=2)
+        for index, statement in enumerate((
+            "DROP TABLE release_issuer_instruments",
+            "DELETE FROM source_assets",
+            "UPDATE release_identifiers SET instrument_id=99",
+        )):
+            revised = parent.root / "work" / ("invalid-financial-metadata-" + str(index) + ".sqlite3")
+            shutil.copyfile(published.metadata_path, revised)
+            with sqlite3.connect(revised) as db:
+                db.execute(statement)
+            invalid = dict(published.manifest, metadata=writer.object(revised, "sqlite3"))
+            with pytest.raises(DataError, match="financial metadata or identifier|financial metadata table"):
+                writer.publish(invalid, expected_parent=2)
         writer.publish(published.manifest, expected_parent=2)
     assert MarketRelease(parent.root).financial().point("600000.XSHG", "net_profit", "2024-03-31",
                source="sina", as_of="2026-10-20T00:00:00+08:00", mode="source_research")["status"] == "ok"

@@ -5,7 +5,7 @@ there is no glob, mutable current/history join, shared writable DuckDB, or servi
 Changed chunks produce new objects. Every earlier manifest and object is retained.
 """
 
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 import fcntl
 import hashlib
 import json
@@ -175,6 +175,7 @@ class ReleaseWriter:
         pointer = self.root / "CURRENT.json"
         old = json.loads(pointer.read_bytes()) if pointer.exists() else None
         parent = old["release_id"] if old else None
+        prior_financial = None
         require(
             parent == expected_parent, "MARKET_PARENT_CHANGED", "Publish against the current parent"
         )
@@ -226,6 +227,24 @@ class ReleaseWriter:
             "MARKET_INTEGRITY",
             "Metadata object changed",
         )
+        if prior_financial:
+            prior_metadata = self.root / prior["metadata"]["path"]
+            require(sha_file(prior_metadata) == prior["metadata"]["sha256"],
+                    "MARKET_INTEGRITY", "Previous financial metadata changed")
+            uri = (self.root / metadata["path"]).as_uri() + "?mode=ro&immutable=1"
+            with closing(sqlite3.connect(uri, uri=True)) as db:
+                db.execute("ATTACH DATABASE ? AS previous",
+                           (prior_metadata.as_uri() + "?mode=ro&immutable=1",))
+                present = {r[0] for r in db.execute("SELECT name FROM main.sqlite_master")}
+                for table in ("release_issuers", "release_issuer_instruments", "source_assets",
+                              "data_batches", "batch_inputs", "source_aliases", "release_identifiers"):
+                    require(table in present, "FIN_METADATA", "Preserve financial metadata table " + table)
+                    columns = ("security,instrument_id" if table == "release_identifiers" else
+                               ",".join(r[1] for r in db.execute("PRAGMA previous.table_info(" + table + ")")))
+                    missing = db.execute("SELECT count(*) FROM (SELECT " + columns + " FROM previous." + table
+                                         + " EXCEPT SELECT " + columns + " FROM main." + table + ")").fetchone()[0]
+                    require(missing == 0, "FIN_METADATA",
+                            "Existing financial metadata or identifier mapping changed: " + table)
         if manifest.get("financial_reference_tables") or any(
             item.get("kind") == "financial_table" for item in manifest.get("evidence", [])
         ):
