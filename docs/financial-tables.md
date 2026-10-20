@@ -18,6 +18,8 @@ SQLite 元数据和固定 DuckDB 版本。候选生成与共用发布分开执�
 
 公司节点不等于证券ID。未核实的供应商主体保留 `source_entity_unverified_legal_identity`，
 不按名称或换码推定同一法律主体。官方字段复核建立限定报告期的证券关系，不延伸到其他时期。
+点查询同时限定冻结证券ID和原始来源代码；即使行情注册表将历史换码列为同一证券ID，
+也不会自动读取另一代码的财务或参考观察。直接SQL关联时应保留同样的来源代码约束。
 日线自带 `tradestatus/is_st` 通过 `reference.daily_attached_status` 视图复用。
 
 内容ID排除抓取时钟、解析器和响应内的分页位置；原响应位置在来源关系中保留。
@@ -87,11 +89,12 @@ value = view.point(
 )
 with view.sql(market_tables=("bars_1d",), securities=["603169.XSHG"]) as db:
     rows = db.execute("""
-        SELECT i.security, o.period_end, o.canonical_field, o.value_decimal_text
+        SELECT json_extract_string(r.body, '$.security') AS source_security,
+               o.period_end, o.canonical_field, o.value_decimal_text
         FROM financial.observations o
         JOIN reference.issuer_instruments r USING(issuer_id)
         JOIN reference.instruments i USING(instrument_id)
-        WHERE i.security='603169.XSHG'
+        WHERE json_extract_string(r.body, '$.security')='603169.XSHG'
     """).fetchall()
 ```
 

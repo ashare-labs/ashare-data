@@ -109,8 +109,9 @@ class FinancialTables:
               JOIN financial.report_versions r USING(report_version_id)
               JOIN reference.issuer_instruments i ON i.issuer_id=o.issuer_id
               LEFT JOIN financial.capture_times ct ON ct.from_type='report' AND ct.from_id=o.report_version_id
-              WHERE i.instrument_id=? AND r.source=? AND o.canonical_field=? AND o.period_end=?
-              LIMIT 10001""", [self.release.identifiers[security], source, field, period]).fetchall()
+              WHERE i.instrument_id=? AND json_extract_string(i.body,'$.security')=?
+               AND r.source=? AND o.canonical_field=? AND o.period_end=?
+              LIMIT 10001""", [self.release.identifiers[security], security, source, field, period]).fetchall()
             require(len(rows) <= 10000, "FIN_QUERY_BOUND", "Narrow the financial point query")
             names = [d[0] for d in c.description]
             records = [dict(zip(names, row)) for row in rows]
@@ -144,9 +145,10 @@ class FinancialTables:
                     proved = c.execute("""SELECT v.policy,v.available_from FROM financial.visibility v
                       JOIN reference.issuer_instruments i ON i.relation_id=v.issuer_relation_id
                       WHERE v.observation_id=? AND i.instrument_id=?
+                       AND json_extract_string(i.body,'$.security')=?
                        AND i.identity_status='verified_report_security_relation'
                        AND (v.policy='verified_exact_publication' OR ?='official_daily')""",
-                                       [row["observation_id"], self.release.identifiers[security], mode]).fetchall()
+                                       [row["observation_id"], self.release.identifiers[security], security, mode]).fetchall()
                     if not proved:
                         reasons.append("historical_visibility_unproven")
                     elif not any(timestamp(gate) <= cutoff for _, gate in proved):
@@ -175,19 +177,21 @@ class FinancialTables:
             ids = {x["observation_id"] for x in accepted}
             replacements = c.execute("""SELECT from_id,to_id,available_at FROM financial.links
                WHERE relation='replaces' AND issuer_id IN
-                (SELECT issuer_id FROM reference.issuer_instruments WHERE instrument_id=?)
+                (SELECT issuer_id FROM reference.issuer_instruments WHERE instrument_id=?
+                 AND json_extract_string(body,'$.security')=?)
                 AND field=? AND period_end=?""",
-                                     [self.release.identifiers[security], field, period]).fetchall()
+                                     [self.release.identifiers[security], security, field, period]).fetchall()
             replaced = {old for new, old, at in replacements if new in ids and (at is None or timestamp(at) <= cutoff)}
             accepted = [x for x in accepted if x["observation_id"] not in replaced]
             # Distinct source versions are never silently selected by latest capture.
             versions = {x["report_version_id"] for x in accepted}
             values = {(x["canonical_value_decimal_text"], x["canonical_unit"], x["context_id"]) for x in accepted}
             blockers = c.execute("""SELECT count(*) FROM financial.links WHERE relation='unresolved_revision'
-              AND issuer_id IN (SELECT issuer_id FROM reference.issuer_instruments WHERE instrument_id=?)
+              AND issuer_id IN (SELECT issuer_id FROM reference.issuer_instruments WHERE instrument_id=?
+               AND json_extract_string(body,'$.security')=?)
               AND period_end=? AND (field IS NULL OR field=?) AND
               (available_at IS NULL OR CAST(available_at AS TIMESTAMPTZ)<=CAST(? AS TIMESTAMPTZ))""",
-                                 [self.release.identifiers[security], period, field, as_of]).fetchone()[0]
+                                 [self.release.identifiers[security], security, period, field, as_of]).fetchone()[0]
             if len(versions) != 1 or len(values) != 1 or blockers:
                 result.update(status="conflict", reasons=["unresolved_version_or_extraction_conflict"],
                               observation_ids=sorted(x["observation_id"] for x in accepted))
@@ -246,18 +250,18 @@ class FinancialTables:
         if family == "calendar":
             require(exchange in {"XSHE", "XSHG"} and security is None,
                     "FIN_REFERENCE", "Calendar point requires an exchange")
-            condition, scope = "r.exchange=?", exchange
+            condition, scope = "r.exchange=?", [exchange]
         else:
             require(security in self.release.identifiers and exchange is None,
                     "FIN_REFERENCE", "Reference point requires one frozen security")
-            condition, scope = "r.instrument_id=?", self.release.identifiers[security]
+            condition, scope = "r.instrument_id=? AND r.security=?", [self.release.identifiers[security], security]
         c = self.sql()
         try:
             key = t.KEYS[table]
             rows = c.execute(f"""SELECT r.*,ct.first_captured_at FROM {table} r
                LEFT JOIN financial.capture_times ct ON ct.from_type=? AND ct.from_id=r.{key}
                WHERE {condition} AND r.{date_column}=? AND r.source=? LIMIT 10001""",
-                             [endpoint, scope, day, source]).fetchall()
+                             [endpoint, *scope, day, source]).fetchall()
             require(len(rows) <= 10000, "FIN_QUERY_BOUND", "Reference point has too many observations")
             names = [x[0] for x in c.description]
             records = [dict(zip(names, row)) for row in rows]

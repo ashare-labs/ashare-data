@@ -24,7 +24,7 @@ def official_reviewed(tmp_path):
     return make_reviewed_fixture.__wrapped__(tmp_path)
 
 
-def market(root):
+def market(root, aliases=()):
     with ReleaseWriter(root, free_reserve_bytes=0) as w:
         p = root / "work/meta.sqlite3"
         db = sqlite3.connect(p)
@@ -38,6 +38,7 @@ def market(root):
             release_id INTEGER NOT NULL,parser_sha256 TEXT NOT NULL,mapping_sha256 TEXT NOT NULL,body TEXT NOT NULL);
           CREATE TABLE batch_inputs(batch_id INTEGER,asset_id TEXT,PRIMARY KEY(batch_id,asset_id));
         """)
+        db.executemany("INSERT INTO release_identifiers VALUES (?,17)", [(s,) for s in aliases])
         db.commit()
         db.close()
         c = connection()
@@ -72,12 +73,13 @@ def report(value="1234567890123456789.000000001"):
                 source_locator="report/20240331")
 
 
-def batch(root, rows, *, state="complete", parser="parser1", capture="2026-10-19T12:00:00+00:00"):
+def batch(root, rows, *, state="complete", parser="parser1", capture="2026-10-19T12:00:00+00:00",
+          symbol="sh600000"):
     root.mkdir(parents=True)
     for name in ("receipts", "raw", "normalized"):
         (root / name).mkdir()
     (root / "writer.lock").touch()
-    task = dict(id="source-task", symbol="sh600000", kind="sina_income", ipo="1999-01-01", out=None)
+    task = dict(id="source-task", symbol=symbol, kind="sina_income", ipo="1999-01-01", out=None)
     tasks = canonical([task])
     universe = canonical({"instruments": []})
     (root / "tasks.json").write_bytes(tasks)
@@ -295,6 +297,27 @@ def test_reference_units_are_separate_from_tax_and_factor_basis(tmp_path):
     adjusted = reader.reference_point("factor", "2024-04-01", **query)
     assert adjusted["value"] == "12.3" and adjusted["unit"] == "ratio"
     assert adjusted["factor_basis"] == factor["basis"]
+
+
+def test_instrument_aliases_do_not_carry_source_financials_or_shares_across_codes(tmp_path):
+    parent = market(tmp_path / "market", aliases=["600001.XSHG"])
+    share = dict(schema="ad.corporate-source-observation.v1", category="shares", source="sina_structure",
+                 security="600000.XSHG", source_revision_id="share",
+                 observation={"date": "2024-04-01", "fields": {"float_a_shares": "100"}})
+    original = batch(tmp_path / "original", [report(), share])
+    prepare(parent, tmp_path / "one-code", [original])
+    reader = FinancialTables.prepared(tmp_path / "one-code", parent)
+    query = dict(source="sina", as_of="2026-10-20T00:00:00+00:00", mode="source_research")
+    assert reader.point("600001.XSHG", "net_profit", "2024-03-31", **query)["status"] == "missing"
+    assert reader.reference_point("share", "2024-04-01", source="sina_structure",
+                                  as_of=query["as_of"], security="600001.XSHG",
+                                  field="float_a_shares")["value"] is None
+    different = dict(report("9"), security="600001.XSHG")
+    second = batch(tmp_path / "second", [different], symbol="sh600001")
+    prepare(parent, tmp_path / "both-codes", [original, second])
+    reader = FinancialTables.prepared(tmp_path / "both-codes", parent)
+    assert reader.point("600000.XSHG", "net_profit", "2024-03-31", **query)["value"] == report()["fields"][0]["value"]
+    assert reader.point("600001.XSHG", "net_profit", "2024-03-31", **query)["value"] == "9"
 
 
 def test_preparation_rejects_active_incomplete_and_corrupt_sources(tmp_path):
