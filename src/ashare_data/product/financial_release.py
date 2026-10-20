@@ -60,10 +60,19 @@ class FinancialTables:
         return path
 
     def receipt(self):
-        return dict(self.release.receipt(), financial_schema=t.VERSION,
-                    financial_published=self.candidate is None,
-                    candidate_id=self.candidate["candidate_id"] if self.candidate else None,
-                    full_history_complete=False)
+        value = dict(self.release.receipt(), financial_schema=t.VERSION,
+                     financial_published=self.candidate is None,
+                     candidate_id=self.candidate["candidate_id"] if self.candidate else None,
+                     full_history_complete=False)
+        if getattr(self, "_unit_candidate", None):
+            value.update(unit_candidate_id=self._unit_candidate.value["candidate_id"],
+                         unit_candidate_published=False)
+        return value
+
+    def with_units(self, root, *, expected_sha256):
+        """Opt into reviewed source-unit annotations without mutating this reader."""
+        from ashare_data.financials.unit_resolution import UnitCandidate
+        return UnitCandidate(root, expected_sha256=expected_sha256).bind(self)
 
     def sql(self, *, market_tables=(), securities=None):
         c = self.release.sql(tables=market_tables, securities=securities)
@@ -86,6 +95,8 @@ class FinancialTables:
               SELECT l.from_type,l.from_id,min(CAST(c.observed_at AS TIMESTAMPTZ)) AS first_captured_at
               FROM financial.links l JOIN meta.financial_captures c ON c.capture_id=l.to_id
               WHERE l.relation='captured_in' AND l.to_type='capture' GROUP BY ALL""")
+            if getattr(self, "_unit_candidate", None):
+                self._unit_candidate.install(c)
             if "bars_1d" in market_tables:
                 names = {r[0] for r in c.execute("DESCRIBE market.bars_1d").fetchall()}
                 if {"tradestatus", "is_st"} <= names:
@@ -98,32 +109,59 @@ class FinancialTables:
             raise
 
     def point(self, security, field, period, *, source, as_of, mode="historical_pit"):
+        return self._point(security, field, period, source=source, as_of=as_of, mode=mode)
+
+    def source_point(self, security, field, period, *, statement, title, source, as_of,
+                     mode="historical_pit"):
+        """Query an exact native field/title without inventing a canonical metric."""
+        return self._point(security, field, period, source=source, as_of=as_of, mode=mode,
+                           source_selector=(statement, field, title))
+
+    def _point(self, security, field, period, *, source, as_of, mode, source_selector=None):
         require(mode in {"historical_pit", "official_daily", "source_research", "listed_security"},
                 "FIN_MODE", "Choose an explicit supported financial query mode")
         cutoff = timestamp(as_of)
         require(security in self.release.identifiers, "FIN_SECURITY", "Unknown frozen security identifier")
         c = self.sql()
         try:
-            rows = c.execute("""SELECT o.*,r.source,i.valid_from,i.valid_to,i.identity_status,
-              ct.first_captured_at FROM financial.observations o
+            table = "financial.unit_resolved_observations" if (
+                source_selector and getattr(self, "_unit_candidate", None)) else "financial.observations"
+            selector = "o.statement=? AND o.source_field=? AND o.source_title=?" if source_selector else "o.canonical_field=?"
+            rows = c.execute(f"""SELECT o.*,r.source,i.valid_from,i.valid_to,i.identity_status,
+              ct.first_captured_at FROM {table} o
               JOIN financial.report_versions r USING(report_version_id)
               JOIN reference.issuer_instruments i ON i.issuer_id=o.issuer_id
               LEFT JOIN financial.capture_times ct ON ct.from_type='report' AND ct.from_id=o.report_version_id
               WHERE i.instrument_id=? AND json_extract_string(i.body,'$.security')=?
-               AND r.source=? AND o.canonical_field=? AND o.period_end=?
-              LIMIT 10001""", [self.release.identifiers[security], security, source, field, period]).fetchall()
+               AND r.source=? AND {selector} AND o.period_end=?
+              LIMIT 10001""", [self.release.identifiers[security], security, source,
+                              *(source_selector or (field,)), period]).fetchall()
             require(len(rows) <= 10000, "FIN_QUERY_BOUND", "Narrow the financial point query")
             names = [d[0] for d in c.description]
             records = [dict(zip(names, row)) for row in rows]
             result = dict(self.receipt(), security=security, field=field, period_end=period,
                           source=source, as_of=as_of, mode=mode, value=None, status="missing",
                           reasons=[], observation_ids=[])
+            if source_selector:
+                result.update(field_namespace="native_source", statement=source_selector[0],
+                              source_title=source_selector[2])
             if not records:
                 result["reasons"] = ["no_observed_field"]
                 return result
             accepted, rejected = [], set()
             for row in records:
                 reasons = []
+                if row.get("unit_ready_value_decimal_text") is not None:
+                    if timestamp(row["unit_evidence_available_from"]) > cutoff:
+                        reasons.append("unit_definition_not_captured_at_cutoff")
+                    else:
+                        row["base_context_id"] = row["context_id"]
+                        ctx = json.loads(row["raw_context_json"])
+                        ctx["unit"] = row["resolved_unit"]
+                        row.update(canonical_value_decimal_text=row["unit_ready_value_decimal_text"],
+                                   canonical_unit=row["resolved_unit"],
+                                   context_id=t.identity("context", ctx),
+                                   quality_state="usable_current_source", quality_reasons_json="[]")
                 if row["quality_state"] != "usable_current_source" or row["canonical_value_decimal_text"] is None:
                     reasons.extend(json.loads(row["quality_reasons_json"]) or ["field_not_calculation_ready"])
                 if mode in {"listed_security", "historical_pit", "official_daily"}:
@@ -182,6 +220,10 @@ class FinancialTables:
                 AND field=? AND period_end=?""",
                                      [self.release.identifiers[security], security, field, period]).fetchall()
             replaced = {old for new, old, at in replacements if new in ids and (at is None or timestamp(at) <= cutoff)}
+            if source_selector:
+                # Canonical-field replacement edges do not establish replacements
+                # for a native field/title selector.
+                replaced = set()
             accepted = [x for x in accepted if x["observation_id"] not in replaced]
             # Distinct source versions are never silently selected by latest capture.
             versions = {x["report_version_id"] for x in accepted}
@@ -205,6 +247,10 @@ class FinancialTables:
                           daily_pit_usable=mode == "official_daily",
                           time_basis="verified_official_daily" if mode == "official_daily" else
                           "verified_exact_publication" if mode == "historical_pit" else "captured_source_snapshot")
+            if row.get("base_context_id"):
+                result.update(base_context_id=row["base_context_id"], unit_rule_id=row["unit_rule_id"],
+                              unit_evidence_available_from=row["unit_evidence_available_from"],
+                              unit_basis="reviewed_source_definition")
             return result
         finally:
             c.close()

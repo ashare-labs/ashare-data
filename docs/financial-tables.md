@@ -141,3 +141,37 @@ with ReleaseWriter(market_root) as writer:
 
 候选或任务结束均不代表完整历史已取得。每个输入批次的空返回、失败、部分返回和
 实际最早日期保留在覆盖表；仍在采集的分区须结束并核验后另生成候选、增量合并。
+
+## 已冻结观察的单位增量
+
+`financials.unit_resolution` 生成单独的 `ad.financial-unit-candidate.v1`。
+它只增加小型单位规则和捕获绑定，不重写五千多万条观察，不改变15张正式表，
+也不自动进入共用发布。协调方可显式审阅、启用：
+
+```python
+reviewed = view.with_units(unit_candidate_root, expected_sha256=unit_candidate_sha256)
+value = reviewed.source_point(
+    "600012.XSHG", "BASICEPS", "2010-03-31",
+    statement="lrb", title="基本每股收益", source="sina",
+    as_of=review_cutoff, mode="source_research",
+)
+```
+
+规则同时绑定原候选的对象集合、抽取映射、批次及捕获回执，以及来源、报表类别、
+原字段ID、完整标题、币种和合并口径。新浪 `f2/ps4` 是显示精度，不能单独证明单位：
+少数股东综合收益金额也存在 `ps4`。此次定义仅使用已经逐页检查的官方合并报表表头、
+明确标注元/股的每股收益行、完整原件元数据审计及新浪原值显示函数。表头定义科目
+单位类别，显示函数确认万/亿只是展示缩写。这是有证据的来源定义推导，
+不是接口直接返回的逐字段单位声明，也不证明供应商数值与官方修订完全一致。
+
+只有审阅清单中列明的原字段组合可以恢复单位；未覆盖的行业科目、旧标题和别名继续
+未核。不增加跨来源规范指标映射，不把相近标题合并为同一经济事实。
+`financial.unit_resolved_observations` 在原列旁提供 `resolved_unit`、
+`unit_ready_value_decimal_text`、`unit_rule_id` 和单位证据时间。
+原始 `financial.observations`、`current_source_values` 和现有规范指标入口保持不变。
+null、空字符串和零仍有区别；其他质量错误不能通过单位规则解除。
+
+`source_point` 默认仍使用 `historical_pit`，单位证据不能授予历史可见资格。
+显式当前源研究查询同时检查源捕获时间与单位证据时间。返回派生的已知单位上下文ID，
+同时保留 `base_context_id`，原存储上下文不修改。源字段必须带报表类别与完整标题，
+证券换码、版本冲突及上市边界沿用正式读者约束。
