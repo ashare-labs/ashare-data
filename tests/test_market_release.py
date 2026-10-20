@@ -15,10 +15,12 @@ def test_explicit_query_spill_directory_and_budget(tmp_path, monkeypatch):
     directory = tmp_path / "query-spill"
     monkeypatch.setenv("ASHARE_DUCKDB_TEMP_DIRECTORY", str(directory))
     monkeypatch.setenv("ASHARE_DUCKDB_MAX_TEMP_DIRECTORY_SIZE", "32MB")
+    monkeypatch.setenv("ASHARE_DUCKDB_MEMORY_LIMIT", "32MB")
     c = connection(memory="128MB", threads=1)
     try:
         assert c.execute("SELECT current_setting('temp_directory')").fetchone()[0] == str(directory)
         assert c.execute("SELECT current_setting('max_temp_directory_size')").fetchone()[0] == "30.5 MiB"
+        assert c.execute("SELECT current_setting('memory_limit')").fetchone()[0] == "30.5 MiB"
     finally:
         c.close()
     explicit = tmp_path / "explicit"

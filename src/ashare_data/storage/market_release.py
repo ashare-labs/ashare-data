@@ -70,7 +70,7 @@ def connection(temp=None, memory="2GB", threads=2):
     c = duckdb.connect()
     try:
         c.execute("SET threads=?", [threads])
-        c.execute("SET memory_limit=?", [memory])
+        c.execute("SET memory_limit=?", [os.environ.get("ASHARE_DUCKDB_MEMORY_LIMIT", memory)])
         c.execute("SET TimeZone='UTC'; SET preserve_insertion_order=false")
         directory = temp if temp is not None else os.environ.get("ASHARE_DUCKDB_TEMP_DIRECTORY")
         if directory is not None:
