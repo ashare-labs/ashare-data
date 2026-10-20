@@ -204,6 +204,11 @@ class ReleaseWriter:
             "MARKET_INTEGRITY",
             "Metadata object changed",
         )
+        if manifest.get("financial_reference_tables") or any(
+            item.get("kind") == "financial_table" for item in manifest.get("evidence", [])
+        ):
+            from ashare_data.storage.financial_release import verify_manifest_contract
+            verify_manifest_contract(self.root, manifest)
         value = {
             **manifest,
             "schema": SCHEMA,
@@ -515,3 +520,8 @@ class MarketRelease:
             "snapshot": "one immutable file manifest for this reader lifetime",
             "strict_historical_pit": False,
         }
+
+    def financial(self):
+        """Financial/reference reader bound to this exact common release."""
+        from ashare_data.product.financial_release import FinancialTables
+        return FinancialTables(self)
