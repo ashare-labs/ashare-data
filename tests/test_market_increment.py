@@ -201,6 +201,9 @@ def test_real_pipeline_overlap_preserves_unchanged_minute_and_promotes_daily_pri
         full_metadata = writer.root / "work/full-reference.sqlite3"
         shutil.copyfile(writer.root / meta["path"], full_metadata)
         with sqlite3.connect(full_metadata) as db:
+            from ashare_data.storage.local_daily import SCHEMA
+
+            db.executescript(SCHEMA)
             db.executescript("""
                 DROP TABLE data_batches;
                 CREATE TABLE data_batches(batch_id INTEGER PRIMARY KEY,batch_key TEXT NOT NULL,release_id INTEGER NOT NULL,
@@ -372,6 +375,23 @@ def test_real_pipeline_overlap_preserves_unchanged_minute_and_promotes_daily_pri
     published = apply(r, plan)
     fresh = MarketRelease(market)
     assert published["release_id"] == 2
+    from ashare_data.product.market_release import ReleasedDailyProduct
+
+    product = ReleasedDailyProduct({"market_release": fresh.receipt()})
+    answer = product.prices(["000001.XSHE"], "2026-10-20", "2026-10-20")
+    assert len(answer["rows"]) == 1
+    assert answer["receipt"]["missing_response_ids"] == []
+    response = answer["receipt"]["responses"][0]
+    assert response["id"] == answer["rows"][0]["response_id"]
+    assert response["sha256"] == hashlib.sha256(bodies["sohu"]).hexdigest()
+    assert response["frozen_source_assets"][0]["record_scope"] == {
+        "native_block_index": 1 if batch_response else None,
+        "requested_security": "000001.XSHE",
+    }
+    with product._read() as store:
+        unknown = product._receipt(store, "prices", {"securities": ["000001.XSHE"]},
+                                   [{"response_id": "unknown"}], [], [])
+    assert unknown["missing_response_ids"] == ["unknown"]
     assert apply(r, plan)["already_applied"] is True
     assert apply(fresh, plan)["already_applied"] is True
     observations, refs = incremental_daily(fresh, "000001.XSHE", "2026-10-20", "2026-10-20", "sohu")

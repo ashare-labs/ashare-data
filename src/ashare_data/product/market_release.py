@@ -199,6 +199,39 @@ class ReleasedDailyProduct(LocalDailyProduct):
     def _receipt(self, store, operation, request, rows, calendar, listing):
         value = super()._receipt(store, operation, request, rows, calendar, listing)
         value.pop("receipt_sha256")
+        missing = set(value["missing_response_ids"])
+        ids = sorted({self.release.identifiers[s] for s in request.get("securities", [])
+                      if s in self.release.identifiers})
+        captured = {}
+        for first in range(0, len(ids), 400):
+            selected = ids[first:first + 400]
+            if not missing:
+                break
+            assets = store.db.execute(
+                "SELECT DISTINCT a.body FROM source_assets a JOIN source_aliases i "
+                "ON i.source_version=a.asset_id WHERE a.asset_id LIKE 'response:%' "
+                "AND i.instrument_id IN (" + ",".join("?" for _ in selected) + ")",
+                selected,
+            )
+            for item in assets:
+                asset = json.loads(item[0])
+                receipt = asset.get("receipt")
+                if receipt is None or digest(receipt) not in missing:
+                    continue
+                response_id = digest(receipt)
+                response = captured.setdefault(response_id, {
+                    "id": response_id, "error": None, "started_at": None,
+                    **receipt, "frozen_source_assets": [],
+                })
+                response["frozen_source_assets"].append(
+                    {key: val for key, val in asset.items() if key != "receipt"}
+                )
+        for response in captured.values():
+            response["frozen_source_assets"].sort(key=lambda item: item["asset_id"])
+        value["responses"] = sorted(
+            value["responses"] + list(captured.values()), key=lambda item: item["id"]
+        )
+        value["missing_response_ids"] = sorted(missing - captured.keys())
         value.update(
             asset={"kind": "market_release", "root": str(self.root)},
             release=self.release.receipt(),
