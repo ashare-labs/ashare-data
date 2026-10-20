@@ -66,6 +66,7 @@ def prepare(root, build_name="build"):
         source_timezone="Asia/Shanghai",
         canonical_timezone="UTC",
         source_label_shift_seconds=0,
+        source_locator="Sohu batch captures retain the entire HTTP response and a native security-block index plus row index. Each block belongs to exactly one requested security; omitted scopes contain no admitted rows.",
         sources={
             "sina_minute": {
                 "raw": "decimal strings",

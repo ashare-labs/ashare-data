@@ -16,8 +16,8 @@ import time
 
 import pandas as pd
 
-from ashare_data.market.increment import minute_rows, normalize_values, MINUTE_SERIES
-from ashare_data.providers.daily_sources import sohu_daily, tencent_daily
+from ashare_data.market.increment import minute_rows, normalize_values, MINUTE_SERIES, sohu_capture
+from ashare_data.providers.daily_sources import tencent_daily
 from ashare_data.storage.market_release import (
     MarketRelease,
     canonical,
@@ -93,19 +93,34 @@ def response_raw(root, job):
     body = gzip.decompress(path.read_bytes())
     assert hashlib.sha256(body).hexdigest() == receipt["sha256"]
     return body, dict(
-        asset_id="response:" + hashlib.sha256(canonical(receipt)).hexdigest(),
+        asset_id="response:"
+        + hashlib.sha256(
+            canonical(
+                receipt
+                if "response_block" not in job
+                else {
+                    "receipt": receipt,
+                    "security": job["security"],
+                    "block": job["response_block"],
+                }
+            )
+        ).hexdigest(),
         path=str(path),
         sha256=sha_file(path),
         content_sha256=receipt["sha256"],
         bytes=path.stat().st_size,
         source=job["source"],
         security=job["security"],
+        record_scope={
+            "native_block_index": job.get("response_block"),
+            "requested_security": job["security"],
+        },
         receipt=receipt,
         locator="JSON array row (Sina minute), hq array row (Sohu), day array row (Tencent)",
     )
 
 
-def failed_record_count(body, source, security):
+def failed_record_count(body, source, security, source_block=None):
     """Error envelopes contain no bars; recognized rejected arrays are counted."""
     if body is None:
         return 0
@@ -118,6 +133,8 @@ def failed_record_count(body, source, security):
             raise ValueError("unclassified Sohu envelope; explicit review required")
         value = json.loads(m[1])
         items = value if isinstance(value, list) else [value]
+        if source_block is not None:
+            items = [items[source_block]]
         return sum(len(x.get("hq", [])) for x in items if isinstance(x, dict))
     value = json.loads(text)
     if source == "sina_minute":
@@ -179,6 +196,16 @@ def build(a):
         )
     else:
         atomic_write(setting_path, canonical(settings))
+    completed = {row[0] for row in checkpoint.execute("select instrument_id from batches")}
+    if (
+        completed == {item["instrument_id"] for item in scopes}
+        and (out / "build-report.json").exists()
+    ):
+        report = json.loads((out / "build-report.json").read_bytes())
+        assert report["preview"] == a.preview
+        print("UNCHANGED: complete build retains its original report", flush=True)
+        checkpoint.close()
+        return
     old = {(f["table"], f["series_id"], f["instrument_id"]): f for f in r.files}
     after = {
         table: max(f["last_date"] for f in r.files if f["table"] == table)
@@ -280,7 +307,7 @@ def build(a):
                 earlier, prior_asset = response_raw(root, previous)
                 if prior_asset:
                     assets.append(prior_asset)
-                n = failed_record_count(earlier, source, security)
+                n = failed_record_count(earlier, source, security, previous.get("response_block"))
                 for index in range(n):
                     ledger.append(
                         dict(
@@ -294,7 +321,7 @@ def build(a):
                     )
             if job["status"] != "ok":
                 failures.append(jobs[-1])
-                n = failed_record_count(body, source, security)
+                n = failed_record_count(body, source, security, job.get("response_block"))
                 for index in range(n):
                     ledger.append(
                         dict(
@@ -350,31 +377,30 @@ def build(a):
                     if rec["disposition"] == "adopted":
                         minute.append(rec)
             else:
-                # Reparse the immutable body and bind locators to its native order.
-                # Sohu returns descending rows; normalized rows are ascending.
-                class FrozenHTTP:
-                    def get(self, url, referer=None):
-                        assert url == asset["receipt"]["url"]
-                        return body, [asset["receipt"]]
+                # Native response block and row positions remain explicit for bulk captures.
+                if source == "sohu":
+                    reparsed, native = sohu_capture(
+                        body,
+                        asset["receipt"],
+                        native_symbol(security),
+                        scope["start"],
+                        scope["end"],
+                        source_block=job.get("response_block"),
+                    )
+                else:
 
-                fn = sohu_daily if source == "sohu" else tencent_daily
-                reparsed, _ = fn(
-                    FrozenHTTP(), native_symbol(security), scope["start"], scope["end"]
-                )
+                    class FrozenHTTP:
+                        def get(self, url, referer=None):
+                            assert url == asset["receipt"]["url"]
+                            return body, [asset["receipt"]]
+
+                    reparsed, _ = tencent_daily(
+                        FrozenHTTP(), native_symbol(security), scope["start"], scope["end"]
+                    )
+                    native = json.loads(body)["data"][native_symbol(security)]["day"]
                 assert reparsed == job["normalized_rows"], (
                     "normalized checkpoint differs from source body"
                 )
-                if source == "sohu":
-                    import re
-
-                    envelope = json.loads(
-                        re.fullmatch(
-                            r"\s*historySearchHandler\((.*)\);?\s*", body.decode("gb18030"), re.S
-                        )[1]
-                    )
-                    native = envelope[0]["hq"] if envelope else []
-                else:
-                    native = json.loads(body)["data"][native_symbol(security)]["day"]
                 locators = {row[0]: index for index, row in enumerate(native)}
                 assert len(locators) == len(native) == len(reparsed)
                 for raw in reparsed:
@@ -683,6 +709,12 @@ def build(a):
     totals = Counter()
     for value in results:
         totals.update(value["input_dispositions"])
+    request_outcomes = Counter(
+        (items[-1]["source"], items[-1]["status"])
+        for items in [
+            sorted(captures, key=lambda job: job["completed_at"]) for captures in versions.values()
+        ]
+    )
     report = dict(
         parent=r.receipt(),
         preview=a.preview,
@@ -694,6 +726,10 @@ def build(a):
             for table in ("bars_1d", "bars_1m")
         },
         raw_source_errors=[x for v in results for x in v["failures"]],
+        latest_capture_outcomes=[
+            {"source": source, "status": status, "scopes": count}
+            for (source, status), count in sorted(request_outcomes.items())
+        ],
         after_date=after,
         cutoff=scope["end"],
         seconds=time.monotonic() - started,

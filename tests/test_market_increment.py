@@ -171,7 +171,10 @@ def test_minute_selection_is_frozen_and_keeps_exact_decimal(tmp_path):
         minute_prices(config(r1), *args, source="sina")
 
 
-def test_real_pipeline_overlap_preserves_unchanged_minute_and_promotes_daily_priority(tmp_path):
+@pytest.mark.parametrize("batch_response", [False, True])
+def test_real_pipeline_overlap_preserves_unchanged_minute_and_promotes_daily_priority(
+    tmp_path, batch_response
+):
     """Use provider-shaped raw bodies through the actual bounded build script."""
     import gzip
     import hashlib
@@ -287,6 +290,16 @@ def test_real_pipeline_overlap_preserves_unchanged_minute_and_promotes_daily_pri
         + urlencode({"param": "sz000001,day,2026-10-20,2026-10-20,640,"}),
         "sina_minute": "test-minute",
     }
+    if batch_response:
+        payload = json.loads(
+            bodies["sohu"].decode().removeprefix("historySearchHandler(").removesuffix(")")
+        )[0]
+        bodies["sohu"] = (
+            "historySearchHandler("
+            + json.dumps([{"code": "cn_000002", "status": 0, "hq": []}, payload])
+            + ")"
+        ).encode()
+        urls["sohu"] = urls["sohu"].replace("code=cn_000001", "code=cn_000002%2Ccn_000001")
     for source, body in bodies.items():
         sha = hashlib.sha256(body).hexdigest()
         (root / "incoming/raw" / (sha + ".gz")).write_bytes(gzip.compress(body))
@@ -323,6 +336,8 @@ def test_real_pipeline_overlap_preserves_unchanged_minute_and_promotes_daily_pri
             receipts=[receipt],
             normalized_rows=rows,
         )
+        if source == "sohu" and batch_response:
+            value["response_block"] = 1
         (root / "jobs" / (source + ".json")).write_bytes(canonical(value))
     args = Namespace(root=root, preview=False, limit=None, build_name=None)
     builder.build(args)
@@ -339,7 +354,9 @@ def test_real_pipeline_overlap_preserves_unchanged_minute_and_promotes_daily_pri
     ).fetchall()
     assert actual[0] == (1,) and actual[1][0] != 1
     hashes = {x["parquet"]: sha_file(x["parquet"]) for x in v["chunks"]}
+    report_hash = sha_file(root / "build/build-report.json")
     builder.build(args)
+    assert sha_file(root / "build/build-report.json") == report_hash
     assert all(sha_file(path) == digest for path, digest in hashes.items())
     assert MarketRelease(market).sha256 == r.sha256 and sha_file(r.root / daily["path"]) == before
     spec = importlib.util.spec_from_file_location(
@@ -391,4 +408,46 @@ def test_collector_resumes_successes_and_does_not_retry_access_denials():
         )
     assert collector.needs_request(
         {"status": "deferred", "pause_evidence": {"receipts": [{"status": 501}]}}, True
+    )
+
+
+def test_sohu_batch_maps_native_blocks_and_preserves_missing_scope_evidence():
+    import importlib.util
+    from pathlib import Path
+    from types import SimpleNamespace
+
+    spec = importlib.util.spec_from_file_location(
+        "batch_collector", Path(__file__).parents[1] / "scripts/collect_market_increment.py"
+    )
+    collector = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(collector)
+    native_row = ["2026-10-20", "10", "10", "0", "0%", "9", "11", "1", "0.1", "0"]
+    body = (
+        "historySearchHandler("
+        + json.dumps(
+            [
+                {"code": "cn_000002", "status": 0, "hq": [native_row]},
+                {"code": "cn_000001", "status": 0, "hq": [native_row]},
+            ]
+        )
+        + ")"
+    ).encode()
+
+    class HTTP:
+        history = SimpleNamespace()
+
+        def get(self, url, referer=None):
+            return body, [{"url": url, "sha256": "raw-response-hash"}]
+
+    jobs = [
+        ("sohu:" + code + ".XSHE", "sohu", {"security": code + ".XSHE", "instrument_id": n})
+        for n, code in enumerate(("000001", "000002", "000003"), 1)
+    ]
+    values = collector.batch_sohu(HTTP(), jobs, "2026-10-20", "2026-10-20", "producer")
+    assert [v["status"] for v in values] == ["ok", "ok", "error"]
+    assert [v["response_block"] for v in values[:2]] == [1, 0]
+    assert values[0]["normalized_rows"][0]["volume"] == "100"
+    assert (
+        values[2]["receipts"] == []
+        and values[2]["batch_response_evidence"][0]["sha256"] == "raw-response-hash"
     )

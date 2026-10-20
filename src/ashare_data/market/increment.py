@@ -12,7 +12,7 @@ import json
 from ashare_data.storage.market_release import FIELDS
 
 NATIVE_FIELDS = ("open", "high", "low", "close", "volume", "amount")
-MAPPING_VERSION = "recent-source-observations.v1"
+MAPPING_VERSION = "recent-source-observations.v2"
 MINUTE_SERIES = 6
 
 
@@ -119,3 +119,54 @@ def minute_rows(body, *, after_date, end_date):
                     reason="conflicting_native_label" if len(values) > 1 else "equal_native_label",
                 )
     return result
+
+
+def sohu_capture(body, receipt, symbol, start, end, *, source_block=None):
+    """Normalize one exact native response block, retaining the whole HTTP response.
+
+    Batch responses use a native array index. Only the selected block is fed to
+    the established unit parser; the receipt hash still identifies the original
+    unsplit response, never the re-encoded parser input.
+    """
+    import re
+    from urllib.parse import parse_qs, urlsplit
+    from ashare_data.providers.daily_sources import sohu_daily
+
+    match = re.fullmatch(r"\s*historySearchHandler\((.*)\);?\s*", body.decode("gb18030"), re.S)
+    if not match:
+        raise ValueError("unrecognized Sohu response envelope")
+    envelope = json.loads(match[1])
+    blocks = envelope if isinstance(envelope, list) else [envelope]
+    index = 0 if source_block is None else source_block
+    if type(index) is not int or not 0 <= index < len(blocks):
+        raise ValueError("invalid native Sohu block index")
+    block = blocks[index]
+    if block.get("code") != "cn_" + symbol[2:]:
+        raise ValueError("Sohu block does not match the requested security")
+    selected_body = (
+        body
+        if source_block is None
+        else ("historySearchHandler(" + json.dumps([block], ensure_ascii=False) + ")").encode(
+            "gb18030"
+        )
+    )
+
+    class FrozenHTTP:
+        def get(self, url, referer=None):
+            actual, requested = urlsplit(receipt["url"]), urlsplit(url)
+            if source_block is None:
+                assert url == receipt["url"]
+            else:
+                assert (actual.scheme, actual.netloc, actual.path) == (
+                    requested.scheme,
+                    requested.netloc,
+                    requested.path,
+                )
+                params, single = parse_qs(actual.query), parse_qs(requested.query)
+                codes = params.pop("code")[0].split(",")
+                code = single.pop("code")[0]
+                assert code in codes and len(codes) == len(set(codes)) and params == single
+            return selected_body, [receipt]
+
+    rows, _ = sohu_daily(FrozenHTTP(), symbol, start, end)
+    return rows, block.get("hq", [])

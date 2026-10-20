@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 import fcntl
 import hashlib
 import json
+import re
 from pathlib import Path
 import shutil
 import sqlite3
@@ -17,6 +18,7 @@ import time
 from urllib.parse import urlencode
 
 from ashare_data.providers.daily_sources import PublicHTTP, sohu_daily, tencent_daily
+from ashare_data.market.increment import sohu_capture
 from ashare_data.storage.market_release import MarketRelease, atomic_write, canonical, sha_file
 
 
@@ -30,6 +32,104 @@ def needs_request(previous, retry_errors):
     return retry_errors and previous["status"] != "ok" and not denied
 
 
+def batch_sohu(http, jobs, start, end, producer):
+    """One native HTTP response, with a separate exact block locator per security."""
+    codes = [
+        "cn_"
+        + (item["security"][3:] if item["security"].startswith("BJ.") else item["security"][:6])
+        for _, _, item in jobs
+    ]
+    assert len(codes) == len(set(codes)) <= 20
+    url = "https://q.stock.sohu.com/hisHq?" + urlencode(
+        dict(
+            code=",".join(codes),
+            start=start.replace("-", ""),
+            end=end.replace("-", ""),
+            stat="1",
+            order="D",
+            period="d",
+            callback="historySearchHandler",
+            rt="jsonp",
+        )
+    )
+    http.history.refresh = True
+    http.history.receipts = []
+    http.history.cache_scope = start + ":" + end
+    began = datetime.now(timezone.utc).isoformat()
+    try:
+        body, receipts = http.get(url, "https://q.stock.sohu.com/")
+    except Exception as error:
+        return [
+            dict(
+                job_key=key,
+                source=source,
+                security=item["security"],
+                instrument_id=item["instrument_id"],
+                status="access_denied" if type(error).__name__ == "SourceBlocked" else "error",
+                error=type(error).__name__ + ": " + str(error),
+                receipts=getattr(error, "receipts", []),
+                started_at=began,
+                completed_at=datetime.now(timezone.utc).isoformat(),
+                collector_sha256=producer,
+            )
+            for key, source, item in jobs
+        ]
+    match = re.fullmatch(r"\s*historySearchHandler\((.*)\);?\s*", body.decode("gb18030"), re.S)
+    assert match, "unclassified batch envelope retained; do not publish"
+    envelope = json.loads(match[1])
+    blocks = envelope if isinstance(envelope, list) else [envelope]
+    positions = {}
+    for index, block in enumerate(blocks):
+        assert isinstance(block, dict), "invalid batch member"
+        code = block.get("code")
+        assert code in codes or not block.get("hq"), (
+            "unrequested source rows require explicit accounting"
+        )
+        if code in codes:
+            assert code not in positions, "duplicate batch security"
+            positions[code] = index
+    values = []
+    for (key, source, item), code in zip(jobs, codes, strict=True):
+        value = dict(
+            job_key=key,
+            source=source,
+            security=item["security"],
+            instrument_id=item["instrument_id"],
+            started_at=began,
+            collector_sha256=producer,
+        )
+        index = positions.get(code)
+        if index is None:
+            # Other members' bars must not be counted again for an omitted security.
+            value.update(
+                status="error",
+                error="requested security omitted from native Sohu batch response",
+                receipts=[],
+                batch_response_evidence=receipts,
+            )
+        else:
+            value.update(receipts=receipts, response_block=index)
+            symbol = (
+                "bj" + item["security"][3:]
+                if item["security"].startswith("BJ.")
+                else ("sh" if item["security"].endswith("XSHG") else "sz") + item["security"][:6]
+            )
+            try:
+                rows, _ = sohu_capture(body, receipts[-1], symbol, start, end, source_block=index)
+                value.update(
+                    status="ok",
+                    rows=len(rows),
+                    first=min((r["date"] for r in rows), default=None),
+                    last=max((r["date"] for r in rows), default=None),
+                    normalized_rows=rows,
+                )
+            except (ValueError, RuntimeError, KeyError) as error:
+                value.update(status="error", error=type(error).__name__ + ": " + str(error))
+        value["completed_at"] = datetime.now(timezone.utc).isoformat()
+        values.append(value)
+    return values
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--market", type=Path, required=True)
@@ -40,6 +140,12 @@ def main():
     p.add_argument("--active-since", required=True)
     p.add_argument("--limit", type=int)
     p.add_argument("--retry-errors", action="store_true")
+    p.add_argument(
+        "--refresh-sohu",
+        action="store_true",
+        help="Refresh only Sohu scopes not yet reaching the frozen cutoff, using native batches",
+    )
+    p.add_argument("--sohu-batch-size", type=int, default=20, choices=range(1, 21))
     a = p.parse_args()
     assert datetime.fromisoformat(a.start) <= datetime.fromisoformat(a.end)
     assert (datetime.fromisoformat(a.end) - datetime.fromisoformat(a.start)).days <= 7
@@ -125,13 +231,34 @@ def main():
     jobs = []
     for item in records:
         sources = (
-            ["sohu"] if item["security"].startswith("BJ.") else ["sohu", "tencent", "sina_minute"]
+            ["sohu"]
+            if a.refresh_sohu or item["security"].startswith("BJ.")
+            else ["sohu", "tencent", "sina_minute"]
         )
         for source in sources:
             key = source + ":" + item["security"]
-            if not needs_request(existing.get(key), a.retry_errors):
+            previous = existing.get(key)
+            if (
+                a.refresh_sohu
+                and previous
+                and previous.get("refresh_target_date") == a.end
+                and not a.retry_errors
+            ):
+                continue
+            stale_sohu = (
+                a.refresh_sohu
+                and previous
+                and previous["status"] == "ok"
+                and (previous.get("last") or "") < a.end
+            )
+            if not stale_sohu and not needs_request(previous, a.retry_errors or a.refresh_sohu):
                 continue
             jobs.append((key, source, item))
+
+    if not jobs and (a.root / "collection-report.json").exists():
+        print("UNCHANGED: all requested scopes already have retained outcomes", flush=True)
+        db.close()
+        return
 
     # Separate sequential host streams maintain a one-second host pace without
     # thousands of in-flight requests. All persisted successes are skipped.
@@ -193,6 +320,56 @@ def main():
         return value
 
     def stream(source):
+        if a.refresh_sohu and source == "sohu":
+            source_jobs = [job for job in jobs if job[1] == source]
+            paused = None
+            for begin in range(0, len(source_jobs), a.sohu_batch_size):
+                group = source_jobs[begin : begin + a.sohu_batch_size]
+                if paused is not None:
+                    values = [
+                        dict(
+                            job_key=key,
+                            source=source,
+                            security=item["security"],
+                            instrument_id=item["instrument_id"],
+                            status="deferred",
+                            error="batch source paused; no request sent",
+                            receipts=[],
+                            pause_evidence=paused,
+                            completed_at=datetime.now(timezone.utc).isoformat(),
+                            collector_sha256=producer,
+                        )
+                        for key, _, item in group
+                    ]
+                else:
+                    values = batch_sohu(http, group, a.start, a.end, producer)
+                for value in values:
+                    value["refresh_target_date"] = a.end
+                    statuses = [r.get("status") for r in value.get("receipts", [])]
+                    if value["status"] == "access_denied" or (
+                        value["status"] == "error"
+                        and statuses
+                        and all(isinstance(v, int) and v >= 500 for v in statuses)
+                    ):
+                        paused = {
+                            "job_key": value["job_key"],
+                            "error": value.get("error"),
+                            "receipts": value.get("receipts", []),
+                            "at": value["completed_at"],
+                        }
+                    path = (
+                        a.root
+                        / "jobs"
+                        / (
+                            hashlib.sha256(value["job_key"].encode()).hexdigest()
+                            + "-"
+                            + hashlib.sha256(canonical(value)).hexdigest()
+                            + ".json"
+                        )
+                    )
+                    atomic_write(path, canonical(value))
+                    yield value
+            return
         paused = None
         for job in jobs:
             if job[1] != source:

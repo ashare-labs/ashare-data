@@ -75,13 +75,18 @@ PYTHONPATH=src "$PYTHON" scripts/collect_market_increment.py \
   --market "$MARKET" --release-id "$RELEASE" --root "$RUN" \
   --start "$START" --end "$END" --active-since "$ACTIVE_SINCE" --retry-errors
 
+# 若来源收盘数据在采集途中更新，只补刷仍落后于截止日的搜狐证券。
+PYTHONPATH=src "$PYTHON" scripts/collect_market_increment.py \
+  --market "$MARKET" --release-id "$RELEASE" --root "$RUN" \
+  --start "$START" --end "$END" --active-since "$ACTIVE_SINCE" --refresh-sohu
+
 PYTHONPATH=src "$PYTHON" scripts/build_market_increment.py --root "$RUN"
 PYTHONPATH=src "$PYTHON" scripts/prepare_market_increment.py --root "$RUN"
 PYTHONPATH=src "$PYTHON" -m ashare_data.product.release_cli \
   --root "$MARKET" --release-id "$RELEASE" apply --plan "$RUN/build/replacement-plan.json"
 ```
 
-采集器使用独占锁、逐请求原文和原子回执。每个主机顺序请求、间隔至少一秒；401/403/429 停止该主机，不自动绕过。每轮预算 8 GiB，并保留 150 GiB 可用磁盘。已有成功请求不重抓，错误重试绕过当天 HTTP 响应缓存，旧尝试仍保留。进程中断后从回执重建小型任务日志。
+采集器使用独占锁、逐请求原文和原子回执。每个主机顺序请求、间隔至少一秒；401/403/429 停止该主机，不自动绕过。每轮预算 8 GiB，并保留 150 GiB 可用磁盘。普通续跑不重抓成功请求；显式搜狐截止日刷新每次最多 20 个代码，保留整份 HTTP 原文和逐证券块位置。错误重试绕过当天 HTTP 响应缓存，旧尝试仍保留。进程中断后从回执重建小型任务日志。
 
 构建固定回执清单、解析器和规则哈希。输入改变时必须使用 `--build-name` 新建阶段，原阶段不覆盖。按证券提交检查点，只重建受影响的完整证券/系列文件，没有整库复制。每条捕获行情有采用、同值重复、已裁决未用、未决隔离、格式拒绝五种互斥去向。新值与目标按键和值核验；未变化的旧行保留批次。
 
