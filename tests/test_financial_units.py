@@ -8,8 +8,8 @@ from ashare_data.core.model import DataError
 from ashare_data.financials import tables as t
 from ashare_data.financials import unit_resolution as units
 from ashare_data.product.financial_release import FinancialTables
-from ashare_data.storage.financial_release import prepare
-from ashare_data.storage.market_release import canonical, sha_file
+from ashare_data.storage.financial_release import compose, prepare
+from ashare_data.storage.market_release import MarketRelease, ReleaseWriter, canonical, sha_file
 from test_financial_release import batch, market, report
 
 
@@ -178,3 +178,18 @@ def test_resolved_context_retains_the_original_dimension_contract(tmp_path):
     context = json.loads(raw)
     context["unit"] = "CNY"
     assert value["context_id"] == t.identity("context", context)
+
+
+def test_unit_overlay_can_bind_published_base_without_changing_publication(tmp_path):
+    original, _, root, _, _, _ = fixture(tmp_path)
+    parent = original.release
+    with ReleaseWriter(parent.root, free_reserve_bytes=0) as writer:
+        manifest = compose(writer, parent, original.candidate_root, expected_parent_sha256=parent.sha256)
+        writer.publish(manifest, expected_parent=parent.release_id)
+    published = MarketRelease(parent.root)
+    before = published.sha256
+    reviewed = published.financial().with_units(root, expected_sha256=sha_file(root / "candidate.json"))
+    value = point(reviewed, "BASICEPS", "基本每股收益")
+    assert (value["value"], value["unit"]) == ("0.104900", "CNY/share")
+    assert value["financial_published"] is True and value["unit_candidate_published"] is False
+    assert MarketRelease(parent.root).sha256 == before
