@@ -451,3 +451,20 @@ def test_sohu_batch_maps_native_blocks_and_preserves_missing_scope_evidence():
         values[2]["receipts"] == []
         and values[2]["batch_response_evidence"][0]["sha256"] == "raw-response-hash"
     )
+
+
+def test_sohu_batches_isolate_unresolved_codes_and_preserve_all_jobs():
+    import importlib.util
+    from pathlib import Path
+
+    spec = importlib.util.spec_from_file_location(
+        "collector_grouping", Path(__file__).parents[1] / "scripts/collect_market_increment.py"
+    )
+    collector = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(collector)
+    jobs = [(str(n), "sohu", {"security": str(n)}) for n in range(9)]
+    successful = {str(n) for n in (0, 1, 3, 4, 5, 7, 8)}
+    groups = list(collector.sohu_groups(jobs, successful, 3))
+    assert [job for group in groups for job in group] == jobs
+    assert [len(group) for group in groups] == [2, 1, 3, 1, 2]
+    assert all(len(group) == 1 for group in groups if group[0][0] not in successful)

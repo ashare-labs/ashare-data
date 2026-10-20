@@ -32,6 +32,24 @@ def needs_request(previous, retry_errors):
     return retry_errors and previous["status"] != "ok" and not denied
 
 
+def sohu_groups(jobs, successful_keys, size):
+    """Keep unresolved codes out of batches that the native endpoint can reject."""
+    pending = []
+    for job in jobs:
+        if job[0] not in successful_keys:
+            if pending:
+                yield pending
+                pending = []
+            yield [job]
+            continue
+        pending.append(job)
+        if len(pending) == size:
+            yield pending
+            pending = []
+    if pending:
+        yield pending
+
+
 def batch_sohu(http, jobs, start, end, producer):
     """One native HTTP response, with a separate exact block locator per security."""
     codes = [
@@ -207,8 +225,11 @@ def main():
     # Recover completed per-job receipts before scheduling any network request.
     # A terminated run need not have reached its final journal merge.
     recovered = {}
+    successful_sohu_keys = set()
     for saved in sorted((a.root / "jobs").glob("*.json")):
         value = json.loads(saved.read_bytes())
+        if value["source"] == "sohu" and value["status"] == "ok" and value.get("rows", 0) > 0:
+            successful_sohu_keys.add(value["job_key"])
         previous = recovered.get(value["job_key"])
         if previous is None or value["completed_at"] > previous["completed_at"]:
             recovered[value["job_key"]] = value
@@ -323,8 +344,7 @@ def main():
         if a.refresh_sohu and source == "sohu":
             source_jobs = [job for job in jobs if job[1] == source]
             paused = None
-            for begin in range(0, len(source_jobs), a.sohu_batch_size):
-                group = source_jobs[begin : begin + a.sohu_batch_size]
+            for group in sohu_groups(source_jobs, successful_sohu_keys, a.sohu_batch_size):
                 if paused is not None:
                     values = [
                         dict(
