@@ -42,6 +42,7 @@ PAGINATION_ERRORS = {
     "Index count disagrees with returned page rows",
     "Index total disagrees with distinct records",
     "Same-day index repair is incomplete or duplicated",
+    "Recovery single-day source exceeds one complete page",
 }
 LABELS = {
     "total_assets": ("资产总计",),
@@ -428,11 +429,12 @@ def select_documents(index):
 
 
 def recover_pagination(client, symbol, manifest):
-    """Resume failed pagination using disjoint, complete single-page date windows.
+    """Resume pagination using disjoint date windows with exact distinct counts.
 
     Original responses remain immutable. Recovery has a separate deterministic
     receipt namespace and the same transport, throttle and retry limits. Related
-    codes are still rejected; this does not establish issuer/code continuity.
+    codes are still rejected. A single date may use bounded validated pages;
+    neither strategy establishes issuer/code continuity.
     """
     code = symbol[2:]
     raw, _ = client.fetch(
@@ -474,16 +476,45 @@ def recover_pagination(client, symbol, manifest):
                 date_start=a.isoformat(), date_end=b.isoformat(), declared_rows=count,
                 requests_this_run=client.calls, state="partitioning_or_validating",
             )))
-            if count > 30 or more:
-                if a == b:
-                    raise ValueError("Recovery single-day source exceeds one complete page")
+            page_receipts = [dict(receipt=key, sha256=receipt["sha256"], observed_at=receipt["observed_at"])]
+            row_evidence = [(key, receipt)] * len(rows)
+            if (count > 30 or more) and a != b:
                 mid = a + (b - a) // 2
                 pending.extend([(mid + timedelta(days=1), b), (a, mid)])
                 continue
+            if more:
+                # A civil date cannot be bisected. Accept bounded additional
+                # pages only when total, row count and distinct IDs all agree.
+                for page in range(2, 201):
+                    extra_key = key + f"-{page:03}"
+                    extra_raw, extra_receipt = client.fetch(
+                        extra_key, ORIGIN + "/new/hisAnnouncement/query",
+                        index_form(symbol, issuer, manifest, label, page,
+                                   start=a.isoformat(), end=b.isoformat()),
+                    )
+                    extra = json.loads(extra_raw)
+                    extra_rows = extra.get("announcements") or []
+                    if (type(extra.get("totalAnnouncement")) is not int
+                            or extra["totalAnnouncement"] != count
+                            or type(extra.get("hasMore")) is not bool
+                            or not isinstance(extra_rows, list)):
+                        raise ValueError("Recovery single-day pagination total changed or malformed")
+                    rows.extend(extra_rows)
+                    row_evidence.extend([(extra_key, extra_receipt)] * len(extra_rows))
+                    evidence.append(extra_key)
+                    nodes += 1
+                    page_receipts.append(dict(receipt=extra_key, sha256=extra_receipt["sha256"],
+                                              observed_at=extra_receipt["observed_at"]))
+                    if nodes > 511 or (not extra_rows and extra["hasMore"]):
+                        raise ValueError("Recovery single-day pagination has no bounded progress")
+                    if extra["hasMore"] is False:
+                        break
+                else:
+                    raise ValueError("Recovery single-day pagination exceeds reviewed cap")
             if len(rows) != count:
                 raise ValueError("Recovery leaf count disagrees with source rows")
             local = set()
-            for row in rows:
+            for row, (row_key, row_receipt) in zip(rows, row_evidence, strict=True):
                 if (row["secCode"], row["orgId"]) != (code, issuer["orgId"]):
                     raise ValueError("Cross-issuer index row")
                 item = report_identity(row)
@@ -493,7 +524,7 @@ def recover_pagination(client, symbol, manifest):
                 if aid in local or aid in seen:
                     raise ValueError("Recovery leaf has duplicate announcement identity")
                 local.add(aid)
-                item.update(index_receipt=key, index_observed_at=receipt["observed_at"])
+                item.update(index_receipt=row_key, index_observed_at=row_receipt["observed_at"])
                 if aid in found and any(
                     found[aid][k] != item[k]
                     for k in ("title", "source_url", "period_end", "published_date")
@@ -504,11 +535,12 @@ def recover_pagination(client, symbol, manifest):
             leaves.append(dict(
                 start=a.isoformat(), end=b.isoformat(), receipt=key, records=count,
                 response_sha256=receipt["sha256"], observed_at=receipt["observed_at"],
+                page_receipts=page_receipts,
             ))
         queries.append(dict(
             kind=label, pages=nodes, records=len(seen), date_windows=leaves,
             pagination_complete_for_query=True,
-            completeness_basis="disjoint_single_page_date_windows_with_exact_counts",
+            completeness_basis="disjoint_date_windows_with_exact_counts_and_distinct_ids",
             snapshot_atomic_across_windows=False,
         ))
     result = dict(

@@ -81,7 +81,7 @@ def test_disjoint_date_windows_resume_without_refetch_and_preserve_old_pages(tmp
 @pytest.mark.parametrize("rows,message", [
     ([row(1, secCode="601975")], "Cross-issuer"),
     ([row(1), row(1)], "duplicate"),
-    ([row(i) for i in range(31)], "single-day"),
+    ([row(i % 30) for i in range(31)], "duplicate"),
 ])
 def test_ambiguous_or_capped_leaf_never_publishes_index(tmp_path, rows, message):
     client = Captured(tmp_path, rows)
@@ -104,6 +104,35 @@ def test_wrong_date_response_cannot_count_as_complete(tmp_path):
     with pytest.raises(ValueError, match="outside requested"):
         o.recover_pagination(client, "sh600000", MANIFEST)
     assert not (tmp_path / "indices/sh600000.json.gz").exists()
+
+
+@pytest.mark.parametrize("changed_total", [False, True])
+def test_single_day_pages_require_exact_total_and_distinct_union(tmp_path, changed_total):
+    client = Captured(tmp_path, [row(i) for i in range(37)])
+    original = client.fetch
+
+    def fetch(key, url, form):
+        raw, receipt = original(key, url, form)
+        if changed_total and form.get("pageNum") == 2:
+            value = json.loads(raw)
+            value["totalAnnouncement"] += 1
+            raw = e.encoded(value)
+            receipt = receipt | dict(sha256=e.digest(raw))
+        return raw, receipt
+
+    client.fetch = fetch
+    if changed_total:
+        with pytest.raises(ValueError, match="total changed"):
+            o.recover_pagination(client, "sh600000", MANIFEST)
+        assert not (tmp_path / "indices/sh600000.json.gz").exists()
+    else:
+        result = o.recover_pagination(client, "sh600000", MANIFEST)
+        assert len(result["announcements"]) == 37
+        leaf = next(x for x in result["queries"][0]["date_windows"] if x["records"])
+        assert leaf["start"] == leaf["end"] == "2024-04-30"
+        assert len(leaf["page_receipts"]) == 2
+        last = next(x for x in result["announcements"] if x["announcement_id"] == "36")
+        assert last["index_receipt"] == leaf["page_receipts"][1]["receipt"]
 
 
 def test_retained_document_scratch_survives_extractor_failure(tmp_path, monkeypatch):
