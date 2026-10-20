@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
-from datetime import datetime, timezone, timedelta
+from contextlib import nullcontext
+from datetime import date, datetime, timezone, timedelta
 from decimal import Decimal
 import fcntl
 import gzip
@@ -25,7 +26,10 @@ from urllib.error import HTTPError
 from urllib.parse import urlencode, urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
-from ashare_data.financials.expansion import atomic, digest, encoded, immutable, now, security
+from ashare_data.financials.expansion import (
+    PRESERVE_TEMPORARIES, atomic, digest, encoded, immutable, now,
+    preserve_temporaries, security,
+)
 from ashare_data.financials import http_backoff
 
 SCHEMA = "ad.official-financial-batch.v1"
@@ -33,6 +37,12 @@ NORMALIZER_SHA256 = digest(Path(__file__).read_bytes())
 HOSTS = {"www.cninfo.com.cn", "static.cninfo.com.cn"}
 CATEGORIES = ";".join("category_" + x + "_szsh" for x in ("ndbg", "bndbg", "yjdbg", "sjdbg")) + ";"
 ORIGIN = "https://www.cninfo.com.cn"
+PAGINATION_ERRORS = {
+    "Index count changed while paging",
+    "Index count disagrees with returned page rows",
+    "Index total disagrees with distinct records",
+    "Same-day index repair is incomplete or duplicated",
+}
 LABELS = {
     "total_assets": ("资产总计",),
     "total_liabilities": ("负债合计",),
@@ -423,6 +433,109 @@ def select_documents(index):
     return [r for r in eligible if r["period_end"] in selected]
 
 
+def recover_pagination(client, symbol, manifest):
+    """Resume failed pagination using disjoint, complete single-page date windows.
+
+    Original responses remain immutable. Recovery has a separate deterministic
+    receipt namespace and the same transport, throttle and retry limits. Related
+    codes are still rejected; this does not establish issuer/code continuity.
+    """
+    code = symbol[2:]
+    raw, _ = client.fetch(
+        "identity-" + symbol, ORIGIN + "/new/information/topSearch/query",
+        {"keyWord": code, "maxNum": 30},
+    )
+    identities = [
+        r for r in json.loads(raw) if r.get("code") == code and r.get("category") == "A股"
+    ]
+    if len(identities) != 1:
+        raise ValueError("Official issuer identity missing or ambiguous")
+    issuer = identities[0]
+    found, evidence, queries = {}, ["identity-" + symbol], []
+    start, end = (date.fromisoformat(manifest[k]) for k in ("target_start", "target_end"))
+    if end < start:
+        raise ValueError("Invalid recovery date bounds")
+    for label, category, keyword in (
+        ("periodic", CATEGORIES, ""), ("correction", "", "更正"), ("revision", "", "修订")
+    ):
+        pending, leaves, seen, nodes = [(start, end)], [], set(), 0
+        while pending:
+            if client.stopped():
+                raise StopRequested()
+            a, b = pending.pop()
+            nodes += 1
+            if nodes > 511:
+                raise ValueError("Recovery date partition exceeds reviewed request cap")
+            key = f"recovery-{symbol}-{label}-{a.isoformat()}-{b.isoformat()}"
+            form = dict(
+                pageNum=1, pageSize=30, column="sse" if symbol.startswith("sh") else "szse",
+                plate="sh" if symbol.startswith("sh") else "sz", tabName="fulltext",
+                stock=code + "," + issuer["orgId"], searchkey=keyword, secid="",
+                category=category, trade="", seDate=a.isoformat() + "~" + b.isoformat(),
+                sortName="time", sortType="asc", isHLtitle="false",
+            )
+            raw, receipt = client.fetch(key, ORIGIN + "/new/hisAnnouncement/query", form)
+            payload = json.loads(raw)
+            count, more, rows = (
+                payload.get("totalAnnouncement"), payload.get("hasMore"),
+                payload.get("announcements") or [],
+            )
+            if type(count) is not int or count < 0 or type(more) is not bool or not isinstance(rows, list):
+                raise ValueError("Malformed recovery pagination envelope")
+            evidence.append(key)
+            atomic(client.root / "recovery-progress.json", encoded(dict(
+                at=now(), pid=os.getpid(), symbol=symbol, query=label,
+                date_start=a.isoformat(), date_end=b.isoformat(), declared_rows=count,
+                requests_this_run=client.calls, state="partitioning_or_validating",
+            )))
+            if count > 30 or more:
+                if a == b:
+                    raise ValueError("Recovery single-day source exceeds one complete page")
+                mid = a + (b - a) // 2
+                pending.extend([(mid + timedelta(days=1), b), (a, mid)])
+                continue
+            if len(rows) != count:
+                raise ValueError("Recovery leaf count disagrees with source rows")
+            local = set()
+            for row in rows:
+                if (row["secCode"], row["orgId"]) != (code, issuer["orgId"]):
+                    raise ValueError("Cross-issuer index row")
+                item = report_identity(row)
+                if not a.isoformat() <= item["published_date"] <= b.isoformat():
+                    raise ValueError("Recovery row outside requested date window")
+                aid = item["announcement_id"]
+                if aid in local or aid in seen:
+                    raise ValueError("Recovery leaf has duplicate announcement identity")
+                local.add(aid)
+                item.update(index_receipt=key, index_observed_at=receipt["observed_at"])
+                if aid in found and any(
+                    found[aid][k] != item[k]
+                    for k in ("title", "source_url", "period_end", "published_date")
+                ):
+                    raise ValueError("Conflicting announcement version during recovery")
+                found.setdefault(aid, item)
+            seen.update(local)
+            leaves.append(dict(
+                start=a.isoformat(), end=b.isoformat(), receipt=key, records=count,
+                response_sha256=receipt["sha256"], observed_at=receipt["observed_at"],
+            ))
+        queries.append(dict(
+            kind=label, pages=nodes, records=len(seen), date_windows=leaves,
+            pagination_complete_for_query=True,
+            completeness_basis="disjoint_single_page_date_windows_with_exact_counts",
+            snapshot_atomic_across_windows=False,
+        ))
+    result = dict(
+        schema="ad.official-report-index.v1", security=security(symbol), issuer=issuer,
+        queries=queries, sources=evidence, announcements=list(found.values()),
+        captured_at=now(), recovery="bounded_date_partition_v1",
+        historical_revision_inventory_complete=False,
+        limitation="Current archive observations across bounded date windows; no historical PIT or code continuity inferred.",
+    )
+    atomic(client.root / "indices" / (symbol + ".json.gz"), gzip.compress(encoded(result), mtime=0))
+    return result
+
+
 def statement_cells(text, report):
     """Conservative Q1 native-text candidates; no unreviewed auto-PIT promotion.
 
@@ -529,8 +642,15 @@ def collect_document(client, symbol, report, extractor, source_batch, force=Fals
     raw, receipt = client.fetch("pdf-" + aid, report["source_url"])
     if not raw.startswith(b"%PDF"):
         raise ValueError("Official document is not a PDF")
-    # All temporary PDFs and extraction scratch are removed on success/failure.
-    with tempfile.TemporaryDirectory(prefix="ad-official-") as temp:
+    # An explicit retention mode keeps scratch even on failure; no cleanup is
+    # allowed during collection sessions that prohibit permanent deletion.
+    if PRESERVE_TEMPORARIES.get():
+        scratch = client.root / "retained-temporaries"
+        scratch.mkdir(exist_ok=True)
+        context = nullcontext(tempfile.mkdtemp(prefix="ad-official-", dir=scratch))
+    else:
+        context = tempfile.TemporaryDirectory(prefix="ad-official-")
+    with context as temp:
         pdf = Path(temp) / "report.pdf"
         pdf.write_bytes(raw)
         result = subprocess.run(
@@ -700,7 +820,7 @@ def audit(root, write=False):
     return result
 
 
-def run(root, extractor, max_codes=0, retry_parse_failed=False):
+def run(root, extractor, max_codes=0, retry_parse_failed=False, recover_paging=False):
     root = Path(root).resolve()
     manifest = json.loads((root / "manifest.json").read_text())
     scope_raw = (root / "scope.json").read_bytes()
@@ -728,6 +848,8 @@ def run(root, extractor, max_codes=0, retry_parse_failed=False):
                 status = json.loads(status_path.read_text())
                 if status.get("state") != "parse_failed":
                     continue
+                if recover_paging and status.get("reason", "").removeprefix("ValueError: ") not in PAGINATION_ERRORS:
+                    continue
                 review_path = root / "parse-reviews" / (symbol + ".json")
                 reviews = json.loads(review_path.read_text()) if review_path.exists() else []
                 reviews.append(
@@ -735,7 +857,10 @@ def run(root, extractor, max_codes=0, retry_parse_failed=False):
                         "at": now(),
                         "prior_status": status,
                         "normalizer_sha256": digest(Path(__file__).read_bytes()),
-                        "action": "retry_existing_source_cache_after_parser_review",
+                        "action": (
+                            "resume_pagination_with_existing_cache_and_bounded_date_windows"
+                            if recover_paging else "retry_existing_source_cache_after_parser_review"
+                        ),
                     }
                 )
                 atomic(review_path, encoded(reviews))
@@ -752,7 +877,12 @@ def run(root, extractor, max_codes=0, retry_parse_failed=False):
                     if status.get("state") in {"complete", "parse_failed", "source_exhausted"}:
                         continue
                     try:
-                        index = index_security(client, symbol, manifest)
+                        try:
+                            index = index_security(client, symbol, manifest)
+                        except ValueError as error:
+                            if not recover_paging or str(error) not in PAGINATION_ERRORS:
+                                raise
+                            index = recover_pagination(client, symbol, manifest)
                         docs = (
                             select_documents(index) if symbol in scope["document_symbols"] else []
                         )
@@ -840,15 +970,18 @@ def main():
     parser.add_argument("--extractor", type=Path)
     parser.add_argument("--max-codes", type=int, default=0)
     parser.add_argument("--retry-parse-failed", action="store_true")
+    parser.add_argument("--recover-pagination", action="store_true")
+    parser.add_argument("--retain-temporaries", action="store_true")
     args = parser.parse_args()
-    if args.command == "prepare":
-        result = prepare(args.root, args.source_batch, args.document_codes)
-    elif args.command == "run":
-        result = run(args.root, args.extractor, args.max_codes, args.retry_parse_failed)
-    elif args.command == "replay":
-        result = replay(args.root, args.extractor)
-    else:
-        result = audit(args.root, True)
+    with preserve_temporaries(args.retain_temporaries):
+        if args.command == "prepare":
+            result = prepare(args.root, args.source_batch, args.document_codes)
+        elif args.command == "run":
+            result = run(args.root, args.extractor, args.max_codes, args.retry_parse_failed, args.recover_pagination)
+        elif args.command == "replay":
+            result = replay(args.root, args.extractor)
+        else:
+            result = audit(args.root, True)
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
