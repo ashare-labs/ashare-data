@@ -6,7 +6,11 @@
 `ad-minute-research.v1` JSON 字典。它读取已发布快照的 `quality="research", as_of=None`
 分钟；合成测试使用 `real_market_data=False` 与 synthetic policy。它不授予执行权限。
 调用方先准备显式日历、状态、公司行动和时间模型，再交给消费者验证能力。证券、日期和来源
-均来自输入，无内置证券或月份名单；最多 20 标的、60 天、每日 4 个区间。
+均来自输入，无内置证券或月份名单；默认最多 20 标的、60 天、每日 4 个区间。
+仅 `research.profile=source-labelled-corporate-date-model.v1` 的明确长窗口能力允许最多
+512 个交易日。AQ 另外校验连续日历、日线参考模型和现金分红来源响应；导出器不授予
+这些事实的真实性、历史可见性或执行认证。底层单次查询行数上限保持不变，应按固定快照
+分块读取后组合，不能改选 latest 或隐藏查询缺口。
 
 ```python
 from ashare_data import export_minute_research
