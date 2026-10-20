@@ -1,6 +1,7 @@
 """Small constructed contracts; no downloaded market data in the package."""
 
 from copy import deepcopy
+from datetime import date, timedelta
 from decimal import Context, localcontext
 
 import pytest
@@ -118,3 +119,19 @@ def test_annotations_cannot_replace_prices_or_disappear(snapshot):
     with pytest.raises(DataError) as exc:
         export_minute_research(view, metadata)
     assert exc.value.code == "MINUTE_RESEARCH_ANNOTATION_OUT_OF_SCOPE"
+
+
+@pytest.mark.parametrize("profile,count", [
+    (None, 61),
+    ("source-labelled-closed-bars.v1", 61),
+    ("source-labelled-corporate-date-model.v1", 513),
+])
+def test_window_cap_is_profile_scoped_before_snapshot_reads(snapshot, profile, count):
+    view, metadata = snapshot
+    days = [(date(2025, 1, 1)+timedelta(days=n)).isoformat() for n in range(count)]
+    metadata.update(days=days, sessions={d: [] for d in days})
+    if profile:
+        metadata["research"] = {"profile": profile}
+    with pytest.raises(DataError) as exc:
+        export_minute_research(view, metadata)
+    assert exc.value.code == "MINUTE_RESEARCH_BOUNDED_SCOPE"

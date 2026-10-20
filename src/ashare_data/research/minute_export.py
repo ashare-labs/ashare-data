@@ -36,14 +36,17 @@ def export_minute_research(snapshot, metadata):
         "The exporter owns schema, producer, minute rows and content identity",
     )
     ids, days = doc["securities"], doc["days"]
+    # This is an explicit, separately admitted AQ research capability. The
+    # exporter still grants no execution permission or source certification.
+    long_model = doc.get("research", {}).get("profile") == "source-labelled-corporate-date-model.v1"
     require(
         0 < len(ids) <= 20
         and len(set(ids)) == len(ids)
-        and 0 < len(days) <= 60
+        and 0 < len(days) <= (512 if long_model else 60)
         and days == sorted(set(days))
         and set(doc["sessions"]) == set(days),
         "MINUTE_RESEARCH_BOUNDED_SCOPE",
-        "Choose unique securities and at most 60 dated sessions",
+        "Choose unique securities within the declared bounded research capability",
     )
     lineage = snapshot.lineage()
     sources = {b["source"]["id"]: b["source"] for b in lineage["batches"]}
