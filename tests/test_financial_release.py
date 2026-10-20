@@ -267,6 +267,35 @@ def test_reference_queries_require_capture_and_exact_date_and_keep_conflicts(tmp
     assert conflict["status"] == "conflict" and conflict["value"] is None
 
 
+def test_reference_units_are_separate_from_tax_and_factor_basis(tmp_path):
+    parent = market(tmp_path / "market")
+    action = dict(schema="ad.tushare-dividend-version.v1", source="tushare", security="600000.XSHG",
+                  source_revision_id="distribution", source_status="实施", implemented=True, fields={
+                      "ex_date": {"value": "2024-04-01"},
+                      "cash_div_tax": {"value": "1.2", "unit": "CNY/eligible_share", "tax_basis": "gross_pre_tax"},
+                      "cash_div": {"value": "0.96", "unit": "CNY/eligible_share",
+                                   "tax_basis": "after_tax_source_claimed_not_investor_specific"},
+                      "base_share": {"value": "1000000", "unit": "shares"},
+                  })
+    factor = dict(schema="ad.tushare-factor-observation.v1", source="tushare", security="600000.XSHG",
+                  source_revision_id="factor", trade_date="2024-04-01",
+                  fields={"adj_factor": {"value": "12.3"}},
+                  basis="tushare_dividend_reinvestment_provider_factor")
+    source = batch(tmp_path / "source", [action, factor])
+    prepare(parent, tmp_path / "candidate", [source])
+    reader = FinancialTables.prepared(tmp_path / "candidate", parent)
+    query = dict(source="tushare", security="600000.XSHG", as_of="2026-10-20T00:00:00+00:00")
+    gross = reader.reference_point("corporate_action", "2024-04-01", field="gross_cash", **query)
+    net = reader.reference_point("corporate_action", "2024-04-01", field="net_cash", **query)
+    assert gross["value"] == "1.2" and gross["unit"] == "CNY/eligible_share"
+    assert gross["tax_basis"] == "gross_pre_tax"
+    assert net["value"] == "0.96" and net["unit"] == "CNY/eligible_share"
+    assert net["tax_basis"] == "after_tax_source_claimed_not_investor_specific"
+    adjusted = reader.reference_point("factor", "2024-04-01", **query)
+    assert adjusted["value"] == "12.3" and adjusted["unit"] == "ratio"
+    assert adjusted["factor_basis"] == factor["basis"]
+
+
 def test_preparation_rejects_active_incomplete_and_corrupt_sources(tmp_path):
     import fcntl
     parent = market(tmp_path / "market")

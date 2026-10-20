@@ -272,7 +272,7 @@ class FinancialTables:
                                      or announcement > timestamp(captured).astimezone(SHANGHAI).date().isoformat()):
                     reasons.add("announcement_after_capture_or_cutoff_requires_review")
                     continue
-                unit, value = None, None
+                unit, value, basis = None, None, None
                 if family == "share":
                     require(field and field.endswith("_shares"), "FIN_REFERENCE", "Select a share class")
                     if row["field"] != field:
@@ -282,7 +282,7 @@ class FinancialTables:
                     else:
                         reasons.add(row["value_state"])
                 elif family == "factor":
-                    value, unit = row["factor_value"], row["basis"]
+                    value, unit, basis = row["factor_value"], "ratio", row["basis"]
                 elif family == "calendar":
                     value, unit = row["is_open"], "boolean"
                 elif family == "price_limit":
@@ -302,20 +302,29 @@ class FinancialTables:
                             "FIN_REFERENCE", "Choose one explicit action field")
                     if row["implemented"] is True:
                         value = row[field]
-                        unit = row["tax_basis"] if "cash" in field else "shares" if field == "base_shares" else "ratio"
+                        unit = "CNY/eligible_share" if "cash" in field else (
+                            "shares" if field == "base_shares" else "new_shares/eligible_share")
+                        if "cash" in field:
+                            native = json.loads(row["source_fields_json"])
+                            native_name = "cash_div_tax" if field == "gross_cash" else "cash_div"
+                            basis = native.get(native_name, {}).get("tax_basis") or row["tax_basis"]
                     else:
                         reasons.add("event_not_implemented")
                 if value is not None:
-                    selected.append((value, unit, row[key]))
-            distinct = {(value, unit) for value, unit, _ in selected}
+                    selected.append((value, unit, basis, row[key]))
+            distinct = {(value, unit, basis) for value, unit, basis, _ in selected}
             result = dict(self.receipt(), family=family, day=day, source=source, security=security,
                           exchange=exchange, field=field, as_of=as_of, value=None,
                           status="missing", reasons=sorted(reasons), carry_forward_authorized=False,
                           time_basis="captured_source_point_not_historical_public_availability")
             if len(distinct) == 1:
-                value, unit = next(iter(distinct))
+                value, unit, basis = next(iter(distinct))
                 result.update(value=value, unit=unit, status="ok",
-                              observation_ids=sorted({x[2] for x in selected}))
+                              observation_ids=sorted({x[3] for x in selected}))
+                if family == "factor":
+                    result["factor_basis"] = basis
+                elif family == "corporate_action" and "cash" in field:
+                    result["tax_basis"] = basis
             elif distinct:
                 result.update(status="conflict", reasons=["conflicting_source_point_values"])
             return result
