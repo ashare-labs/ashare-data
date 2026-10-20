@@ -349,6 +349,7 @@ def main(argv=None):
     build.add_argument("--batch", action="append", type=Path, default=[])
     build.add_argument("--daily-review-spec", action="append", type=Path, default=[])
     build.add_argument("--official-batch", action="append", type=Path, default=[])
+    build.add_argument("--official-repair", action="append", type=Path, default=[])
     build.add_argument("--share-resolutions", action="append", type=Path, default=[])
     query = sub.add_parser("query")
     query.add_argument("--candidate", type=Path)
@@ -362,7 +363,8 @@ def main(argv=None):
     parent = MarketRelease(args.market_root, args.release_id, expected_manifest_sha256=args.manifest_sha256)
     if args.action == "prepare":
         value = prepare(parent, args.output, args.batch, daily_reviews=args.daily_review_spec,
-                        official_batches=args.official_batch, share_resolutions=args.share_resolutions)
+                        official_batches=args.official_batch, share_resolutions=args.share_resolutions,
+                        official_repairs=args.official_repair)
         print(json.dumps({"candidate_id": value["candidate_id"], "published": False,
                           "validation": value["validation"]}, ensure_ascii=False))
     else:

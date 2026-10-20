@@ -516,17 +516,21 @@ class TableBuilder:
         return value
 
 
-def prepare(parent, root, batches, *, daily_reviews=(), official_batches=(), share_resolutions=()):
+def prepare(parent, root, batches, *, daily_reviews=(), official_batches=(), share_resolutions=(),
+            official_repairs=()):
+    specification = {
+        "batches": [str(Path(p).resolve()) for p in batches],
+        "daily_reviews": [str(Path(p).resolve()) for p in daily_reviews],
+        "official_batches": [str(Path(p).resolve()) for p in official_batches],
+        "share_resolutions": [str(Path(p).resolve()) for p in share_resolutions]}
+    if official_repairs:
+        specification["official_repairs"] = [str(Path(p).resolve()) for p in official_repairs]
     candidate = Path(root) / "candidate.json"
     if candidate.exists():
         existing = json.loads(candidate.read_text())
         require(existing["mapping_sha256"] == mapper_sha256()
                 and existing["parent_manifest_sha256"] == parent.sha256
-                and existing.get("input_specification") == {
-                    "batches": [str(Path(p).resolve()) for p in batches],
-                    "daily_reviews": [str(Path(p).resolve()) for p in daily_reviews],
-                    "official_batches": [str(Path(p).resolve()) for p in official_batches],
-                    "share_resolutions": [str(Path(p).resolve()) for p in share_resolutions]},
+                and existing.get("input_specification") == specification,
                 "FIN_FROZEN_INPUT", "Use a new candidate directory for different inputs or mapping")
         verify_object(root, existing["metadata_delta"])
         for item in existing["files"]:
@@ -541,11 +545,10 @@ def prepare(parent, root, batches, *, daily_reviews=(), official_batches=(), sha
         if share_resolutions:
             from ashare_data.financials.table_shares import import_resolutions
             done.extend(import_resolutions(builder, p) for p in share_resolutions)
-        builder.input_specification = {
-            "batches": [str(Path(p).resolve()) for p in batches],
-            "daily_reviews": [str(Path(p).resolve()) for p in daily_reviews],
-            "official_batches": [str(Path(p).resolve()) for p in official_batches],
-            "share_resolutions": [str(Path(p).resolve()) for p in share_resolutions]}
+        if official_repairs:
+            from ashare_data.financials.table_official import import_recovered_archive
+            done.extend(import_recovered_archive(builder, p) for p in official_repairs)
+        builder.input_specification = specification
         return builder.finish(done)
 
 
