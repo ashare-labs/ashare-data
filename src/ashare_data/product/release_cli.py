@@ -107,6 +107,12 @@ def apply(release, plan):
     require(
         plan["schema"] == "ad-market-replacement-plan.v1", "MARKET_PLAN", "Unknown replacement plan"
     )
+    plan_sha256 = hashlib.sha256(canonical(plan)).hexdigest()
+    if (
+        release.manifest.get("replacement_plan_sha256") == plan_sha256
+        and release.manifest.get("parent_manifest_sha256") == plan["parent_manifest_sha256"]
+    ):
+        return {"unchanged": True, "already_applied": True, "release": release.receipt()}
     require(
         plan["parent_manifest_sha256"] == release.sha256,
         "MARKET_PARENT_CHANGED",
@@ -117,7 +123,21 @@ def apply(release, plan):
         "MARKET_CHANGE_EVIDENCE",
         "Supply correction evidence and reason",
     )
-    with ReleaseWriter(release.root) as writer:
+    with ReleaseWriter(
+        release.root, retain_work_files=bool(plan.get("retain_work_files"))
+    ) as writer:
+        current = MarketRelease(release.root)
+        if current.sha256 != release.sha256:
+            if (
+                current.manifest.get("replacement_plan_sha256") == plan_sha256
+                and current.manifest.get("parent_manifest_sha256") == release.sha256
+            ):
+                return {"unchanged": True, "already_applied": True, "release": current.receipt()}
+            require(
+                False,
+                "MARKET_PARENT_CHANGED",
+                "A different release has advanced the current parent",
+            )
         writer.budget()
         pending = (
             writer.root
@@ -132,7 +152,11 @@ def apply(release, plan):
                     "MARKET_INTEGRITY",
                     "Pending evidence changed",
                 )
-            return writer.publish(candidate, expected_parent=release.release_id)
+            return writer.publish(
+                candidate,
+                expected_parent=release.release_id,
+                verify_unchanged=not plan.get("incremental_validation", False),
+            )
         c = connection(writer.root / "work/spill")
         files = {(f["table"], f["series_id"], f["instrument_id"]): f for f in release.files}
         changes = []
@@ -228,10 +252,11 @@ def apply(release, plan):
 
         metadata = import_object(plan["metadata"], "sqlite3")
         evidence = [*release.manifest.get("evidence", [])]
-        evidence.extend(
-            import_object(item, Path(item["path"]).suffix.lstrip(".") or "bin")
+        imported_evidence = {
+            item["path"]: import_object(item, Path(item["path"]).suffix.lstrip(".") or "bin")
             for item in plan["evidence"]
-        )
+        }
+        evidence.extend(imported_evidence.values())
         with sqlite3.connect(writer.root / metadata["path"]) as db, release.metadata() as old_db:
             instruments = {
                 r[0] for r in db.execute("select instrument_id from release_instruments")
@@ -329,7 +354,15 @@ def apply(release, plan):
             )
         from ashare_data.storage.market_coverage import refresh
 
-        metadata, evidence, coverage = refresh(writer, c, release, changes, evidence, metadata)
+        metadata, evidence, coverage = refresh(
+            writer,
+            c,
+            release,
+            changes,
+            evidence,
+            metadata,
+            incremental_counts=plan.get("incremental_validation", False),
+        )
         plan_copy = writer.root / "work/replacement-plan.json"
         plan_copy.write_bytes(canonical(plan))
         evidence.append({**writer.object(plan_copy, "json"), "kind": "replacement_plan"})
@@ -351,16 +384,33 @@ def apply(release, plan):
             "evidence": evidence,
             "input_dispositions": plan["input_dispositions"],
             "change_set": {"reason": plan["change_reason"], "changes": changes},
+            "replacement_plan_sha256": plan_sha256,
             "target_unique_keys": {
                 table: sum(f["rows"] for f in files.values() if f["table"] == table)
                 for table in ("bars_1d", "bars_1m")
             },
         }
+        if "increment_summary" in plan:
+            summary = plan["increment_summary"]
+            frozen_summary = imported_evidence[summary["path"]]
+            require(
+                frozen_summary["sha256"] == summary["sha256"],
+                "MARKET_INPUT_INTEGRITY",
+                "Increment summary differs",
+            )
+            value["increment"] = {
+                "summary": frozen_summary,
+                "mapping_sha256": plan["mapping_sha256"],
+            }
         if "daily_key_reconciliation" in value:
             value["initial_build_daily_key_reconciliation"] = value.pop("daily_key_reconciliation")
         c.close()
         atomic_write(pending, canonical(value))
-        return writer.publish(value, expected_parent=release.release_id)
+        return writer.publish(
+            value,
+            expected_parent=release.release_id,
+            verify_unchanged=not plan.get("incremental_validation", False),
+        )
 
 
 def main(argv=None):

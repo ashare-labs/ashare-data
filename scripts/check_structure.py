@@ -58,8 +58,8 @@ def headings(text):
 def check(root):
     errors = []
     guides = list((root / "docs").rglob("*.md"))
-    if not 12 <= len(guides) <= 19:
-        errors.append("docs must contain 12–19 task guides; merge related reader tasks")
+    if not 12 <= len(guides) <= 20:
+        errors.append("docs must contain 12–20 task guides; merge related reader tasks")
     if list((root / "docs").rglob("*.csv")):
         errors.append("generate coverage tables with the public API instead of storing docs CSVs")
     paths = project_files(root)

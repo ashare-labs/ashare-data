@@ -137,6 +137,10 @@ class LocalMinuteProduct:
         if self.market_release is not None:
             selected = self.market_release
             path = self._path(self.document["assets"][selected["asset"]]["path"])
+            from ashare_data.product.market_release import open_release, released_minute_sources
+
+            frozen = open_release(self.frozen_market_config)
+            source_map, canonical_series = released_minute_sources(frozen)
             rows = [
                 {
                     "source": source,
@@ -149,7 +153,8 @@ class LocalMinuteProduct:
                     "historical_pit": False,
                     "strict_execution_admitted": False,
                 }
-                for source, series in (("canonical", 2), ("free_stockdb", 4), ("tdx", 3))
+                for source, series in [("canonical", canonical_series[0]), *source_map.items()]
+                if source != "neigezhu"
             ]
         for source in (
             ["neigezhu"]
@@ -191,7 +196,9 @@ class LocalMinuteProduct:
             "Choose one security and at most 60 days",
         )
         source = self.default_source if source == "auto" else source
-        if self.market_release is not None and source in {"canonical", "tdx", "free_stockdb"}:
+        if self.market_release is not None and (
+            source not in self.registry or source in {"canonical", "tdx", "free_stockdb"}
+        ):
             from ashare_data.product.market_release import minute_prices
 
             return minute_prices(self.frozen_market_config, security, a, b, source)

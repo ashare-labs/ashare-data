@@ -54,31 +54,53 @@ class FrozenDailyStore(LocalDailyStore):
     def get_price(self, security, start="2010-01-01", end=None, source="auto", **unused):
         selected = "canonical" if source in ("auto", "canonical") else source
         if selected not in ("canonical", "free_stockdb"):
-            require(
-                not security.startswith("BJ."),
-                "MARKET_SOURCE_SCOPE",
-                "This frozen SQLite source has no Beijing daily observations; use canonical",
-            )
-            from ashare_data.storage.source_observations import daily_source
+            from ashare_data.storage.source_observations import daily_source, incremental_daily
 
-            if self._source_store is None:
-                row = self.db.execute(
-                    "select body from source_assets where asset_id='daily-sqlite'"
-                ).fetchone()
-                require(
-                    row is not None,
-                    "MARKET_SOURCE_SNAPSHOT",
-                    "Frozen original source metadata is required",
-                )
-                self._source_context = daily_source(json.loads(row[0]))
-                self._source_store = self._source_context.__enter__()
-            frame = self._source_store.get_price(security, start, end, source=selected)
-            frame.attrs.update(
-                release=self.release.receipt(),
-                access="explicit_frozen_source_observation",
-                canonical=False,
-                source_asset_id="daily-sqlite",
+            incoming, observation_refs = incremental_daily(
+                self.release, security, start, end, selected, metadata_db=self.db
             )
+            if security.startswith("BJ."):
+                require(
+                    observation_refs,
+                    "MARKET_SOURCE_SCOPE",
+                    "This release has no Beijing observations for the selected source",
+                )
+                frame = pd.DataFrame(columns=incoming.columns)
+            else:
+                if self._source_store is None:
+                    row = self.db.execute(
+                        "select body from source_assets where asset_id='daily-sqlite'"
+                    ).fetchone()
+                    require(
+                        row is not None,
+                        "MARKET_SOURCE_SNAPSHOT",
+                        "Frozen original source metadata is required",
+                    )
+                    self._source_context = daily_source(json.loads(row[0]))
+                    self._source_store = self._source_context.__enter__()
+                frame = self._source_store.get_price(security, start, end, source=selected)
+            attrs = dict(frame.attrs)
+            if not incoming.empty:
+                # Each release explicitly fixes the latest retained source capture.
+                # Canonical selection remains independent of this research overlay.
+                frame = (
+                    pd.concat(
+                        [frame.loc[~frame.date.isin(incoming.date)], incoming], ignore_index=True
+                    )
+                    .sort_values("date")
+                    .reset_index(drop=True)
+                )
+            frame.attrs = {
+                **attrs,
+                "release": self.release.receipt(),
+                "access": "explicit_frozen_source_observation",
+                "canonical": False,
+                "source_asset_id": "daily-sqlite",
+                "incremental_observation_refs": observation_refs,
+                "source_selection": selected,
+                "source": selected,
+                "incremental_calendar_and_listing": "unknown unless independently evidenced",
+            }
             return frame
         rows = []
         for series in (5,) if selected == "free_stockdb" else (1, 5):
@@ -189,7 +211,7 @@ class ReleasedDailyProduct(LocalDailyProduct):
         value = super()._prices(*args, **kwargs)
         value["limitations"] = list(LIMITATIONS)
         value["market_release"] = self.release.receipt()
-        if value["source"] in ("auto", "canonical", "free_stockdb"):
+        if value["source"] in ("auto", "canonical", "free_stockdb") or value["rows"]:
             known = set(value["calendar"])
             missing_listing = {
                 gap["security"] for gap in value["gaps"] if gap["code"] == "SECURITY_UNAVAILABLE"
@@ -288,24 +310,58 @@ class ReleasedDailyProduct(LocalDailyProduct):
         }
 
 
+def released_minute_sources(release):
+    """Small immutable metadata determines source selection for this release."""
+    sources = {"neigezhu": 2, "tdx": 3, "free_stockdb": 4}
+    canonical_series = [2, 4]
+    with release.metadata() as db:
+        if db.execute(
+            "select 1 from sqlite_master where type='table' and name='release_contracts'"
+        ).fetchone():
+            row = db.execute(
+                "select body from release_contracts where name='minute_selection'"
+            ).fetchone()
+            if row:
+                value = json.loads(row[0])
+                sources = value["sources"]
+                canonical_series = value["canonical_series"]
+    require(
+        isinstance(sources, dict)
+        and bool(canonical_series)
+        and len(set(canonical_series)) == len(canonical_series)
+        and all(type(v) is int and v > 0 for v in sources.values())
+        and set(canonical_series) <= set(sources.values()),
+        "MARKET_MINUTE_CONTRACT",
+        "Invalid frozen minute selection",
+    )
+    return sources, canonical_series
+
+
 def minute_prices(config, security, start, end, source="canonical"):
     release = open_release(config)
-    series = {"canonical": 2, "neigezhu": 2, "tdx": 3, "free_stockdb": 4}.get(source)
+    sources, canonical_series = released_minute_sources(release)
+    chosen = canonical_series if source == "canonical" else [sources.get(source)]
     require(
-        series is not None, "PRODUCT_MINUTE_SOURCE_UNKNOWN", "Choose a registered released source"
+        all(s is not None for s in chosen),
+        "PRODUCT_MINUTE_SOURCE_UNKNOWN",
+        "Choose a source registered in this release",
     )
+    series = chosen[0]
     a, b = timestamp(start, minute=True), timestamp(end, minute=True)
-    raw = release.read("bars_1m", security, a, b, series_id=series, max_rows=15000)
-    if source == "canonical":
-        supplement = release.read("bars_1m", security, a, b, series_id=4, max_rows=15000)
+    raw, observed_days = [], set()
+    for chosen_series in chosen:
+        part = release.read("bars_1m", security, a, b, series_id=chosen_series, max_rows=15000)
+        days = {r["trade_date"] for r in part}
         require(
-            not ({r["trade_date"] for r in raw} & {r["trade_date"] for r in supplement}),
+            not (days & observed_days),
             "MARKET_MINUTE_SCOPE",
             "Supplements must use separate security days, without guessing label alignment",
         )
-        raw.extend(supplement)
-        raw.sort(key=lambda row: row["label_at"])
-        require(len(raw) <= 15000, "MARKET_QUERY_BOUND", "Narrow the requested range")
+        observed_days.update(days)
+        raw.extend(part)
+    raw.sort(key=lambda row: row["label_at"])
+    require(len(raw) <= 15000, "MARKET_QUERY_BOUND", "Narrow the requested range")
+    names = {value: key for key, value in sources.items()}
     restrictions = {}
     with release.metadata() as db:
         if db.execute(
@@ -322,11 +378,7 @@ def minute_prices(config, security, start, end, source="canonical"):
             "security": security,
             "instrument_id": row["instrument_id"],
             "series_id": row["series_id"],
-            "source": "free_stockdb"
-            if row["series_id"] == 4
-            else "neigezhu"
-            if row["series_id"] == 2
-            else "tdx",
+            "source": names[row["series_id"]],
             "trade_date": str(row["trade_date"]),
             "source_label": row["label_at"].isoformat(),
             "label_at": row["label_at"].isoformat(),
@@ -352,7 +404,12 @@ def minute_prices(config, security, start, end, source="canonical"):
     return {
         "schema": "ad-local-minute-prices.v1",
         "source": source,
-        "binding": {"reader": "market-release", "series_id": series, **release.receipt()},
+        "binding": {
+            "reader": "market-release",
+            "series_id": series,
+            "series_ids": chosen,
+            **release.receipt(),
+        },
         "rows": rows,
         "report": {
             "rows": len(rows),

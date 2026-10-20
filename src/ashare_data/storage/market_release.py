@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 import shutil
 import sqlite3
+from uuid import uuid4
 
 import duckdb
 
@@ -80,11 +81,19 @@ def connection(temp=None, memory="2GB", threads=2):
 class ReleaseWriter:
     """Single cooperative writer. Unpublished objects and checkpoints are resumable."""
 
-    def __init__(self, root, *, budget_bytes=200 * 1024**3, free_reserve_bytes=150 * 1024**3):
+    def __init__(
+        self,
+        root,
+        *,
+        budget_bytes=200 * 1024**3,
+        free_reserve_bytes=150 * 1024**3,
+        retain_work_files=False,
+    ):
         self.root = Path(root).resolve()
         self.root.mkdir(parents=True, exist_ok=True)
         self.budget_bytes = budget_bytes
         self.free_reserve_bytes = free_reserve_bytes
+        self.retain_work_files = retain_work_files
         for name in ("objects", "releases", "work"):
             (self.root / name).mkdir(exist_ok=True)
         self.lock = None
@@ -114,7 +123,7 @@ class ReleaseWriter:
         target = self.root / "objects" / (digest + "." + kind)
         if target.exists():
             require(sha_file(target) == digest, "MARKET_INTEGRITY", "Existing object changed")
-            if target != path:
+            if target != path and not self.retain_work_files:
                 path.unlink()
         else:
             os.replace(path, target)
@@ -127,7 +136,8 @@ class ReleaseWriter:
         }
 
     def parquet(self, c, sql, params, name):
-        path = self.root / "work" / (name + ".partial.parquet")
+        suffix = "-" + uuid4().hex if self.retain_work_files else ""
+        path = self.root / "work" / (name + suffix + ".partial.parquet")
         if path.exists():
             path.unlink()  # This writer's incomplete output only; never a source or published object.
         try:
@@ -161,10 +171,11 @@ class ReleaseWriter:
             result["key_value_mismatches"] = difference
             return result
         except BaseException:
-            path.unlink(missing_ok=True)
+            if not self.retain_work_files:
+                path.unlink(missing_ok=True)
             raise
 
-    def publish(self, manifest, *, expected_parent):
+    def publish(self, manifest, *, expected_parent, verify_unchanged=True):
         require(self.lock is not None, "MARKET_WRITER", "Acquire the writer lock")
         pointer = self.root / "CURRENT.json"
         old = json.loads(pointer.read_bytes()) if pointer.exists() else None
@@ -173,6 +184,10 @@ class ReleaseWriter:
             parent == expected_parent, "MARKET_PARENT_CHANGED", "Publish against the current parent"
         )
         release_id = (parent or 0) + 1
+        inherited = {}
+        if old and not verify_unchanged:
+            prior = MarketRelease(self.root, parent, expected_manifest_sha256=old["sha256"])
+            inherited = {(f["table"], f["series_id"], f["instrument_id"]): f for f in prior.files}
         seen = set()
         for item in manifest["files"]:
             key = (item["table"], item["series_id"], item["instrument_id"])
@@ -187,11 +202,12 @@ class ReleaseWriter:
                 "MARKET_RECONCILIATION",
                 "Unverified chunk",
             )
-            require(
-                sha_file(self.root / item["path"]) == item["sha256"],
-                "MARKET_INTEGRITY",
-                "Cannot publish a changed object",
-            )
+            if inherited.get(key) != item:
+                require(
+                    sha_file(self.root / item["path"]) == item["sha256"],
+                    "MARKET_INTEGRITY",
+                    "Cannot publish a changed object",
+                )
         for source, count in manifest["input_dispositions"].items():
             require(
                 count["input_rows"] == sum(count.get(k, 0) for k in DISPOSITIONS),
@@ -212,6 +228,9 @@ class ReleaseWriter:
             "parent_manifest_sha256": old["sha256"] if old else None,
             "query_engine": "duckdb==" + ENGINE,
             "snapshot_model": "immutable file manifests; retained replaced chunks, no sparse row history",
+            "publication_validation": "all fact objects"
+            if verify_unchanged
+            else "changed fact objects; exact unchanged descriptors inherited from verified parent manifest; selected objects reverified on read",
         }
         body = canonical(value)
         digest = hashlib.sha256(body).hexdigest()

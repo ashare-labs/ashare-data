@@ -250,6 +250,10 @@ def test_incremental_revision_and_duplicate_input_are_idempotent(tmp_path):
         "input_dispositions": {"patch": {"input_rows": 1, "adopted": 1}},
     }
     assert apply(current, plan)["release_id"] == 2
+    # A crash after publication but before the caller records success must not
+    # create another release or reject an already committed identical plan.
+    assert apply(current, plan)["already_applied"]
+    assert apply(MarketRelease(tmp_path), plan)["already_applied"]
     assert (
         current.read("bars_1d", "000001.XSHE", "2024-01-02", "2024-01-02")[0]["close_price"] == 10
     )
@@ -259,7 +263,10 @@ def test_incremental_revision_and_duplicate_input_are_idempotent(tmp_path):
     assert MarketRelease(tmp_path).release_id == 2
 
 
-def test_increment_refreshes_expected_and_new_days_then_delete(tmp_path, monkeypatch):
+@pytest.mark.parametrize("incremental_validation", [False, True])
+def test_increment_refreshes_expected_and_new_days_then_delete(
+    tmp_path, monkeypatch, incremental_validation
+):
     import json
     import shutil
     import ashare_data.storage.market_release as module
@@ -280,7 +287,16 @@ def test_increment_refreshes_expected_and_new_days_then_delete(tmp_path, monkeyp
         value = {
             **manifest(meta, [first]),
             "evidence": [check],
-            "coverage": {"obsolete": True},
+            "coverage": {
+                "counts_by_series": {
+                    "1": {
+                        "expected_days": 1,
+                        "expected_observed_days": 1,
+                        "expected_missing_days": 0,
+                        "expected_observed_rows": 1,
+                    }
+                }
+            },
             "created_at": "old",
             "capacity": {"obsolete": True},
         }
@@ -308,6 +324,7 @@ def test_increment_refreshes_expected_and_new_days_then_delete(tmp_path, monkeyp
         "schema": "ad-market-replacement-plan.v1",
         "parent_manifest_sha256": r1.sha256,
         "change_reason": "isolated append test",
+        "incremental_validation": incremental_validation,
         "chunks": [{**key, "parquet": str(replacement), "sha256": sha_file(replacement)}],
         "metadata": {"path": str(proposed), "sha256": sha_file(proposed)},
         "evidence": [{"path": str(proof), "sha256": sha_file(proof)}],

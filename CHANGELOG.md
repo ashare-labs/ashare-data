@@ -1,5 +1,12 @@
 # 更新记录
 
+## 0.10.0.dev12
+
+- Add resumable recent daily/minute collection and exact source-to-release admission with immutable response and destination evidence.
+- Add release-pinned Sina minute selection and explicit recent daily observation captures; preserve prior releases and source contracts.
+- Make repeated replacement plans idempotent and update coverage only for changed scopes.
+
+
 ## 0.10.0.dev5
 
 - Integrate formal daily publication and generic source-labelled minute research exports in one paired runtime; retain the existing source, quality and visibility boundaries.

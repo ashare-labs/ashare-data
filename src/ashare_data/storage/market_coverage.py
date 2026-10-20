@@ -10,7 +10,7 @@ from ashare_data.storage.market_release import canonical, sql_literal
 VERSION = "frozen-expectations-current-observations.v1"
 
 
-def refresh(writer, c, release, changes, evidence, metadata):
+def refresh(writer, c, release, changes, evidence, metadata, *, incremental_counts=False):
     scopes = {(item["key"][1], item["key"][2]) for item in changes}
     previous = [item for item in evidence if item.get("kind") == "bar_day_checks"]
     result = [
@@ -71,18 +71,20 @@ def refresh(writer, c, release, changes, evidence, metadata):
             kind="bar_day_checks", check_version=VERSION, series_id=series, instrument_id=instrument
         )
         result.append(item)
-    checks = [item for item in result if item.get("kind") == "bar_day_checks"]
-    counts = {}
-    if checks:
+
+    def aggregate(checks):
+        if not checks:
+            return {}
         paths = ",".join(sql_literal(writer.root / item["path"]) for item in checks)
         rows = c.execute(
             """select series_id,expected_state,count(*),
-          sum(case when observed_count>0 then 1 else 0 end),
-          sum(case when expected_state='expected' and observed_count=0 then 1 else 0 end),
-          sum(observed_count) from read_parquet(["""
+            sum(case when observed_count>0 then 1 else 0 end),
+            sum(case when expected_state='expected' and observed_count=0 then 1 else 0 end),
+            sum(observed_count) from read_parquet(["""
             + paths
             + "],union_by_name=true) group by 1,2"
         ).fetchall()
+        counts = {}
         for series, state, days, present, missing, observed in rows:
             counts.setdefault(str(series), {}).update(
                 {
@@ -92,12 +94,43 @@ def refresh(writer, c, release, changes, evidence, metadata):
                     state + "_observed_rows": observed,
                 }
             )
+        return counts
+
+    checks = [item for item in result if item.get("kind") == "bar_day_checks"]
+    if incremental_counts and "counts_by_series" in release.manifest.get("coverage", {}):
+        counts = {
+            key: dict(value)
+            for key, value in release.manifest["coverage"]["counts_by_series"].items()
+        }
+
+        def changed(items):
+            return [
+                item
+                for item in items
+                if (item.get("series_id"), item.get("instrument_id")) in scopes
+            ]
+
+        for sign, partial in [(-1, aggregate(changed(previous))), (1, aggregate(changed(checks)))]:
+            for series, fields in partial.items():
+                target = counts.setdefault(series, {})
+                for field, value in fields.items():
+                    target[field] = target.get(field, 0) + sign * value
+                    require(
+                        target[field] >= 0,
+                        "MARKET_COVERAGE",
+                        "Frozen coverage totals disagree with changed scopes",
+                    )
+    else:
+        counts = aggregate(checks)
     coverage = {
         "check_version": VERSION,
         "counts_by_series": counts,
         "expected_minute_count": None,
         "expectation_scope": "Prior release-frozen expectations retained. New dates and scopes remain unknown; a market-calendar expansion is not inferred from new bars.",
         "changed_scopes": [{"series_id": s, "instrument_id": i} for s, i in sorted(scopes)],
+        "aggregation": "parent totals plus changed scopes"
+        if incremental_counts
+        else "all selected checks",
     }
     # Keep the proposed metadata as input evidence; derive a separate immutable output.
     result.append({**metadata, "kind": "proposed_metadata"})
