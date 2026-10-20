@@ -35,6 +35,11 @@ class FinancialTables:
         self.candidate_root = None
         self.candidate = None
         self.files = [x for x in release.manifest.get("evidence", []) if x.get("kind") == "financial_table"]
+        if "financial_unit_resolution" in release.manifest:
+            from ashare_data.storage.unit_publication import PublishedUnits
+            published = PublishedUnits(release)
+            published.bind(self)
+            self._unit_candidate = published
 
     @classmethod
     def prepared(cls, root, parent):
@@ -66,7 +71,7 @@ class FinancialTables:
                      full_history_complete=False)
         if getattr(self, "_unit_candidate", None):
             value.update(unit_candidate_id=self._unit_candidate.value["candidate_id"],
-                         unit_candidate_published=False)
+                         unit_candidate_published=getattr(self._unit_candidate, "published", False))
         return value
 
     def with_units(self, root, *, expected_sha256):
@@ -397,14 +402,23 @@ def main(argv=None):
     build.add_argument("--official-batch", action="append", type=Path, default=[])
     build.add_argument("--official-repair", action="append", type=Path, default=[])
     build.add_argument("--share-resolutions", action="append", type=Path, default=[])
-    query = sub.add_parser("query")
-    query.add_argument("--candidate", type=Path)
-    query.add_argument("--security", required=True)
-    query.add_argument("--field", required=True)
-    query.add_argument("--period", required=True)
-    query.add_argument("--source", required=True)
-    query.add_argument("--as-of", required=True)
-    query.add_argument("--mode", default="historical_pit")
+    for command in ("query", "source-query"):
+        query = sub.add_parser(command)
+        query.add_argument("--candidate", type=Path)
+        query.add_argument("--security", required=True)
+        query.add_argument("--field", required=True)
+        query.add_argument("--period", required=True)
+        query.add_argument("--source", required=True)
+        query.add_argument("--as-of", required=True)
+        query.add_argument("--mode", default="historical_pit")
+        if command == "source-query":
+            query.add_argument("--statement", required=True)
+            query.add_argument("--title", required=True)
+    publish = sub.add_parser("publish-units")
+    publish.add_argument("--unit-candidate", required=True, type=Path)
+    publish.add_argument("--candidate-sha256", required=True)
+    publish.add_argument("--review-script", type=Path)
+    publish.add_argument("--calendar-plan", type=Path)
     args = parser.parse_args(argv)
     parent = MarketRelease(args.market_root, args.release_id, expected_manifest_sha256=args.manifest_sha256)
     if args.action == "prepare":
@@ -413,10 +427,17 @@ def main(argv=None):
                         official_repairs=args.official_repair)
         print(json.dumps({"candidate_id": value["candidate_id"], "published": False,
                           "validation": value["validation"]}, ensure_ascii=False))
+    elif args.action == "publish-units":
+        from ashare_data.storage.unit_publication import compose
+        value = compose(parent, args.unit_candidate, expected_sha256=args.candidate_sha256,
+                        calendar_plan=args.calendar_plan, review_script=args.review_script)
+        print(json.dumps(value, ensure_ascii=False))
     else:
         reader = FinancialTables.prepared(args.candidate, parent) if args.candidate else FinancialTables(parent)
-        print(json.dumps(reader.point(args.security, args.field, args.period,
-                                      source=args.source, as_of=args.as_of, mode=args.mode), ensure_ascii=False))
+        method = reader.source_point if args.action == "source-query" else reader.point
+        extra = {"statement": args.statement, "title": args.title} if args.action == "source-query" else {}
+        print(json.dumps(method(args.security, args.field, args.period,
+                                source=args.source, as_of=args.as_of, mode=args.mode, **extra), ensure_ascii=False))
 
 
 if __name__ == "__main__":

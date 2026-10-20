@@ -268,6 +268,12 @@ class ReleaseWriter:
         ):
             from ashare_data.storage.financial_release import verify_manifest_contract
             verify_manifest_contract(self.root, manifest)
+        from ashare_data.storage.unit_publication import CONTRACT as unit_contract, verify_contract as verify_units
+        if old and prior.get(unit_contract):
+            require(manifest.get(unit_contract) == prior[unit_contract], "FIN_UNIT_HISTORY",
+                    "Preserve the immutable unit contract when publishing unrelated increments")
+        if manifest.get(unit_contract):
+            verify_units(self.root, manifest)
         value = {
             **manifest,
             "schema": SCHEMA,

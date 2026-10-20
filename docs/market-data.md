@@ -273,3 +273,23 @@ PYTHONPATH=src "$PYTHON" -m ashare_data.product.release_cli \
 验收检查本轮全部输入、修改的键和值、发布幂等、CLI/API/UI 和 A宽的固定版本读取。未改变的大库文件沿用父 manifest 的完全相同描述，实际选中读取时验证内容。本轮不执行新的全市场扫描或全量恢复演练。失败输出、旧发布及原件均保留；磁盘不足时停止新写入并报告，不自动清理。
 
 每轮 `build/increment-summary.json` 给出真实新增键数、实际修改行、逐日采用量、来源错误、输入去向和覆盖限制。正式 manifest 的 `increment.summary` 引用该摘要的不可变对象。
+
+
+### 保留原件的有界日历补齐
+
+`calendar_release` 只读取固定发布内的新浪日历响应回执及对应原件，并与保留的
+深交所完整月历逐日核对。原件已经含有的日期不会再发网络请求。单次只允许当前月
+至多 31 个自然日的追加，不由行情存在反推开市，也不改变证券状态或认证可交易性。
+原有沪深共用日历语义保持明确；不能据此认证北京市场或逐证券停复牌。
+
+```sh
+PYTHONPATH=src python -B scripts/prepare_calendar_extension.py \
+  --market-root "$MARKET" --release-id "$PARENT" --manifest-sha256 "$PARENT_SHA" \
+  --output "$CALENDAR_OUTPUT" --end "$END" --sina-raw "$SINA_RAW" \
+  --sina-response-id "$SINA_RESPONSE_ID" --szse-root "$SZSE_CLOSED_BATCH"
+```
+
+输出只含一份小型元数据候选和固定计划。验证比较所有元数据表的精确增删差异：
+原行必须完整保留，只允许推导出的日历、批次、来源与标记行增加。可以与单位证据
+在同一发布提交。旧版仍读取旧日历；财务参考表自己的日历覆盖不随市场日历隐式扩大。
+准备和失败产物留在指定目录，正式默认通过 deployment 中明确的 release/hash 切换。

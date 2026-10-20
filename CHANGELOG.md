@@ -1,5 +1,11 @@
 # 更新记录
 
+## 0.10.0.dev14
+
+- Publish reviewed source-unit rules with their immutable proof closure; exact source-field queries use the release-bound annotations while preserving original financial observations, missing values and historical visibility restrictions.
+- Append bounded market calendar sessions from retained, agreeing source calendars; verify the complete metadata delta before one atomic publication with unchanged market facts.
+- Preserve prior releases, accept interrupted publication retries and reject dropped unit evidence.
+
 ## 0.10.0.dev13
 
 - Accept the reviewed financial reference and recovered official-index candidates without re-parsing prior frozen inputs. Retain source-code quarantine and incomplete index coverage.

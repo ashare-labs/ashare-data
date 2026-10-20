@@ -146,7 +146,7 @@ with ReleaseWriter(market_root) as writer:
 
 `financials.unit_resolution` 生成单独的 `ad.financial-unit-candidate.v1`。
 它只增加小型单位规则和捕获绑定，不重写五千多万条观察，不改变15张正式表，
-也不自动进入共用发布。协调方可显式审阅、启用：
+候选需要先显式审阅，再通过受控发布入口加入共用发布。候选检查方式：
 
 ```python
 reviewed = view.with_units(unit_candidate_root, expected_sha256=unit_candidate_sha256)
@@ -175,3 +175,32 @@ null、空字符串和零仍有区别；其他质量错误不能通过单位规�
 显式当前源研究查询同时检查源捕获时间与单位证据时间。返回派生的已知单位上下文ID，
 同时保留 `base_context_id`，原存储上下文不修改。源字段必须带报表类别与完整标题，
 证券换码、版本冲突及上市边界沿用正式读者约束。
+
+
+通过复核后，`storage.unit_publication` 将候选、原候选清单、原件审计、审阅定义、
+引用证据及实现代码复制为小型不可变对象。正式读者仅使用 release 固定的对象清单，
+不会重开候选内的外部绝对路径；原始采集原件仍由原有血缘单独保留。每个后续发布
+必须保留既有单位合同。首轮单位发布支持同时纳入一个已验证日历计划；行情文件和
+财务观察文件不重写。增量限制为 512 MiB，正式存储保留 150 GiB 空闲预算。
+
+```sh
+PYTHONPATH=src python -B -m ashare_data.product.financial_release \
+  --market-root "$MARKET" --release-id "$PARENT" --manifest-sha256 "$PARENT_SHA" \
+  publish-units --unit-candidate "$UNITS" --candidate-sha256 "$UNITS_SHA" \
+  --review-script scripts/prepare_sina_unit_review.py --calendar-plan "$CALENDAR_PLAN"
+```
+
+发布成功后的默认 `release.financial()` 自动绑定已发布单位规则，旧 release 不变。
+显式源字段可经公开 CLI 查询；省略 `--mode source_research` 时仍要求历史可见证据：
+
+```sh
+PYTHONPATH=src python -B -m ashare_data.product.financial_release \
+  --market-root "$MARKET" --release-id "$RELEASE" --manifest-sha256 "$MANIFEST_SHA" \
+  source-query --security 600012.XSHG --statement lrb --field BASICEPS \
+  --title 基本每股收益 --period 2010-03-31 --source sina \
+  --as-of "$REVIEW_CUTOFF" --mode source_research
+```
+
+单位修订没有增加来源财务事实，也没有声称供应商历史终值当年即可知。现有规范指标
+查询继续原路径；未复核字段仍不可计算。重复执行同一父版本、候选和日历计划是
+无变化操作；中断留下的对象可复用，发布前失败不改变 CURRENT。
