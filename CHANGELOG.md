@@ -5,6 +5,8 @@
 - Add resumable recent daily/minute collection and exact source-to-release admission with immutable response and destination evidence.
 - Add release-pinned Sina minute selection and explicit recent daily observation captures; preserve prior releases and source contracts.
 - Make repeated replacement plans idempotent and update coverage only for changed scopes.
+- Compose reviewed financial/reference candidates into the same immutable release; retain source-code identity, capture cutoffs, unit restrictions and prior market facts.
+- Resolve incremental raw-response provenance in daily read receipts, including native Sohu batch positions.
 
 
 ## 0.10.0.dev5

@@ -5,7 +5,7 @@ there is no glob, mutable current/history join, shared writable DuckDB, or servi
 Changed chunks produce new objects. Every earlier manifest and object is retained.
 """
 
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 import fcntl
 import hashlib
 import json
@@ -69,13 +69,19 @@ def atomic_write(path, body):
 def connection(temp=None, memory="2GB", threads=2):
     require(duckdb.__version__ == ENGINE, "MARKET_RUNTIME", "Use the frozen DuckDB version")
     c = duckdb.connect()
-    c.execute("SET threads=?", [threads])
-    c.execute("SET memory_limit=?", [memory])
-    c.execute("SET TimeZone='UTC'; SET preserve_insertion_order=false")
-    if temp is not None:
-        c.execute("SET temp_directory=?", [str(temp)])
-        c.execute("SET max_temp_directory_size='8GB'")
-    return c
+    try:
+        c.execute("SET threads=?", [threads])
+        c.execute("SET memory_limit=?", [os.environ.get("ASHARE_DUCKDB_MEMORY_LIMIT", memory)])
+        c.execute("SET TimeZone='UTC'; SET preserve_insertion_order=false")
+        directory = temp if temp is not None else os.environ.get("ASHARE_DUCKDB_TEMP_DIRECTORY")
+        if directory is not None:
+            c.execute("SET temp_directory=?", [str(directory)])
+            c.execute("SET max_temp_directory_size=?",
+                      [os.environ.get("ASHARE_DUCKDB_MAX_TEMP_DIRECTORY_SIZE", "8GB")])
+        return c
+    except BaseException:
+        c.close()
+        raise
 
 
 class ReleaseWriter:
@@ -180,14 +186,31 @@ class ReleaseWriter:
         pointer = self.root / "CURRENT.json"
         old = json.loads(pointer.read_bytes()) if pointer.exists() else None
         parent = old["release_id"] if old else None
+        prior_financial = None
         require(
             parent == expected_parent, "MARKET_PARENT_CHANGED", "Publish against the current parent"
         )
+        if old:
+            prior_body = (self.root / "releases" / f"{parent:08d}.json").read_bytes()
+            require(hashlib.sha256(prior_body).hexdigest() == old["sha256"],
+                    "MARKET_RELEASE_INTEGRITY", "Current parent manifest changed")
+            prior = json.loads(prior_body)
+            prior_financial = prior.get("financial_reference_tables")
+            if prior_financial:
+                incoming = manifest.get("financial_reference_tables")
+                require(bool(incoming), "FIN_CONTRACT", "Preserve the published financial contract")
+                require(set(prior_financial["candidate_ids"]) <= set(incoming.get("candidate_ids", [])),
+                        "FIN_CONTRACT", "Preserve financial candidate history")
+                def financial_objects(value):
+                    return {(x["table"], x["partition_key"], x["sha256"])
+                            for x in value.get("evidence", []) if x.get("kind") == "financial_table"}
+                require(financial_objects(prior) <= financial_objects(manifest),
+                        "FIN_CONTRACT", "Previously published financial table set must be retained")
         release_id = (parent or 0) + 1
         inherited = {}
         if old and not verify_unchanged:
-            prior = MarketRelease(self.root, parent, expected_manifest_sha256=old["sha256"])
-            inherited = {(f["table"], f["series_id"], f["instrument_id"]): f for f in prior.files}
+            prior_release = MarketRelease(self.root, parent, expected_manifest_sha256=old["sha256"])
+            inherited = {(f["table"], f["series_id"], f["instrument_id"]): f for f in prior_release.files}
         seen = set()
         for item in manifest["files"]:
             key = (item["table"], item["series_id"], item["instrument_id"])
@@ -220,6 +243,29 @@ class ReleaseWriter:
             "MARKET_INTEGRITY",
             "Metadata object changed",
         )
+        if prior_financial:
+            prior_metadata = self.root / prior["metadata"]["path"]
+            require(sha_file(prior_metadata) == prior["metadata"]["sha256"],
+                    "MARKET_INTEGRITY", "Previous financial metadata changed")
+            uri = (self.root / metadata["path"]).as_uri() + "?mode=ro&immutable=1"
+            with closing(sqlite3.connect(uri, uri=True)) as db:
+                db.execute("ATTACH DATABASE ? AS previous",
+                           (prior_metadata.as_uri() + "?mode=ro&immutable=1",))
+                present = {r[0] for r in db.execute("SELECT name FROM main.sqlite_master")}
+                for table in ("release_issuers", "release_issuer_instruments", "source_assets",
+                              "data_batches", "batch_inputs", "source_aliases", "release_identifiers"):
+                    require(table in present, "FIN_METADATA", "Preserve financial metadata table " + table)
+                    columns = ("security,instrument_id" if table == "release_identifiers" else
+                               ",".join(r[1] for r in db.execute("PRAGMA previous.table_info(" + table + ")")))
+                    missing = db.execute("SELECT count(*) FROM (SELECT " + columns + " FROM previous." + table
+                                         + " EXCEPT SELECT " + columns + " FROM main." + table + ")").fetchone()[0]
+                    require(missing == 0, "FIN_METADATA",
+                            "Existing financial metadata or identifier mapping changed: " + table)
+        if manifest.get("financial_reference_tables") or any(
+            item.get("kind") == "financial_table" for item in manifest.get("evidence", [])
+        ):
+            from ashare_data.storage.financial_release import verify_manifest_contract
+            verify_manifest_contract(self.root, manifest)
         value = {
             **manifest,
             "schema": SCHEMA,
@@ -534,3 +580,8 @@ class MarketRelease:
             "snapshot": "one immutable file manifest for this reader lifetime",
             "strict_historical_pit": False,
         }
+
+    def financial(self):
+        """Financial/reference reader bound to this exact common release."""
+        from ashare_data.product.financial_release import FinancialTables
+        return FinancialTables(self)
