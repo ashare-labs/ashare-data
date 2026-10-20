@@ -68,13 +68,19 @@ def atomic_write(path, body):
 def connection(temp=None, memory="2GB", threads=2):
     require(duckdb.__version__ == ENGINE, "MARKET_RUNTIME", "Use the frozen DuckDB version")
     c = duckdb.connect()
-    c.execute("SET threads=?", [threads])
-    c.execute("SET memory_limit=?", [memory])
-    c.execute("SET TimeZone='UTC'; SET preserve_insertion_order=false")
-    if temp is not None:
-        c.execute("SET temp_directory=?", [str(temp)])
-        c.execute("SET max_temp_directory_size='8GB'")
-    return c
+    try:
+        c.execute("SET threads=?", [threads])
+        c.execute("SET memory_limit=?", [memory])
+        c.execute("SET TimeZone='UTC'; SET preserve_insertion_order=false")
+        directory = temp if temp is not None else os.environ.get("ASHARE_DUCKDB_TEMP_DIRECTORY")
+        if directory is not None:
+            c.execute("SET temp_directory=?", [str(directory)])
+            c.execute("SET max_temp_directory_size=?",
+                      [os.environ.get("ASHARE_DUCKDB_MAX_TEMP_DIRECTORY_SIZE", "8GB")])
+        return c
+    except BaseException:
+        c.close()
+        raise
 
 
 class ReleaseWriter:

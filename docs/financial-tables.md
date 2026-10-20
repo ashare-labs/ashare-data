@@ -57,6 +57,12 @@ PYTHONPATH=src python -B -m ashare_data.product.financial_release \
 `candidate.json` 包含逐表行数、输入处置对账、父版本、实现hash及数据对象，
 `BUILD-PROGRESS.json` 只记录本次离线入表进度。
 
+大批次的全表去重验收仍限制内存，但会使用磁盘临时空间。
+`ASHARE_DUCKDB_TEMP_DIRECTORY` 可指定正式数据根下的独立临时目录，
+`ASHARE_DUCKDB_MAX_TEMP_DIRECTORY_SIZE` 可指定本次查询的磁盘上限（默认8 GB）。
+显式传入的临时目录优先于环境变量。离线协调脚本应使用临时目录上下文，
+成功或失败后关闭连接并清理；不在工作树或Codex任务目录承载大批次临时数据。
+
 `REVIEW_SPEC_JSON` 包含 `official_root`、`review`、`review_sha256`、
 `reference_root`、`reference_tasks` 和可选 `correction_reviews`。
 它调用现有 `official_daily.reader` 核验PDF、字段、索引、更正范围和交易日证据，

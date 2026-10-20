@@ -32,6 +32,13 @@ def main():
         coverage = db.execute("""SELECT source,source_state,count(*),sum(input_rows),
           sum(mapped_rows),sum(quarantined_rows) FROM meta.financial_coverage
           GROUP BY source,source_state ORDER BY source,source_state""").fetchall()
+        source_ranges = db.execute("""SELECT source,
+          min(coalesce(json_extract_string(coverage_json,'$.source_earliest_period'),
+                       json_extract_string(coverage_json,'$.source_earliest_date'))),
+          max(coalesce(json_extract_string(coverage_json,'$.source_latest_period'),
+                       json_extract_string(coverage_json,'$.source_latest_date'))),
+          sum(coalesce(json_array_length(json_extract(coverage_json,'$.quarters_without_observation')),0))
+          FROM meta.financial_coverage GROUP BY source ORDER BY source""").fetchall()
         reports = db.execute("""SELECT r.source,r.statement,min(r.period_end),max(r.period_end),
           count(DISTINCT r.report_version_id),count(DISTINCT i.instrument_id)
           FROM financial.report_versions r JOIN reference.issuer_instruments i USING(issuer_id)
@@ -80,6 +87,7 @@ def main():
     result = dict(schema="ad.financial-public-table-acceptance.v1", candidate_id=candidate["candidate_id"],
                   parent_manifest_sha256=parent.sha256, published=False, full_history_complete=False,
                   complete_frozen_task_set_accounted=True, tasks=len(tasks), source_coverage=coverage,
+                  source_observed_ranges_and_missing_quarters=source_ranges,
                   report_ranges=reports, share_ranges=shares, action_ranges=actions, field_quality=quality,
                   whole_batch_validation=candidate["validation"], financial_points=checks,
                   pre_capture_denied=pre_capture, historical_pit_denied=historical,

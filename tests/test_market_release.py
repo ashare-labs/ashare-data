@@ -11,6 +11,24 @@ from ashare_data.core.model import DataError
 from ashare_data.storage.market_release import MarketRelease, ReleaseWriter, connection
 
 
+def test_explicit_query_spill_directory_and_budget(tmp_path, monkeypatch):
+    directory = tmp_path / "query-spill"
+    monkeypatch.setenv("ASHARE_DUCKDB_TEMP_DIRECTORY", str(directory))
+    monkeypatch.setenv("ASHARE_DUCKDB_MAX_TEMP_DIRECTORY_SIZE", "32MB")
+    c = connection(memory="128MB", threads=1)
+    try:
+        assert c.execute("SELECT current_setting('temp_directory')").fetchone()[0] == str(directory)
+        assert c.execute("SELECT current_setting('max_temp_directory_size')").fetchone()[0] == "30.5 MiB"
+    finally:
+        c.close()
+    explicit = tmp_path / "explicit"
+    c = connection(explicit, memory="128MB", threads=1)
+    try:
+        assert c.execute("SELECT current_setting('temp_directory')").fetchone()[0] == str(explicit)
+    finally:
+        c.close()
+
+
 def metadata(writer):
     path = writer.root / "work/reference.sqlite3"
     d = sqlite3.connect(path)
