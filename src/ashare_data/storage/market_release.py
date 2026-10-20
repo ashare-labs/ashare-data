@@ -178,6 +178,22 @@ class ReleaseWriter:
         require(
             parent == expected_parent, "MARKET_PARENT_CHANGED", "Publish against the current parent"
         )
+        if old:
+            prior_body = (self.root / "releases" / f"{parent:08d}.json").read_bytes()
+            require(hashlib.sha256(prior_body).hexdigest() == old["sha256"],
+                    "MARKET_RELEASE_INTEGRITY", "Current parent manifest changed")
+            prior = json.loads(prior_body)
+            prior_financial = prior.get("financial_reference_tables")
+            if prior_financial:
+                incoming = manifest.get("financial_reference_tables")
+                require(bool(incoming), "FIN_CONTRACT", "Preserve the published financial contract")
+                require(set(prior_financial["candidate_ids"]) <= set(incoming.get("candidate_ids", [])),
+                        "FIN_CONTRACT", "Preserve financial candidate history")
+                def financial_objects(value):
+                    return {(x["table"], x["partition_key"], x["sha256"])
+                            for x in value.get("evidence", []) if x.get("kind") == "financial_table"}
+                require(financial_objects(prior) <= financial_objects(manifest),
+                        "FIN_CONTRACT", "Previously published financial table set must be retained")
         release_id = (parent or 0) + 1
         seen = set()
         for item in manifest["files"]:

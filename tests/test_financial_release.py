@@ -388,6 +388,14 @@ def test_later_market_publication_cannot_drop_financial_tables(tmp_path):
         invalid = dict(published.manifest, evidence=[])
         with pytest.raises(DataError, match="table set"):
             writer.publish(invalid, expected_parent=2)
+        invalid.pop("financial_reference_tables")
+        invalid.pop("financial_table_validation")
+        with pytest.raises(DataError, match="financial contract"):
+            writer.publish(invalid, expected_parent=2)
+        forgotten = deepcopy(published.manifest)
+        forgotten["financial_reference_tables"]["candidate_ids"] = []
+        with pytest.raises(DataError, match="candidate history"):
+            writer.publish(forgotten, expected_parent=2)
         writer.publish(published.manifest, expected_parent=2)
     assert MarketRelease(parent.root).financial().point("600000.XSHG", "net_profit", "2024-03-31",
                source="sina", as_of="2026-10-20T00:00:00+08:00", mode="source_research")["status"] == "ok"
