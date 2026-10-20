@@ -76,6 +76,9 @@ def test_conflicting_labels_never_last_write_win():
     assert [r["disposition"] for r in normalize([one, one])] == ["adopted", "equal_duplicate"]
     invalid = {**one, "low": "0"}
     assert all(r["disposition"] == "quarantined" for r in normalize([one, invalid]))
+    other_invalid = {**one, "volume": "1.5"}
+    assert all(r["disposition"] == "quarantined" for r in normalize([invalid, other_invalid]))
+    assert all(r["disposition"] == "quarantined" for r in normalize([invalid, invalid]))
 
 
 def make_minute(writer, c, series, day):

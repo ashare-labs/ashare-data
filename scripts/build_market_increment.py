@@ -193,6 +193,7 @@ def build(a):
     for pos, item in enumerate(scopes):
         instrument = item["instrument_id"]
         security = item["security"]
+        assert 0 < instrument < 10000, "batch allocation range requires an explicit new mapping"
         if checkpoint.execute(
             "select 1 from batches where instrument_id=?", (instrument,)
         ).fetchone():

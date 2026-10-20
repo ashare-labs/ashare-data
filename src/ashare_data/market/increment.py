@@ -106,6 +106,12 @@ def minute_rows(body, *, after_date, end_date):
         item.update(disposition="adopted", reason="new_whole_security_day_source")
     for group in groups.values():
         if len(group) > 1:
+            if any(item["disposition"] != "adopted" for item in group):
+                for item in group:
+                    item.update(
+                        disposition="quarantined", reason="invalid_or_conflicting_native_label"
+                    )
+                continue
             values = {tuple(item.get(k) for k in FIELDS) for item in group}
             for item in group if len(values) > 1 else group[1:]:
                 item.update(
