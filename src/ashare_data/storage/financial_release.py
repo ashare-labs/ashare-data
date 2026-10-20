@@ -29,6 +29,13 @@ from ashare_data.storage.market_release import (
 CANDIDATE = "ad.financial-table-candidate.v1"
 CONTRACT_NAME = "financial_reference_tables"
 TERMINAL = {"complete", "partial_source", "empty_unknown", "parse_failed", "failed_retryable", "deferred"}
+# Frozen v1 candidates produced by reviewed commits b4abfe2 and 8e01efb.
+# Additive importer entrypoints change the implementation hash, not these table
+# schemas. Composition still verifies every object, registry and relationship.
+COMPATIBLE_PREPARED_MAPPINGS = frozenset({
+    "c4592ca38dccd80a180992debd6eb6fa74a9b0e0e9cad7679a4daf2763ae989f",
+    "1e3b970124711dd3e343969f71f78f908ddfb349163964cb249c3a825da7a098",
+})
 REGISTRY_SQL = """
 CREATE TABLE IF NOT EXISTS release_issuers(
  issuer_id TEXT PRIMARY KEY,source_namespace TEXT NOT NULL,source_issuer_key TEXT NOT NULL,
@@ -516,17 +523,21 @@ class TableBuilder:
         return value
 
 
-def prepare(parent, root, batches, *, daily_reviews=(), official_batches=(), share_resolutions=()):
+def prepare(parent, root, batches, *, daily_reviews=(), official_batches=(), share_resolutions=(),
+            official_repairs=()):
+    specification = {
+        "batches": [str(Path(p).resolve()) for p in batches],
+        "daily_reviews": [str(Path(p).resolve()) for p in daily_reviews],
+        "official_batches": [str(Path(p).resolve()) for p in official_batches],
+        "share_resolutions": [str(Path(p).resolve()) for p in share_resolutions]}
+    if official_repairs:
+        specification["official_repairs"] = [str(Path(p).resolve()) for p in official_repairs]
     candidate = Path(root) / "candidate.json"
     if candidate.exists():
         existing = json.loads(candidate.read_text())
         require(existing["mapping_sha256"] == mapper_sha256()
                 and existing["parent_manifest_sha256"] == parent.sha256
-                and existing.get("input_specification") == {
-                    "batches": [str(Path(p).resolve()) for p in batches],
-                    "daily_reviews": [str(Path(p).resolve()) for p in daily_reviews],
-                    "official_batches": [str(Path(p).resolve()) for p in official_batches],
-                    "share_resolutions": [str(Path(p).resolve()) for p in share_resolutions]},
+                and existing.get("input_specification") == specification,
                 "FIN_FROZEN_INPUT", "Use a new candidate directory for different inputs or mapping")
         verify_object(root, existing["metadata_delta"])
         for item in existing["files"]:
@@ -541,11 +552,10 @@ def prepare(parent, root, batches, *, daily_reviews=(), official_batches=(), sha
         if share_resolutions:
             from ashare_data.financials.table_shares import import_resolutions
             done.extend(import_resolutions(builder, p) for p in share_resolutions)
-        builder.input_specification = {
-            "batches": [str(Path(p).resolve()) for p in batches],
-            "daily_reviews": [str(Path(p).resolve()) for p in daily_reviews],
-            "official_batches": [str(Path(p).resolve()) for p in official_batches],
-            "share_resolutions": [str(Path(p).resolve()) for p in share_resolutions]}
+        if official_repairs:
+            from ashare_data.financials.table_official import import_recovered_archive
+            done.extend(import_recovered_archive(builder, p) for p in official_repairs)
+        builder.input_specification = specification
         return builder.finish(done)
 
 
@@ -569,7 +579,8 @@ def compose(writer, parent, candidate_root, *, expected_parent_sha256):
     require(parent.sha256 == expected_parent_sha256, "FIN_PARENT", "Explicit parent hash differs")
     root = Path(candidate_root).resolve()
     candidate = json.loads((root / "candidate.json").read_text())
-    require(candidate["schema"] == CANDIDATE and candidate["mapping_sha256"] == mapper_sha256(),
+    require(candidate["schema"] == CANDIDATE
+            and candidate["mapping_sha256"] in COMPATIBLE_PREPARED_MAPPINGS | {mapper_sha256()},
             "FIN_CANDIDATE", "Unexpected candidate implementation")
     current = MarketRelease(writer.root)
     require(current.sha256 == expected_parent_sha256, "FIN_PARENT", "Market publisher advanced; recompose")

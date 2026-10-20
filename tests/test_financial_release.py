@@ -162,6 +162,97 @@ def test_recapture_and_reparse_do_not_create_report_versions(tmp_path):
     assert counts["financial.observations"] == 10
 
 
+def recovered_package(tmp_path, rows):
+    from test_source_repair import Cache
+    from ashare_data.financials import source_repair
+    original = Cache(tmp_path / "official")
+    original.page("periodic", 1, len(rows), False, rows)
+    source = batch(tmp_path / "financial-source", [report()])
+    root = tmp_path / "recovered"
+    source_repair.prepare(root, source, original.root, [], ["sh600000"])
+    return root, original
+
+
+def test_recovered_official_events_preserve_gaps_and_related_code_quarantine(tmp_path):
+    from test_source_repair import row
+    source, original = recovered_package(tmp_path, [
+        row("accepted"), row("conflict"), row("conflict", adjunctUrl="changed.pdf"),
+        row("related", secCode="601975"), row("wrong-issuer", orgId="different")])
+    parent = market(tmp_path / "market")
+    status = (original.root / "securities/sh600000.json").read_bytes()
+    output = tmp_path / "candidate"
+    result = prepare(parent, output, [], official_repairs=[source])
+    assert prepare(parent, output, [], official_repairs=[source])["candidate_id"] == result["candidate_id"]
+    assert (original.root / "securities/sh600000.json").read_bytes() == status
+    assert result["validation"]["input_rows"] == 5
+    assert result["validation"]["mapped_rows"] == 1
+    assert result["validation"]["quarantined_rows"] == 4
+    counts = result["validation"]["table_rows"]
+    assert counts["financial.disclosure_events"] == 1
+    assert counts["financial.observations"] == counts["financial.visibility"] == 0
+    view = FinancialTables.prepared(output, parent)
+    with view.sql() as db:
+        assert db.execute("SELECT native_event_id FROM financial.disclosure_events").fetchall() == [("accepted",)]
+        assert db.execute("SELECT source_state FROM meta.financial_coverage").fetchone()[0] == "recovered_with_query_gaps"
+        assert db.execute("SELECT count(*) FROM quality.financial_quarantine").fetchone()[0] == 4
+    assert view.point("600000.XSHG", "net_profit", "2024-03-31", source="cninfo",
+                      as_of="2026-10-20T00:00:00+08:00")["value"] is None
+    with ReleaseWriter(parent.root, free_reserve_bytes=0) as writer:
+        manifest = compose(writer, parent, output, expected_parent_sha256=parent.sha256)
+        writer.publish(manifest, expected_parent=parent.release_id)
+    with MarketRelease(parent.root).financial().sql() as db:
+        assert db.execute("SELECT count(*) FROM financial.disclosure_events").fetchone()[0] == 1
+
+
+def test_recovered_official_source_receipt_change_is_rejected(tmp_path):
+    from test_source_repair import row
+    source, original = recovered_package(tmp_path, [row()])
+    path = original.root / "receipts/index-sh600000-periodic-001.json"
+    receipt = json.loads(path.read_text())
+    receipt["observed_at"] = "2026-10-20T00:00:00+00:00"
+    path.write_bytes(canonical(receipt))
+    with pytest.raises(ValueError, match="receipt changed"):
+        prepare(market(tmp_path / "market"), tmp_path / "candidate", [], official_repairs=[source])
+
+
+def test_recovered_official_modified_derived_title_is_quarantined(tmp_path):
+    from test_source_repair import row
+    source, _ = recovered_package(tmp_path, [row()])
+    manifest_path = source / "repair-manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    output = manifest["official"][0]["index"]
+    path = source / output["path"]
+    index = json.loads(gzip.decompress(path.read_bytes()))
+    index["announcements"][0]["title"] = "altered derived title"
+    body = gzip.compress(canonical(index), mtime=0)
+    path.write_bytes(body)
+    output.update(sha256=e.digest(body), bytes=len(body))
+    manifest_path.write_bytes(canonical(manifest))
+    result = prepare(market(tmp_path / "market"), tmp_path / "candidate", [], official_repairs=[source])
+    assert result["validation"]["mapped_rows"] == 0
+    assert result["validation"]["quarantined_rows"] == 1
+
+
+@pytest.mark.parametrize("compatible", [True, False])
+def test_additive_importer_accepts_only_explicitly_reviewed_previous_mapping(tmp_path, monkeypatch, compatible):
+    from ashare_data.storage import financial_release as storage
+    parent = market(tmp_path / "market")
+    source = batch(tmp_path / "source", [report()])
+    output = tmp_path / "candidate"
+    result = prepare(parent, output, [source])
+    monkeypatch.setattr(storage, "mapper_sha256", lambda: "next-additive-implementation")
+    monkeypatch.setattr(storage, "COMPATIBLE_PREPARED_MAPPINGS",
+                        frozenset({result["mapping_sha256"]}) if compatible else frozenset())
+    with ReleaseWriter(parent.root, free_reserve_bytes=0) as writer:
+        if not compatible:
+            with pytest.raises(DataError, match="Unexpected candidate implementation"):
+                compose(writer, parent, output, expected_parent_sha256=parent.sha256)
+        else:
+            manifest = compose(writer, parent, output, expected_parent_sha256=parent.sha256)
+            writer.publish(manifest, expected_parent=parent.release_id)
+    assert MarketRelease(parent.root).release_id == (2 if compatible else 1)
+
+
 def test_interrupted_import_resumes_committed_shards_without_double_counting(tmp_path, monkeypatch):
     parent = market(tmp_path / "market")
     source = batch(tmp_path / "source", [report()])

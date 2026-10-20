@@ -1,5 +1,10 @@
 # 更新记录
 
+## 0.10.0.dev13
+
+- Accept the reviewed financial reference and recovered official-index candidates without re-parsing prior frozen inputs. Retain source-code quarantine and incomplete index coverage.
+- Keep JSON consumer stdout free of DuckDB progress output; preserve returned financial values and version bindings.
+
 ## 0.10.0.dev12
 
 - Add resumable recent daily/minute collection and exact source-to-release admission with immutable response and destination evidence.

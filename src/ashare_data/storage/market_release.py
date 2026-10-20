@@ -73,6 +73,8 @@ def connection(temp=None, memory="2GB", threads=2):
         c.execute("SET threads=?", [threads])
         c.execute("SET memory_limit=?", [os.environ.get("ASHARE_DUCKDB_MEMORY_LIMIT", memory)])
         c.execute("SET TimeZone='UTC'; SET preserve_insertion_order=false")
+        # Library consumers and JSON CLIs own stdout; engine progress is not payload.
+        c.execute("SET enable_progress_bar=false")
         directory = temp if temp is not None else os.environ.get("ASHARE_DUCKDB_TEMP_DIRECTORY")
         if directory is not None:
             c.execute("SET temp_directory=?", [str(directory)])

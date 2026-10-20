@@ -323,3 +323,106 @@ def import_archive(builder, root):
         builder.db.commit()
         immutable_json(checkpoint, result)
         return result
+
+
+def import_recovered_archive(builder, root):
+    """Import a frozen repair package without adopting it into its live archive."""
+    from ashare_data.financials import source_repair
+    from ashare_data.storage.financial_release import closed_batch, checked_path, immutable_json
+    root = Path(root).resolve()
+    with closed_batch(root):
+        manifest_path = root / "repair-manifest.json"
+        manifest = json.loads(manifest_path.read_text())
+        for entry in manifest.get("official", []):
+            checked_path(root, entry["index"]["path"])
+        manifest = source_repair.verify_inputs(root)
+        original = Path(manifest["official_source"]).resolve()
+        key = t.identity("recovered-official-batch", str(root), sha_file(manifest_path), builder.mapping)
+        checkpoint = builder.root / ("batch-" + key.split(":")[1] + ".json")
+        if checkpoint.exists():
+            return json.loads(checkpoint.read_text())
+        batch_id = new_batch(builder, key, dict(
+            kind="bounded_recovered_official_index", repair_root=str(root),
+            original_archive_closed=False, historical_pit_certified=False))
+        asset(builder, batch_id, manifest_path, "official_repair_manifest")
+        asset(builder, batch_id, original / "manifest.json", "official_batch",
+              manifest["source_manifest_sha256"]["official"])
+        buffer, files, states = defaultdict(list), [], Counter()
+        for entry in manifest["official"]:
+            path = checked_path(root, entry["index"]["path"])
+            asset(builder, batch_id, path, "recovered_official_index", entry["index"]["sha256"])
+            index = json.loads(gzip.decompress(path.read_bytes()))
+            require(index["schema"] == "ad.recovered-official-index.v1"
+                    and index["security"] == e.security(entry["symbol"])
+                    and index["sources"] == entry["source_receipts"],
+                    "FIN_SOURCE", "Recovered index identity or receipt inventory differs")
+            projection = t.Projection(instruments=builder.instruments, register_issuer=builder.issuer,
+                                      mapping_sha256=builder.mapping)
+            issuer = builder.issuer("cninfo", index["security"], None, dict(
+                kind="cninfo_recovered_index", source_issuer_key=index["issuer"]["orgId"]))
+            captures, payloads = {}, {}
+            for source, expected in index["sources"].items():
+                receipt_path = original / "receipts" / (source + ".json")
+                require(sha_file(receipt_path) == expected["receipt_sha256"],
+                        "FIN_SOURCE", "Recovered source receipt changed")
+                captures[source], _ = source_capture(builder, projection, original, source, batch_id, key)
+                receipt = verified_source(original, source)
+                require(receipt["sha256"] == expected["response_sha256"],
+                        "FIN_SOURCE", "Recovered response binding differs")
+                payloads[source] = json.loads(gzip.decompress((original / receipt["path"]).read_bytes()))
+                require(sha_file(receipt_path) == expected["receipt_sha256"],
+                        "FIN_SOURCE", "Recovered source receipt changed during import")
+            count = mapped = quarantined = 0
+            for item in index["announcements"]:
+                count += 1
+                source = item["index_receipt"]
+                payload = payloads[source]
+                matching = [row for row in (payload.get("announcements") or [])
+                            if isinstance(row, dict) and str(row.get("announcementId")) == item["announcement_id"]
+                            and row.get("secCode") == entry["symbol"][2:]
+                            and row.get("orgId") == index["issuer"]["orgId"]]
+                if (item["source_security"] != index["security"] or not matching
+                        or any(any(item.get(k) != v for k, v in report_identity(row).items())
+                               for row in matching)):
+                    projection.quarantine(dict(item, schema=index["schema"]), captures[source],
+                                          "recovered_announcement_does_not_match_source")
+                    quarantined += 1
+                    continue
+                disclosure(projection, issuer, item, captures[source])
+                mapped += 1
+            rejected = [(row, "related_code_continuity_unproven")
+                        for row in index["related_code_announcements"]]
+            rejected += [(row, "conflicting_recovered_announcement")
+                         for versions in index["conflicting_versions"].values() for row in versions]
+            rejected += [(row, "rejected_source_announcement:" + row["reason"])
+                         for row in index["quarantined_rows"]]
+            for item, reason in rejected:
+                source = item.get("index_receipt") or item.get("source", {}).get("receipt")
+                require(source in captures, "FIN_SOURCE", "Recovered rejected row lacks source evidence")
+                projection.quarantine(dict(item, schema=index["schema"]), captures[source], reason)
+                count += 1
+                quarantined += 1
+            state = "recovered_complete_query_set" if index["query_set_complete"] else "recovered_with_query_gaps"
+            states[state] += 1
+            projection.add(
+                "meta.financial_coverage", coverage_id=t.identity("coverage", key, entry["symbol"]),
+                batch_key=key, task_id=entry["symbol"], source="cninfo_recovered",
+                security=index["security"], source_state=state, input_rows=count, mapped_rows=mapped,
+                quarantined_rows=quarantined, coverage_json=t.text(dict(
+                    query_set_complete=index["query_set_complete"], query_gaps=entry["query_gaps"],
+                    related_code_records=entry["related_code_records"], full_archive=False,
+                    financial_fields_extracted=False, historical_pit_certified=False)))
+            for name, rows in projection.rows.items():
+                buffer[name].extend(rows)
+            if sum(len(rows) for rows in buffer.values()) >= builder.rows_per_shard:
+                files.extend(builder.flush(buffer, key, len(files)))
+                buffer.clear()
+                builder.db.commit()
+        if buffer:
+            files.extend(builder.flush(buffer, key, len(files)))
+        result = dict(batch_key=key, source_root=str(root), files=files, tasks=len(manifest["official"]),
+                      task_states=dict(states), receipt_inventory_sha256=t.identity(
+                          "recovered-sources", [entry["source_receipts"] for entry in manifest["official"]]))
+        builder.db.commit()
+        immutable_json(checkpoint, result)
+        return result
