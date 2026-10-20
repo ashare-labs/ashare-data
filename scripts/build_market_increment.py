@@ -12,6 +12,7 @@ import hashlib
 import json
 from pathlib import Path
 import sqlite3
+import shutil
 import time
 
 import pandas as pd
@@ -218,6 +219,14 @@ def build(a):
     c = connection(out / "spill", memory="1GB", threads=1)
     started = time.monotonic()
     for pos, item in enumerate(scopes):
+        if pos % 100 == 0:
+            assert shutil.disk_usage(root).free >= scope.get("free_reserve_bytes", 150 * 1024**3), (
+                "free-space reserve reached; retained completed batches"
+            )
+            used = sum(path.stat().st_size for path in root.rglob("*") if path.is_file())
+            assert used < scope.get("budget_bytes", 8 * 1024**3), (
+                "increment budget reached; retained completed batches"
+            )
         instrument = item["instrument_id"]
         security = item["security"]
         assert 0 < instrument < 10000, "batch allocation range requires an explicit new mapping"
