@@ -282,6 +282,19 @@ def report_identity(row):
     }
 
 
+def index_form(symbol, issuer, manifest, label, page=1, *, start=None, end=None):
+    """One shared request contract for collection and bounded recovery."""
+    return dict(
+        pageNum=page, pageSize=30, column="sse" if symbol.startswith("sh") else "szse",
+        plate="sh" if symbol.startswith("sh") else "sz", tabName="fulltext",
+        stock=symbol[2:] + "," + issuer["orgId"],
+        searchkey={"periodic": "", "correction": "更正", "revision": "修订"}[label],
+        secid="", category=CATEGORIES if label == "periodic" else "", trade="",
+        seDate=(start or manifest["target_start"]) + "~" + (end or manifest["target_end"]),
+        sortName="time", sortType="asc", isHLtitle="false",
+    )
+
+
 def index_security(client, symbol, manifest):
     root = client.root
     path = root / "indices" / (symbol + ".json.gz")
@@ -300,30 +313,11 @@ def index_security(client, symbol, manifest):
         raise ValueError("Official issuer identity missing or ambiguous")
     issuer = identities[0]
     found, evidence, queries = {}, ["identity-" + symbol], []
-    for label, category, keyword in (
-        ("periodic", CATEGORIES, ""),
-        ("correction", "", "更正"),
-        ("revision", "", "修订"),
-    ):
+    for label in ("periodic", "correction", "revision"):
         total, seen, pages = None, set(), 0
         source_rows, duplicate_dates = 0, set()
         for page in range(1, 201):
-            form = {
-                "pageNum": page,
-                "pageSize": 30,
-                "column": "sse" if symbol.startswith("sh") else "szse",
-                "plate": "sh" if symbol.startswith("sh") else "sz",
-                "tabName": "fulltext",
-                "stock": code + "," + issuer["orgId"],
-                "searchkey": keyword,
-                "secid": "",
-                "category": category,
-                "trade": "",
-                "seDate": manifest["target_start"] + "~" + manifest["target_end"],
-                "sortName": "time",
-                "sortType": "asc",
-                "isHLtitle": "false",
-            }
+            form = index_form(symbol, issuer, manifest, label, page)
             key = f"index-{symbol}-{label}-{page:03}"
             raw, receipt = client.fetch(key, ORIGIN + "/new/hisAnnouncement/query", form)
             payload = json.loads(raw)
@@ -455,9 +449,7 @@ def recover_pagination(client, symbol, manifest):
     start, end = (date.fromisoformat(manifest[k]) for k in ("target_start", "target_end"))
     if end < start:
         raise ValueError("Invalid recovery date bounds")
-    for label, category, keyword in (
-        ("periodic", CATEGORIES, ""), ("correction", "", "更正"), ("revision", "", "修订")
-    ):
+    for label in ("periodic", "correction", "revision"):
         pending, leaves, seen, nodes = [(start, end)], [], set(), 0
         while pending:
             if client.stopped():
@@ -467,13 +459,7 @@ def recover_pagination(client, symbol, manifest):
             if nodes > 511:
                 raise ValueError("Recovery date partition exceeds reviewed request cap")
             key = f"recovery-{symbol}-{label}-{a.isoformat()}-{b.isoformat()}"
-            form = dict(
-                pageNum=1, pageSize=30, column="sse" if symbol.startswith("sh") else "szse",
-                plate="sh" if symbol.startswith("sh") else "sz", tabName="fulltext",
-                stock=code + "," + issuer["orgId"], searchkey=keyword, secid="",
-                category=category, trade="", seDate=a.isoformat() + "~" + b.isoformat(),
-                sortName="time", sortType="asc", isHLtitle="false",
-            )
+            form = index_form(symbol, issuer, manifest, label, start=a.isoformat(), end=b.isoformat())
             raw, receipt = client.fetch(key, ORIGIN + "/new/hisAnnouncement/query", form)
             payload = json.loads(raw)
             count, more, rows = (
@@ -534,6 +520,154 @@ def recover_pagination(client, symbol, manifest):
     )
     atomic(client.root / "indices" / (symbol + ".json.gz"), gzip.compress(encoded(result), mtime=0))
     return result
+
+
+def capture_index_remainders(client, symbol, manifest):
+    """Capture missing original query pages; keep normalization/code checks separate."""
+    raw, _ = client.fetch(
+        "identity-" + symbol, ORIGIN + "/new/information/topSearch/query",
+        dict(keyWord=symbol[2:], maxNum=30),
+    )
+    identities = [
+        r for r in json.loads(raw)
+        if r.get("code") == symbol[2:] and r.get("category") == "A股"
+    ]
+    if len(identities) != 1:
+        raise ValueError("Official issuer identity missing or ambiguous")
+    terminals = []
+    for label in ("periodic", "correction", "revision"):
+        for page in range(1, 201):
+            raw, receipt = client.fetch(
+                f"index-{symbol}-{label}-{page:03}", ORIGIN + "/new/hisAnnouncement/query",
+                index_form(symbol, identities[0], manifest, label, page),
+            )
+            payload = json.loads(raw)
+            count, more, rows = (
+                payload.get("totalAnnouncement"), payload.get("hasMore"),
+                payload.get("announcements") or [],
+            )
+            if type(count) is not int or count < 0 or type(more) is not bool or not isinstance(rows, list):
+                raise ValueError("Malformed remainder pagination envelope")
+            if more and not rows:
+                raise ValueError("Empty remainder page claims more results")
+            if more is False:
+                terminals.append(dict(kind=label, terminal_page=page, observed_at=receipt["observed_at"]))
+                break
+        else:
+            raise ValueError("Index exceeds reviewed pagination cap")
+    # Reuse the hash-bound offline parser. It quarantines unknown identities and
+    # exposes drift, duplicates and listing-lifetime gaps without merging codes.
+    from ashare_data.financials.source_repair import recover_index
+    return terminals, recover_index(client.root, symbol)
+
+
+def run_index_remainders(root):
+    """Finite continuation of the original related-code failures under its lock."""
+    root = Path(root).resolve()
+    manifest = json.loads((root / "manifest.json").read_text())
+    scope_raw = (root / "scope.json").read_bytes()
+    if manifest["schema"] != SCHEMA or digest(scope_raw) != manifest["scope_sha256"]:
+        raise ValueError("Changed official batch identity")
+    output = root / "supplement" / "related-code-remainders-v1"
+    stop = {"value": False}
+    previous = {s: signal.signal(s, lambda *_: stop.update(value=True)) for s in (signal.SIGINT, signal.SIGTERM)}
+
+    def stopped():
+        return stop["value"] or (root / "STOP").exists()
+
+    try:
+        with (root / "writer.lock").open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            plan_path = output / "plan.json"
+            if not plan_path.exists():
+                selected, selection_evidence = [], {}
+                for symbol in json.loads(scope_raw)["symbols"]:
+                    status_raw = (root / "securities" / (symbol + ".json")).read_bytes()
+                    status = json.loads(status_raw)
+                    if status.get("reason") == "ValueError: Cross-issuer index row":
+                        selected.append(symbol)
+                        selection_evidence[symbol] = digest(status_raw)
+                immutable(plan_path, encoded(dict(
+                    source_manifest_sha256=digest((root / "manifest.json").read_bytes()),
+                    scope_sha256=manifest["scope_sha256"], symbols=selected,
+                    selection_evidence=selection_evidence,
+                    canonical_indices_modified=False, code_intervals_merged=False,
+                )))
+            plan = json.loads(plan_path.read_text())
+            if (plan["source_manifest_sha256"] != digest((root / "manifest.json").read_bytes())
+                    or plan["scope_sha256"] != manifest["scope_sha256"]):
+                raise ValueError("Changed remainder continuation plan")
+            if (len(set(plan["symbols"])) != len(plan["symbols"])
+                    or not set(plan["symbols"]) <= set(json.loads(scope_raw)["symbols"])):
+                raise ValueError("Remainder targets escaped the frozen scope")
+            for symbol in plan["symbols"]:
+                if digest((root / "securities" / (symbol + ".json")).read_bytes()) != plan["selection_evidence"][symbol]:
+                    raise ValueError("Remainder target status changed; review before continuing")
+            client = Client(root, stopped)
+            while not stopped():
+                deferred = False
+                for symbol in plan["symbols"]:
+                    if stopped():
+                        break
+                    status_path = output / (symbol + ".json")
+                    status = json.loads(status_path.read_text()) if status_path.exists() else {}
+                    if status.get("state") == "captured_with_explicit_identity_gaps":
+                        artifact = (root / status["recovered_index"]["path"]).resolve()
+                        if (not artifact.is_relative_to(output)
+                                or digest(artifact.read_bytes()) != status["recovered_index"]["sha256"]):
+                            raise ValueError("Captured remainder artifact changed")
+                    if status.get("state") in {"captured_with_explicit_identity_gaps", "source_exhausted", "parse_failed"}:
+                        continue
+                    try:
+                        terminals, recovered = capture_index_remainders(client, symbol, manifest)
+                        raw = gzip.compress(encoded(recovered), mtime=0)
+                        artifact = output / (symbol + ".json.gz")
+                        atomic(artifact, raw)
+                        status = dict(
+                            state="captured_with_explicit_identity_gaps", terminal_queries=terminals,
+                            recovered_index=dict(path=str(artifact.relative_to(root)), sha256=digest(raw)),
+                            exact_code_records=len(recovered["announcements"]),
+                            related_code_records=len(recovered["related_code_announcements"]),
+                            quarantined_rows=len(recovered["quarantined_rows"]),
+                            query_set_complete=recovered["query_set_complete"],
+                            issuer_continuity_proven=False, canonical_index_modified=False,
+                        )
+                    except Deferred as error:
+                        deferred = True
+                        status = dict(state="deferred", reason=str(error))
+                    except SourceExhausted as error:
+                        status = dict(state="source_exhausted", reason=str(error))
+                    except StopRequested:
+                        break
+                    except Exception as error:
+                        status = dict(state="parse_failed", reason=f"{type(error).__name__}: {error}"[:500])
+                    status.update(at=now(), symbol=symbol, pid=os.getpid(), requests_this_run=client.calls)
+                    atomic(status_path, encoded(status))
+                    atomic(output / "progress.json", encoded(status))
+                    print(json.dumps(status, ensure_ascii=False), flush=True)
+                    host = client.state.get("www.cninfo.com.cn", {})
+                    if host.get("blocked") or host.get("cooldown_until", 0) > time.time():
+                        deferred = True
+                        break
+                if not deferred or any(s.get("blocked") for s in client.state.values()):
+                    break
+                wake = max([time.time() + 30] + [s.get("cooldown_until", 0) for s in client.state.values()])
+                while time.time() < wake and not stopped():
+                    time.sleep(min(1, wake - time.time()))
+            states = Counter()
+            for symbol in plan["symbols"]:
+                path = output / (symbol + ".json")
+                states[json.loads(path.read_text())["state"] if path.exists() else "pending"] += 1
+            result = dict(
+                at=now(), pid=os.getpid(), states=dict(states), requests=client.calls,
+                stop_requested=stopped(), source_plan=str(plan_path),
+                source_restrictions=client.state, published_release_modified=False,
+            )
+            atomic(output / "completion.json", encoded(result))
+            return result
+    finally:
+        for sig, handler in previous.items():
+            signal.signal(sig, handler)
 
 
 def statement_cells(text, report):
@@ -963,7 +1097,7 @@ def run(root, extractor, max_codes=0, retry_parse_failed=False, recover_paging=F
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("prepare", "run", "audit", "replay"))
+    parser.add_argument("command", choices=("prepare", "run", "audit", "replay", "capture-remainders"))
     parser.add_argument("--root", required=True, type=Path)
     parser.add_argument("--source-batch", type=Path)
     parser.add_argument("--document-codes", type=int, default=120)
@@ -980,6 +1114,8 @@ def main():
             result = run(args.root, args.extractor, args.max_codes, args.retry_parse_failed, args.recover_pagination)
         elif args.command == "replay":
             result = replay(args.root, args.extractor)
+        elif args.command == "capture-remainders":
+            result = run_index_remainders(args.root)
         else:
             result = audit(args.root, True)
     print(json.dumps(result, ensure_ascii=False, indent=2))

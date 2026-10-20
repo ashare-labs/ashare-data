@@ -42,7 +42,9 @@ class Captured:
                 r for r in self.rows
                 if a <= o.report_identity(r)["published_date"] <= b
             ] if not form["searchkey"] else []
-            data = dict(totalAnnouncement=len(rows), hasMore=len(rows) > 30, announcements=rows[:30])
+            offset = (form["pageNum"] - 1) * 30
+            data = dict(totalAnnouncement=len(rows), hasMore=len(rows) > offset + 30,
+                        announcements=rows[offset:offset + 30])
         raw = e.encoded(data)
         self.cache[key] = raw, dict(sha256=e.digest(raw), observed_at=e.now())
         return self.cache[key]
@@ -139,3 +141,53 @@ def test_resume_only_resets_pagination_failures(tmp_path, monkeypatch):
     assert json.loads((tmp_path / "securities/sh600000.json").read_text())["state"] == "complete"
     assert related.read_bytes() == before
     assert not (tmp_path / "parse-reviews/sh600001.json").exists()
+
+
+def test_remainder_capture_finishes_queries_but_does_not_merge_codes(tmp_path, monkeypatch):
+    from ashare_data.financials import source_repair
+    client = Captured(tmp_path, [row(i, secCode="601975" if i > 10 else "600000") for i in range(65)])
+    recovered = dict(query_set_complete=False, issuer_continuity_proven=False)
+    monkeypatch.setattr(source_repair, "recover_index", lambda *a: recovered)
+    client.interrupt_at = 3
+    with pytest.raises(o.Deferred):
+        o.capture_index_remainders(client, "sh600000", MANIFEST)
+    before = dict(client.cache)
+    client.interrupt_at = None
+    terminals, result = o.capture_index_remainders(client, "sh600000", MANIFEST)
+    assert [t["terminal_page"] for t in terminals] == [3, 1, 1]
+    assert result == recovered
+    assert all(client.cache[key] == value for key, value in before.items())
+    assert not (tmp_path / "indices").exists()
+
+
+def test_remainder_runner_preserves_canonical_status_and_index(tmp_path, monkeypatch):
+    scope = dict(symbols=["sh600000", "sh600001"], document_symbols=[])
+    raw = e.encoded(scope)
+    e.immutable(tmp_path / "scope.json", raw)
+    e.immutable(tmp_path / "manifest.json", e.encoded(dict(schema=o.SCHEMA, scope_sha256=e.digest(raw))))
+    for symbol, state, reason in [
+        ("sh600000", "parse_failed", "ValueError: Cross-issuer index row"),
+        ("sh600001", "complete", None),
+    ]:
+        e.atomic(tmp_path / "securities" / (symbol + ".json"), e.encoded(dict(
+            state=state, symbol=symbol, reason=reason,
+        )))
+    old = {p: p.read_bytes() for p in (tmp_path / "securities").glob("*")}
+    client = Captured(tmp_path, [])
+    client.state = {}
+    monkeypatch.setattr(o, "Client", lambda *a: client)
+    calls = []
+
+    def capture(client, symbol, manifest):
+        calls.append(symbol)
+        return [], dict(announcements=[{}], related_code_announcements=[{}],
+                        quarantined_rows=[], query_set_complete=True)
+
+    monkeypatch.setattr(o, "capture_index_remainders", capture)
+    result = o.run_index_remainders(tmp_path)
+    assert result["states"] == {"captured_with_explicit_identity_gaps": 1}
+    assert all(p.read_bytes() == raw for p, raw in old.items())
+    assert calls == ["sh600000"]
+    assert not (tmp_path / "indices").exists()
+    o.run_index_remainders(tmp_path)
+    assert calls == ["sh600000"]
