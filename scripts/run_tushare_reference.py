@@ -29,6 +29,7 @@ def main():
     parser.add_argument("--root", required=True, type=Path)
     parser.add_argument("--baseline", required=True, type=Path)
     parser.add_argument("--factor-inventory", type=Path, help="Explicit small existing-factor coverage manifest; never a database scan")
+    parser.add_argument("--coalesce-dividends", action="store_true", help="Reuse one code response across pending dividend dates, with scoped fallbacks")
     parser.add_argument("--followup-spec", type=Path, help="This batch's finite offline supervisor plan")
     parser.add_argument("--followup-root", type=Path)
     credential = parser.add_mutually_exclusive_group()
@@ -85,6 +86,8 @@ def main():
                    "macos_keychain" if args.keychain else "local_hidden_prompt" if args.prompt_token else "existing_environment_reference"]
         if args.keychain:
             command.extend(("--keychain", "--keychain-helper", str(args.keychain_helper.resolve())))
+        if args.coalesce_dividends:
+            command.append("--coalesce-dividends")
         for flag, value in (("--factor-inventory", args.factor_inventory), ("--followup-spec", args.followup_spec),
                             ("--followup-root", args.followup_root)):
             if value is not None:
@@ -106,8 +109,10 @@ def main():
             raise RuntimeError("Another Tushare batch worker is active") from None
         start_followup(args.followup_spec, args.followup_root)
         prompted = args.credential_origin == "local_hidden_prompt" if args.credential_fd is not None else args.prompt_token
-        collect(root, args.baseline, transport, prompted, calendar, limits, capped, args.factor_inventory, args.ready_fd,
-                "macos_keychain" if args.keychain else None)
+        with ts.e.preserve_temporaries(args.coalesce_dividends):
+            collect(root, args.baseline, transport, prompted, calendar, limits, capped, args.factor_inventory, args.ready_fd,
+                    "macos_keychain" if args.keychain else None,
+                    **({"coalesce_dividends": True} if args.coalesce_dividends else {}))
     return 0
 
 
@@ -243,14 +248,17 @@ def wait_source(root, baseline, stopping, credential_saved=False):
     return False
 
 
-def collect(root, baseline, transport, prompted, calendar, limits, capped, factor_inventory=None, ready_fd=None, credential_origin=None):
+def collect(root, baseline, transport, prompted, calendar, limits, capped, factor_inventory=None, ready_fd=None, credential_origin=None, *, coalesce_dividends=False):
     stored = credential_origin == "macos_keychain"
+    modules = [("transport", ts), ("fundamentals", gaps.f), ("gap_planner", gaps)]
+    if coalesce_dividends:
+        from ashare_data.financials import tushare_dividends as dividends
+        modules.append(("dividend_coalescing", dividends))
     atomic(root / "worker.json", encoded({"pid": os.getpid(), "started_at": now(),
            "source": "tushare", "credential_source": credential_origin or ("local_hidden_prompt" if prompted else "existing_environment_reference"),
-           "credential_saved": stored, "requests_serial": True,
+           "credential_saved": stored, "requests_serial": True, "coalesce_dividends": coalesce_dividends,
            "credential_transfer": "scoped_macos_keychain" if stored else "anonymous_pipe" if ready_fd is not None else "direct_process_memory",
-           "code_sha256": {name: ts.e.digest(Path(module.__file__).read_bytes()) for name, module in
-                           (("transport", ts), ("fundamentals", gaps.f), ("gap_planner", gaps))},
+           "code_sha256": {name: ts.e.digest(Path(module.__file__).read_bytes()) for name, module in modules},
            "runner_sha256": ts.e.digest(Path(__file__).read_bytes())}))
     signal_ready(ready_fd)
     stopped = {"value": False}
@@ -265,7 +273,7 @@ def collect(root, baseline, transport, prompted, calendar, limits, capped, facto
     def stopping():
         return stopped["value"] or (root / "STOP").exists()
     roots, gap_roots, state, failure = [], [], "incomplete", None
-    def phase(batch, prepare=None):
+    def phase(batch, prepare=None, runner=None):
         if stopping():
             return False
         if prepare:
@@ -274,7 +282,9 @@ def collect(root, baseline, transport, prompted, calendar, limits, capped, facto
                "state": "collecting", "credential_saved": stored}))
         roots.append(batch)
         share_source_restrictions(batch, roots)
-        supervise(batch, lambda b: ts.run(b, transport, stop_paths=(root / "STOP",)), stop_paths=(root / "STOP",))
+        runner = runner or (lambda b: ts.run(b, transport, stop_paths=(root / "STOP",),
+                                            **({"retain_temporaries": True} if coalesce_dividends else {})))
+        supervise(batch, runner, stop_paths=(root / "STOP",))
         status = json.loads((batch / "supervisor.json").read_text())
         if status["state"] == "stopped":
             stopped["value"] = True
@@ -300,6 +310,19 @@ def collect(root, baseline, transport, prompted, calendar, limits, capped, facto
             plan = json.loads((target / "gap-plan.json").read_text())
             if ts.e.digest(ts.e.encoded(plan)) != manifest["gap_plan_sha256"]:
                 raise ValueError("Frozen gap plan changed")
+        if coalesce_dividends:
+            from ashare_data.financials import tushare_dividends as dividends
+            capture = root / "dividend-coalesced"
+            dividends.prepare(capture, target)
+            dividends.apply(capture)  # Reuse captured responses before another request.
+            share_source_restrictions(capture, [target, *roots])
+            def collect_dividends(batch):
+                result = ts.run(batch, transport, max_jobs=50, stop_paths=(root / "STOP",), retain_temporaries=True)
+                dividends.apply(batch)  # Source writer has released its lock at this boundary.
+                return result
+            if not phase(capture, runner=collect_dividends):
+                state = "stopped_or_source_blocked"
+                return
         for depth in range(18):  # More than enough to bisect 2010-present into single days.
             if depth:
                 next_root = root / ("fundamentals-split-" + str(depth))

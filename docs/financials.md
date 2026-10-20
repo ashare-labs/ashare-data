@@ -537,6 +537,17 @@ Tushare再投资因子与Sina hfq不是可直接衔接的同一序列；缺日�
 
 ### 运行中监督、缓存回放和来源交接
 
+`scripts/run_tushare_reference.py --coalesce-dividends` 可在原采集器释放写锁后继续同一批次。
+它保留冻结任务清单和已有成功/已捕获回执，把同一证券的多个待查询分红日期合并为一次字段并集请求。
+`dividend-coalesced` 分区保存真实请求、完整返回版本及原任务映射；验证证券、字段、日期和原事件锚点后，
+在原任务下写入明确标注 `source_reuse` 的本地投影回执。原始响应以硬链接共用，日期任务不伪造网络调用。
+返回达到2,000行、声明 `has_more`、字段不足或事件未匹配时保留原日期请求。
+日期、登记日、税前现金均匹配且其他非空锚点不冲突时，可复用该日期的查询结果；
+源送转字段为null不会补成0，严格跨源事件配对仍返回未解决，并记录 `unresolved_event_bindings`。
+同日多版本全部保留，范围外新事件也保留在独立源分区；不会通过选择最新一行消除歧义。
+每50次源请求后的写锁边界应用复用结果，`reuse-summary.json` 区分已避免的日期请求、真实网络尝试及净减少量。
+续跑先复用成功响应，保留失败尝试和回执快照；该模式保留失败临时文件，不自动清除既有临时文件。
+
 `scripts/watch_reference_expansion.py --spec PLAN.json --root FOLLOWUP_ROOT` 只读取显式批次，
 不读取凭据、不请求网络、不重启采集器。每30秒检查写锁和源状态；旧的supervisor或worker-exit
 必须与当前progress的PID和时点相符，不能据旧结束文件改在途回执。
@@ -579,12 +590,13 @@ Tushare再投资因子与Sina hfq不是可直接衔接的同一序列；缺日�
 | 逻辑表/接口 | 已有字段与必须保持的键 | 接入端需明确的部分 |
 | --- | --- | --- |
 | `meta.source_assets` / `meta.ingest_batches` | 原响应SHA、字节数、源定位、请求批次、捕获时间、parser/mapping摘要 | 复用现有asset/batch ID分配，外部原件原位引用及恢复策略 |
-| `reference.security_bindings` | 源代码、交易所、有效区间、身份审核证据、目标release摘要 | 接受哪个冻结instrument ID映射；未核实换码的逐项状态，不能按同名并主体 |
-| `financial.report_versions` | 来源、官方公告ID（若有）、源版本/投影摘要、report_type、报告期、修订标记 | 官方报告与供应商投影的独立版本键；不得把未知报告ID补成官方ID |
-| `financial.extractions` | report_version、parser_sha256、mapping_sha256、抽取版本 | 同原文重新解析产生新抽取版本；不改来源版本或旧事实 |
-| `financial.contexts` | report_version、extraction_version、context_id；主体、合并口径、instant或duration、YTD/单季、币种、单位、维度 | context主键及维度字典；缺单位仍未知，不默认为元 |
-| `financial.observations` | context、原字段名/标题、canonical_field、source_locator、ordinal、原十进制文本、value/state | 数值类型和唯一键，原始精度的往返对账；不折叠不同投影/修订/可比列 |
-| `financial.visibility` | 公告日、实际公告日、精度、captured_at、历史可见证据、已知更正范围 | 日频可见模式与精确时刻模式；未知时刻不得取采集时间替代 |
+| 既有身份registry / `reference.security_bindings` | issuer、instrument、来源主体/代码、关系角色、有效区间、审核证据、registry/release摘要 | 财报绑定issuer，证券查询经有证据的issuer–instrument关系；不按代码或名称推定公司连续性 |
+| `financial.report_versions` | issuer、来源报告/投影身份、内容摘要、report_type、报告期、源版本 | 表示一版内容；官方原文与供应商投影独立，披露事件和解析运行另有身份 |
+| 披露事件 / `financial.visibility` | 事件ID、issuer、渠道、原生公告ID、内容版本引用、公告日期/时刻及精度、证据状态 | 复用等价事件登记，保留一次内容的多次披露；捕获时钟只属于回执，不冒充公开可见时间 |
+| `financial.extractions` / 既有批次登记 | 内容版本、解析运行/批次、parser_sha256、mapping_sha256、schema/输出摘要、抽取版本 | 复用data_batches和batch_inputs；重新解析不产生新的报告内容或披露事件 |
+| `financial.contexts` | report_version、extraction_version、规范化context_id；issuer、合并口径、instant或duration、YTD/单季、币种、单位、维度 | context由版本化规则生成，原始上下文另外保留；可内联并以视图暴露，不必新建物理表 |
+| `financial.observations` | context、原字段名/标题、canonical_field、source_locator、ordinal、原值、decimal、单位/换算证据、缺失状态 | 现有唯一键只防同一抽取输出重复；不能充当跨来源、跨修订的经济事实去重键 |
+| 来源/修订关系行 | 稳定link_id、明确端点、关系类型、字段/期间/issuer范围、证据、审核与生效边界 | 优先复用等价关系登记；影响PIT或替代选择的关系必须能逐行引用、查验，不能只放JSON数组 |
 | `reference.exchange_calendar` / `reference.price_limits` | 交易所/证券、日期、来源版本、开市标记/原上下限价 | 来源优先级和缺口合并；缺限价不推出无限价或停牌，保留原日线状态 |
 | `corporate_action.events` / `reference.share_observations` / `reference.factor_observations` | 事件日期角色、税前/税后、股份基数、来源精度、因子basis | 明确事件配对键；Tushare与Sina因子分系列，禁止拼接或猜补 |
 | `financial.derived_indicators` | 公式及版本、输入事实ID、报告期、单位、可见依据 | 仅已核实基础科目派生的常用指标；缺输入、口径冲突或单位未知逐项返回 |
@@ -595,3 +607,108 @@ Tushare再投资因子与Sina hfq不是可直接衔接的同一序列；缺日�
 不能仅因API成功就让旧读者把未支持schema作为已有能力。正式接入验证须覆盖原件→规范字段→
 目标表→公共读者的键/值/单位/版本对应及缺口数量；旧行情release和现有账户测试应保持可重现。
 只处理已完成或已明确封闭的批次；仍在写入的分区不能冒充不可变全范围交付。
+
+### 公司、版本和事实身份的审阅约束
+
+这些是上述接入接口的语义约束，尚未建立正式表，也不以“必须新增几张表”为设计目标。
+来源资产及回执复用 `source_assets`，采集/解析运行及输入复用 `data_batches`、`batch_inputs`，
+证券ID、代码和已核别名复用 `release_instruments`、`release_identifiers`、`source_aliases`。
+当前这些证券登记不等于已经有完整issuer登记；若缺公司节点或带时间的发行关系，只在同一registry
+内补最少的类型和关系能力，不能另造一套公司主数据或把instrument_id改称issuer_id。
+
+报告内容直接归属issuer；公司与A股、H股、旧代码、新代码或其他instrument通过registry关系关联。
+证券入口需要核对关系角色、有效区间、证据及查询可见边界，才可选择公司的报表。
+同公司多证券不会复制财报，代码复用、借壳或同名也不会自动合并公司；绑定未定时保留来源主体，
+证券计算入口拒绝未经核实的关联。现有按security读取的有界账本继续遵守原契约，不冒充已完成此迁移。
+
+内容版本、披露事件和解析运行各有身份。一版内容可在多个渠道或日期披露；同一公告也可带多个附件。
+重复抓取增加捕获回执，不增加内容版本或披露事件；同原文换解析器只增加解析运行/抽取版本。
+内容身份不含抓取时钟或parser，披露事件保留原生ID、渠道、日期精度和证据，解析运行绑定输入内容、
+parser/mapping/schema及输出摘要。供应商字段投影是独立源版本；缺官方公告ID时不能编造等价关系。
+
+报告到原文/回执/披露事件的source links，以及更正到前后观察的revision links，须提供稳定可引用的关系行。
+复用等价通用关系表或受同等约束的关系数据集即可，无需按财报供应商复制表；仅从未约束的JSON数组
+临时展开不算完成这项要求。端点类型与存在性、重复关系、字段/期间/主体范围、替代时间与无环性必须验证。
+`replaces`、范围未定更正和已核无关更正不能混为一种关系；未知范围继续阻断相应PIT选择。
+跨SQLite与Parquet的引用由发布前校验器及固定清单检查，不宣称存在跨引擎SQL外键。
+
+`(report_version_id, extraction_version_id, context_id, source_field, source_locator, source_ordinal)`
+是**抽取输出唯一键**：它防止同一输出被重复导入，允许同一经济事项出现在多个原文、比较列和修订中。
+issuer＋字段＋期间也不能单独去重。经济事实匹配还需合并口径、期间类型、YTD/单季、币种、单位、
+维度和栏目角色，并受版本及披露关系约束；匹配候选组不是唯一性证明。已确认同义或替代关系通过关系行表达，
+不删除原观察，不用“保留最新行”代替版本选择。
+
+context由版本化规范规则确定生成，包含issuer绑定、报表类型、范围、期间类型及起止日、basis、栏目角色、
+币种/单位状态和规范维度。维度键有稳定顺序、类型和重复键检查；未知、缺失及不适用显式区分。
+同一规范输入产生同一context_id；同一复合context键出现不同属性必须拒绝。保留原始上下文文本，
+不能从标题相似推定相同口径；内联列加受校验的contexts视图可满足此契约。
+
+观察分别保存 `raw_value_text`、精确 `value_decimal_text`、原单位/规范单位及换算证据、
+`canonical_value_decimal_text`、值状态与单位状态。原空字符串、缺字段、null、解析失败、零各自保留；
+未知单位不抹掉可解析的源decimal，也不产生规范数值。不默认元、不转DOUBLE、不以0代缺失；
+规范换算必须保留比例与精度并通过无损往返核对。派生常用指标仍只消费口径相容且有可见依据的输入。
+
+## 失败缓存的离线恢复
+
+`scripts/repair_source_cache.py prepare` 接收独立新 `--root`、原 `--financial-batch`、
+`--official-batch`，以及显式重复的 `--financial-task` 和 `--official-symbol`。
+只读取已有响应及其回执，校验请求、范围和摘要；不创建客户端、不下载、不改活动源批次。
+财务原文采用同盘硬链接，规范结果可直接由 `SnapshotReader` 读取。
+`--financial-task` 也接受 `sina_structure` 任务。股本页中带明确“万股”单位的负数
+单元保留原字符串、表格位置和 `negative_source_share_count` 原因，该规范字段及其
+精度为未知；同列其他有效字段、其他历史列继续解析。源页标为 `partial_source`，
+`unparsed_records` 和逐列 `field_gaps` 明示缺口。既不取绝对值或置零，也不从
+总股本、限售股、高管股或另一接口回填这一源字段。单位不明、表格错列和身份不符
+仍然拒绝解析；此前成功的正常列输出保持不变。
+
+`scripts/audit_share_structure.py --batch STRUCTURE --float-batch PUBLIC --output NEW_JSON`
+只读诊断已捕获失败页，可用带时区的 `--captured-before` 固定某次检查范围。
+按“总股本等于限售股”“股份分类扣减关系”“尚不能解释”分组，在各显示值半个
+最小单位之和内区分舍入误差，逐项绑定原回执及响应摘要。已有流通股序列只按完全
+相同日期作独立记录比较；同一供应商的两个接口不算独立供应商确认，算式吻合也不
+证明高管股与限售股互斥。上市前记录仍受既有证券存续期和PIT读取约束。
+`source_repair.recovered_announcements(root, security=...)` 按公告实际返回代码提供恢复索引，
+同时返回每类查询的缺口。共享机构ID不证明上市历史连续；新旧代码不自动合并。
+
+总数漂移或缺页只使对应查询不完整，合法的已捕获记录仍可使用。重复公告保留每次来源位置；
+同日跨页重复可由现有主查询和日期查询的并集核对，只有稳定总数、连续页及去重后数量均吻合才闭合。
+同ID内容冲突或不符主体的行只隔离受影响记录。恢复索引完整也不证明历史修订齐全或精确PIT可见性。
+
+发布采用独立暂存目录和原子改名；`--retain-temporaries` 保留失败暂存和临时文件供审查，
+默认失败自动清理。`source-receipts/` 封存被修复的完整原回执，接纳后仍可核验原始失败。
+`repair-manifest.json` 绑定原批次、回执、原文、
+解析器和产物摘要。`apply-idle` 仅在取得原批次独占写锁后幂等接纳；不完整官方索引留在恢复批次，
+不以文件存在冒充原批次完成。现有有限跟进计划可在对应任务配置 `cache_repair`（`root` 与
+`manifest_sha256`），等原采集自然结束后接纳完整修复并核验；不增加采集进程或常驻服务。
+
+### 负股本单元的显式点值恢复
+
+`scripts/review_share_structure.py prepare --root NEW_REVIEW --structure-batch STRUCTURE --float-batch PUBLIC`
+只读已经捕获的股本页、流通股序列及冻结证券范围。清单逐字段区分上市前、代码存续期内和身份未确定；
+源代码上市时间及已知换码事件用于此分类，不声称上市前同名主体或历史主板成员资格已经核定。
+原表负值、规范字段未知及既有回执保持不变，新清单单独绑定两份回执、原响应和具体源观察。
+
+部分新浪股本页同一列内的图表XML显式给出正的流通A股值。恢复只解析原HTML中的惰性属性，
+不运行Flash或发起请求。param与embed必须一致，证券及日期链接必须吻合；其他图中分类须与
+表格明确的万股单位及原值对应，全部图中分类之和须与总股本在显示舍入界内相符。
+图中流通A股还必须与另一已采接口同日、唯一记录的值精确一致，才能建立点值恢复关系。
+不能由总股本减限售股、高管股或A/H股混合分类计算替代值，也不推断缺失的零值或日期。
+
+```python
+from ashare_data.financials.share_resolution import ShareResolutionReader
+
+reader = ShareResolutionReader("NEW_REVIEW")
+value = reader.read("001226.XSHE", "2026-06-30", purpose="listed_security",
+                    as_of="2026-10-20T00:00:00+00:00")
+```
+
+该入口显式返回已采流通股接口的值及图表核对证据；每次重验两份源回执、源观察、日期和图中证据。
+`as_of` 必须晚于两次捕获且满足既有公告、代码存续期约束；不允许历史PIT、跨日期前填或隐式换源。
+同一供应商的多种表示不等于独立交易所历史确认。没有同日记录、图中分类不能闭合或单位不明时，
+保留未解决点；这些点的流通市值、换手率分母及流通权重仍不可由此恢复。其他有效字段按各自读取契约使用。
+`purpose="source_audit"` 可查看原负值和恢复关系，但不授予计算使用权。此清单不是正式表或全历史覆盖声明。
+
+覆盖报告必须同时列出目标窗全部负值、上市前、上市后已恢复、上市后未解决和身份未确定，
+并区分字段数、不同证券日期数与不同证券数。例如本轮862个负值字段中，上市后583个＝恢复535个＋
+未解决48个，另有上市前279个；本轮未恢复合计327个。原表负值字段仍全部保留为未知，
+535仅表示经显式恢复入口可用的同日源点值，不能把48写成全体未解决总数或把原源覆盖改成全完整。

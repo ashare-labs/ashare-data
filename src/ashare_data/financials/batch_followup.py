@@ -185,7 +185,7 @@ def official_integrity(root):
                              if read(p).get("state") != "complete"})
 
 
-def follow_batch(root, kind, *, handoff_record=None):
+def follow_batch(root, kind, *, handoff_record=None, cache_repair=None):
     """No source request, no restart, no all-captured derivative rewrite."""
     root = Path(root).resolve()
     if (root / "STOP").exists() and not (handoff_record and owned_handoff(root, handoff_record)):
@@ -196,9 +196,17 @@ def follow_batch(root, kind, *, handoff_record=None):
         ready = official_ready(root) if kind == "official" else generic_ready(root, handoff_record=handoff_record)
         if not ready:
             return {"state": "waiting_for_natural_source_boundary"}
+        repaired = None
+        if cache_repair:
+            from ashare_data.financials.source_repair import apply_idle
+            repair_root = Path(cache_repair["root"])
+            if e.digest((repair_root / "repair-manifest.json").read_bytes()) != cache_repair["manifest_sha256"]:
+                raise ValueError("Cache repair manifest changed before adoption")
+            repaired = apply_idle(repair_root, root, _writer_owned=True)
         if kind == "official":
             result = official_integrity(root)
-            return dict(state="verified_with_explicit_gaps" if not result["integrity_errors"] else "integrity_failed", result=result)
+            return dict(state="verified_with_explicit_gaps" if not result["integrity_errors"] else "integrity_failed",
+                        cache_repair=repaired, result=result)
         before = e.audit(root)
         if before["pending_or_retryable"] and not (handoff_record and owned_handoff(root, handoff_record)):
             return {"state": "waiting_for_pending_requests"}
@@ -210,6 +218,7 @@ def follow_batch(root, kind, *, handoff_record=None):
         return {"state": "writer_active"}
     return dict(state="verified_with_explicit_gaps" if not result["integrity_errors"] else "integrity_failed",
                 network_requests=0, before=before, result=result,
+                cache_repair=repaired,
                 legacy_pending_preserved=bool(result["pending_or_retryable"]))
 
 
@@ -257,7 +266,8 @@ def tick(spec, state, output):
         if prior.get("state") in TERMINAL_FOLLOWUP:
             continue
         try:
-            current = follow_batch(job["root"], job["kind"], handoff_record=handoff if job["kind"] == "limits" else None)
+            current = follow_batch(job["root"], job["kind"], handoff_record=handoff if job["kind"] == "limits" else None,
+                                   cache_repair=job.get("cache_repair"))
         except Exception as error:
             current = dict(state="followup_failed", error=f"{type(error).__name__}: {error}"[:500])
         if spec.get("finish_policy") == "current_batch_only" and current["state"] in {"waiting_for_natural_source_boundary", "waiting_for_pending_requests"}:

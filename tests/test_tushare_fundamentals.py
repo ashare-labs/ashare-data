@@ -253,7 +253,8 @@ def test_reconciliation_aggregates_split_windows_and_keeps_units_unverified(exis
     assert len(ledger["leaf_receipts"]) == 2 and not list((tmp_path / "reconcile").glob("*.tmp"))
 
 
-def test_finite_runner_collects_all_authorized_stages_and_resumes_without_requests(existing, tmp_path, monkeypatch):
+@pytest.mark.parametrize("coalesce", [False, True])
+def test_finite_runner_collects_all_authorized_stages_and_resumes_without_requests(existing, tmp_path, monkeypatch, coalesce):
     import importlib.util
     from pathlib import Path
     scripts = Path(__file__).parents[1] / "scripts"
@@ -281,12 +282,13 @@ def test_finite_runner_collects_all_authorized_stages_and_resumes_without_reques
             row.update({k: "10.00" for k in f.METRICS[api]})
             return 200, payload([row]), {}
         return 200, payload([]), {}
-    runner.collect(root, baseline, fetch, False, calendar, limits, capped)
+    runner.collect(root, baseline, fetch, False, calendar, limits, capped, coalesce_dividends=coalesce)
     completion = json.loads((root / "completion.json").read_text())
     assert completion["state"] == "source_pass_finished_with_explicit_gaps"
     assert {"income", "balancesheet", "cashflow", "dividend"} <= set(calls)
     assert completion["reconciliation"]["records"] > 0 and not completion["database_imported"]
-    runner.collect(root, baseline, lambda _: pytest.fail("Completed task fetched on resume"), False, calendar, limits, capped)
+    runner.collect(root, baseline, lambda _: pytest.fail("Completed task fetched on resume"), False, calendar, limits, capped,
+                   coalesce_dividends=coalesce)
     assert not list(root.rglob("*.tmp"))
 
 

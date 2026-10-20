@@ -5,6 +5,10 @@ never promoted into FinancialLedger's official, historically visible reports.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
+from contextvars import ContextVar
+from uuid import uuid4
+
 import argparse
 import calendar
 from collections import Counter, defaultdict
@@ -65,11 +69,24 @@ def digest(raw):
     return hashlib.sha256(raw).hexdigest()
 
 
+PRESERVE_TEMPORARIES = ContextVar("expansion_preserve_temporaries", default=False)
+
+
+@contextmanager
+def preserve_temporaries(enabled=True):
+    token = PRESERVE_TEMPORARIES.set(enabled)
+    try:
+        yield
+    finally:
+        PRESERVE_TEMPORARIES.reset(token)
+
+
 def atomic(path, raw):
     """Same-directory atomic replace, cleaning the temporary on every outcome."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    temp = path.with_name(path.name + ".tmp")
+    retained = PRESERVE_TEMPORARIES.get()
+    temp = path.with_name(path.name + ("." + uuid4().hex if retained else "") + ".tmp")
     try:
         with temp.open("wb") as stream:
             stream.write(raw)
@@ -77,7 +94,8 @@ def atomic(path, raw):
             os.fsync(stream.fileno())
         os.replace(temp, path)
     finally:
-        temp.unlink(missing_ok=True)
+        if not retained:
+            temp.unlink(missing_ok=True)
 
 
 def immutable(path, raw):
@@ -238,6 +256,8 @@ def parse_reference(raw, task, start, end):
         for item in parsed.get(category, []):
             values = item.get("fields", {})
             quality = []
+            if item.get("field_gaps"):
+                quality.append("source_share_fields_quarantined")
             if category == "shares" and values.get("total_shares") is not None:
                 total = Decimal(values["total_shares"])
                 components = [values.get(k) for k in ("float_a_shares", "float_b_shares", "float_h_shares")]
@@ -524,7 +544,7 @@ def load_batch(root):
 
 
 def run(root, max_jobs=0, interval=2.0, *, fetcher=None, normalizer=None, adaptive=False,
-        authenticated=False, minimum_interval=2.0, stop_paths=()):
+        authenticated=False, minimum_interval=2.0, stop_paths=(), retain_temporaries=False):
     from ashare_data.financials import http_backoff
     fetcher = fetcher or fetch
     normalizer = normalizer or normalize_saved
@@ -549,9 +569,9 @@ def run(root, max_jobs=0, interval=2.0, *, fetcher=None, normalizer=None, adapti
             for sub in ("receipts", "raw", "normalized"):
                 folder = root / sub
                 folder.mkdir(exist_ok=True)
-                for path in folder.glob("*.tmp"):
+                for path in (() if retain_temporaries else folder.glob("*.tmp")):
                     path.unlink()
-            for path in root.glob("*.tmp"):
+            for path in (() if retain_temporaries else root.glob("*.tmp")):
                 path.unlink()
             state_path = root / "source-state.json"
             hosts = json.loads(state_path.read_text()) if state_path.exists() else {}
