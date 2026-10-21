@@ -2,7 +2,7 @@
 
 SQL exposes retained source observations; calculation requires an explicit mode,
 field, source and cutoff. No source priority, capture-time revision ordering,
-unit guessing, filling or cross-code propagation.
+unit guessing or filling. Reviewed source aliases are explicitly release-bound.
 """
 
 from datetime import datetime, timedelta, timezone
@@ -79,8 +79,9 @@ class FinancialTables:
         from ashare_data.financials.unit_resolution import UnitCandidate
         return UnitCandidate(root, expected_sha256=expected_sha256).bind(self)
 
-    def sql(self, *, market_tables=(), securities=None):
-        c = self.release.sql(tables=market_tables, securities=securities)
+    def sql(self, *, market_tables=(), securities=None, include_market_evidence=True):
+        c = self.release.sql(tables=market_tables, securities=securities,
+                             include_market_evidence=include_market_evidence)
         try:
             verify = self._candidate_object if self.candidate else self.release.verify
             table_views(c, self.files, verify)
@@ -102,6 +103,11 @@ class FinancialTables:
               WHERE l.relation='captured_in' AND l.to_type='capture' GROUP BY ALL""")
             if getattr(self, "_unit_candidate", None):
                 self._unit_candidate.install(c)
+            coverage = self.release.manifest.get('reference_coverage_resolution')
+            if coverage and not self.candidate:
+                path = self.release.verify(coverage['rows'])
+                c.read_parquet(str(path)).create_view('_reference_coverage_rows')
+                c.execute('CREATE OR REPLACE VIEW quality.reference_coverage AS SELECT * FROM _reference_coverage_rows')
             if "bars_1d" in market_tables:
                 names = {r[0] for r in c.execute("DESCRIBE market.bars_1d").fetchall()}
                 if {"tradestatus", "is_st"} <= names:
@@ -127,7 +133,7 @@ class FinancialTables:
                 "FIN_MODE", "Choose an explicit supported financial query mode")
         cutoff = timestamp(as_of)
         require(security in self.release.identifiers, "FIN_SECURITY", "Unknown frozen security identifier")
-        c = self.sql()
+        c = self.sql(include_market_evidence=False)
         try:
             table = "financial.unit_resolved_observations" if (
                 source_selector and getattr(self, "_unit_candidate", None)) else "financial.observations"
@@ -283,6 +289,13 @@ class FinancialTables:
                 result.update(value=format(100 * Decimal(inputs[0]["value"]) / Decimal(inputs[1]["value"]), "f"), status="ok")
         return result
 
+    def reference_coverage(self, *, security=None, day=None):
+        from ashare_data.storage import reference_coverage
+        result = dict(self.receipt(), coverage=reference_coverage.summary(self.release))
+        if security is not None or day is not None:
+            result['rows'] = reference_coverage.rows(self.release, security=security, day=day)
+        return result
+
     def reference_point(self, family, day, *, source, as_of, security=None, exchange=None, field=None):
         """Exact captured-source point; never daily fill or historical availability."""
         kinds = {
@@ -306,7 +319,18 @@ class FinancialTables:
             require(security in self.release.identifiers and exchange is None,
                     "FIN_REFERENCE", "Reference point requires one frozen security")
             condition, scope = "r.instrument_id=? AND r.security=?", [self.release.identifiers[security], security]
-        c = self.sql()
+        alias_ids = []
+        if family == "price_limit":
+            from ashare_data.storage.reference_coverage import rows as coverage_rows
+            evidence = coverage_rows(self.release, security=security, day=day)
+            for item in evidence:
+                if item['disposition'] == 'covered_identity_alias':
+                    alias_ids.extend(json.loads(item['limit_observation_ids']))
+            if alias_ids:
+                placeholders = ','.join('?' for _ in alias_ids)
+                condition = f"r.instrument_id=? AND (r.security=? OR r.observation_id IN ({placeholders}))"
+                scope.extend(alias_ids)
+        c = self.sql(include_market_evidence=False)
         try:
             key = t.KEYS[table]
             rows = c.execute(f"""SELECT r.*,ct.first_captured_at FROM {table} r
@@ -371,7 +395,8 @@ class FinancialTables:
             result = dict(self.receipt(), family=family, day=day, source=source, security=security,
                           exchange=exchange, field=field, as_of=as_of, value=None,
                           status="missing", reasons=sorted(reasons), carry_forward_authorized=False,
-                          time_basis="captured_source_point_not_historical_public_availability")
+                          time_basis="captured_source_point_not_historical_public_availability",
+                          reviewed_alias_observation_ids=alias_ids)
             if len(distinct) == 1:
                 value, unit, basis = next(iter(distinct))
                 result.update(value=value, unit=unit, status="ok",
@@ -415,6 +440,17 @@ def main(argv=None):
         if command == "source-query":
             query.add_argument("--statement", required=True)
             query.add_argument("--title", required=True)
+    coverage = sub.add_parser("reference-coverage")
+    coverage.add_argument("--security")
+    coverage.add_argument("--day")
+    reference = sub.add_parser("reference-query")
+    reference.add_argument("--family", required=True)
+    reference.add_argument("--day", required=True)
+    reference.add_argument("--source", required=True)
+    reference.add_argument("--as-of", required=True)
+    reference.add_argument("--security")
+    reference.add_argument("--exchange")
+    reference.add_argument("--field")
     publish = sub.add_parser("publish-units")
     publish.add_argument("--unit-candidate", required=True, type=Path)
     publish.add_argument("--candidate-sha256", required=True)
@@ -428,6 +464,11 @@ def main(argv=None):
                         official_repairs=args.official_repair, stopped_batches=args.stopped_batch)
         print(json.dumps({"candidate_id": value["candidate_id"], "published": False,
                           "validation": value["validation"]}, ensure_ascii=False))
+    elif args.action == "reference-coverage":
+        print(json.dumps(FinancialTables(parent).reference_coverage(security=args.security, day=args.day), ensure_ascii=False))
+    elif args.action == "reference-query":
+        print(json.dumps(FinancialTables(parent).reference_point(args.family, args.day, source=args.source,
+            as_of=args.as_of, security=args.security, exchange=args.exchange, field=args.field), ensure_ascii=False))
     elif args.action == "publish-units":
         from ashare_data.storage.unit_publication import compose
         value = compose(parent, args.unit_candidate, expected_sha256=args.candidate_sha256,

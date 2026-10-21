@@ -170,14 +170,48 @@ def calendar_rows(raw, task):
 
 
 def active_codes(universe, day):
-    return {r["symbol"][2:] + (".SH" if r["symbol"].startswith("sh") else ".SZ")
-            for r in universe["instruments"] if r["ipo"] <= day and (not r["out"] or day < r["out"])}
+    """Use listing range AND separately frozen trading-code validity, if known."""
+    # New collection plans also honor the already frozen source code-change evidence.
+    starts, ends = {}, {}
+    for event in universe.get('code_events', []):
+        if not event.get('receipt') or not event.get('body'):
+            continue
+        body = json.loads(event['body'])
+        if any(body.get(k) != event.get(k) for k in ('old_symbol','new_symbol','effective_date','receipt')):
+            raise ValueError('Frozen code-event evidence differs')
+        starts[event['new_symbol']] = event['effective_date']
+        ends[event['old_symbol']] = event['effective_date']
+    return {r['symbol'][2:] + ('.SH' if r['symbol'].startswith('sh') else '.SZ')
+            for r in universe['instruments']
+            if r['ipo'] <= day and (not r['out'] or day < r['out'])
+            and (not (r.get('code_valid_from') or starts.get(r['symbol'])) or (r.get('code_valid_from') or starts[r['symbol']]) <= day)
+            and (not (r.get('code_valid_to') or ends.get(r['symbol'])) or day < (r.get('code_valid_to') or ends[r['symbol']]))}
+
+
+def with_identifier_periods(universe, release):
+    """Freeze exchange-code intervals without confusing them with source aliases."""
+    from copy import deepcopy
+    value = deepcopy(universe)
+    with release.metadata() as db:
+        intervals = {row[0]: row[1:] for row in db.execute(
+            'SELECT security,valid_from,valid_to,validity_precision FROM release_identifiers')}
+    for item in value['instruments']:
+        security = e.security(item['symbol'])
+        if security in intervals:
+            start, end, precision = intervals[security]
+            item.update(code_valid_from=start, code_valid_to=end, code_validity_precision=precision)
+    value['identifier_release'] = release.receipt()
+    return value
 
 
 def limit_rows(raw, task, universe):
     _, params = request_identity(task["url"])
     day = e.day(params["trade_date"])
     expected = active_codes(universe, day)
+    # Historical observations may be backfilled under a newer source file/code.
+    # Keep those source observations while using trading-code periods as denominator.
+    source_targets = {r['symbol'][2:] + ('.SH' if r['symbol'].startswith('sh') else '.SZ')
+                      for r in universe['instruments'] if r['ipo'] <= day and (not r['out'] or day < r['out'])}
     if params.get("ts_code"):
         expected &= {params["ts_code"]}
     source, seen, rows = table(raw), set(), []
@@ -186,7 +220,7 @@ def limit_rows(raw, task, universe):
         if e.day(r["trade_date"]) != day or code in seen or (params.get("ts_code") and code != params["ts_code"]):
             raise ValueError("Limit date/code/duplicate mismatch")
         seen.add(code)
-        if code not in expected:
+        if code not in source_targets:
             continue
         if r.get("asset_type") not in {None, "", "STK"}:
             raise ValueError("Target security returned non-stock asset type")
@@ -253,12 +287,14 @@ def normalize(root, manifest, task, receipt, raw=None):
         receipt.update(state="parse_failed", parse_error=f"{type(error).__name__}: {error}"[:300])
 
 
-def _prepare(root, baseline, tasks, extra):
+def _prepare(root, baseline, tasks, extra, *, market_release=None):
     root, baseline = Path(root).resolve(), Path(baseline).resolve()
     _, original, _ = e.load_batch(baseline)
     if root == baseline:
         raise ValueError("Independent source partition required")
     raw = (baseline / "universe.json").read_bytes()
+    if market_release is not None:
+        raw = e.encoded(with_identifier_periods(json.loads(raw), market_release))
     credential_policy = "request_identity_and_source_files_never_contain_credentials; storage_policy_is_explicit_in_parent_worker"
     if (root / "manifest.json").exists():
         previous = json.loads((root / "manifest.json").read_text())
@@ -294,7 +330,7 @@ def prepare_calendar(root, baseline):
     return _prepare(root, baseline, tasks, {"calendar_inference": False})
 
 
-def prepare_limits(root, baseline, calendar_root):
+def prepare_limits(root, baseline, calendar_root, *, market_release=None):
     calendar_root, _, tasks = e.load_batch(calendar_root)
     dates, sources, missing = set(), [], []
     for task in tasks:
@@ -318,7 +354,8 @@ def prepare_limits(root, baseline, calendar_root):
                     url=request_url("stk_limit", {"trade_date": d.replace("-", "")})) for d in ordered]
     return _prepare(root, baseline, planned, {"calendar_batch": str(calendar_root),
                     "calendar_receipts": sources, "unknown_calendar_dates": missing,
-                    "row_cap": ROW_CAP, "cap_policy": "explicit_partial_then_missing_target_code_requests"})
+                    "row_cap": ROW_CAP, "cap_policy": "explicit_partial_then_missing_target_code_requests"},
+                    market_release=market_release)
 
 
 def prepare_capped_targets(root, baseline, limit_root):

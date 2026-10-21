@@ -15,6 +15,7 @@ from ashare_data.storage.market_release import (
 
 CONTRACT = "financial_unit_resolution"
 SCHEMA = "ad.financial-unit-publication.v1"
+LAYERS_SCHEMA = "ad.financial-unit-publication-set.v1"
 
 
 def _verified(root, item):
@@ -27,6 +28,8 @@ def _verified(root, item):
 def verify_contract(root, manifest):
     """Verify the immutable proof closure without accessing original source paths."""
     contract = manifest[CONTRACT]
+    if contract.get("schema") == LAYERS_SCHEMA:
+        return _verify_layers(root, manifest, contract)
     require(contract["schema"] == SCHEMA, "FIN_UNIT_PUBLICATION", "Unknown unit publication")
     evidence = {(x["path"], x["sha256"], x["bytes"]) for x in manifest["evidence"]}
     items = [contract["candidate"], *contract["dependencies"], *contract["code_evidence"]]
@@ -129,8 +132,10 @@ def compose(parent, candidate_root, *, expected_sha256, calendar_plan=None, revi
         verify_contract(current.root, current.manifest)
         return {"unchanged": True, "already_applied": True, "release": current.receipt()}
     require(current.sha256 == parent.sha256, "MARKET_PARENT_CHANGED", "Unit parent advanced")
-    require(CONTRACT not in parent.manifest, "FIN_UNIT_PUBLICATION",
-            "This command publishes the first unit overlay; later revisions need a reviewed replacement")
+    if CONTRACT in parent.manifest:
+        return _compose_increment(parent, candidate_root, expected_sha256=expected_sha256,
+                                  review_script=review_script, calendar_plan=calendar_plan,
+                                  free_reserve_bytes=free_reserve_bytes)
     refs = [candidate.value[k] for k in ("base_candidate", "audit", "review")]
     review = json.loads(Path(candidate.value["review"]["path"]).read_bytes())
     refs += review["evidence"]
@@ -209,3 +214,124 @@ def compose(parent, candidate_root, *, expected_sha256, calendar_plan=None, revi
     return {"unchanged": False, "release": published, "operation_id": operation,
             "unit_coverage": candidate.value["coverage"],
             "calendar_sessions_added": len(calendar["added_sessions"]) if calendar else 0}
+
+
+def layers(contract):
+    return contract["layers"] if contract.get("schema") == LAYERS_SCHEMA else [contract]
+
+
+def preserves_prior(previous, current):
+    """A new publication may append one proof, never reinterpret old unit rules."""
+    if current == previous:
+        return True
+    if not current or current.get("schema") != LAYERS_SCHEMA:
+        return False
+    before, after = layers(previous), current.get("layers", [])
+    return len(after) == len(before) + 1 and after[:-1] == before
+
+
+def _verify_layers(root, manifest, contract):
+    entries = contract.get("layers", [])
+    require(len(entries) >= 2 and all(x.get("schema") == SCHEMA for x in entries),
+            "FIN_UNIT_PUBLICATION", "Unit increments need a flat immutable proof list")
+    values = [verify_contract(root, dict(manifest, **{CONTRACT: layer})) for layer in entries]
+    ids = [v["candidate_id"] for v in values]
+    require(len(set(ids)) == len(ids), "FIN_UNIT_PUBLICATION", "Duplicate unit increment")
+    merged = deepcopy(values[0])
+    rules, seen = [], set()
+    for value in values:
+        for key in ("base_candidate_id", "base_mapping_sha256", "base_batch_key", "captures", "base_table_objects"):
+            require(value[key] == merged[key], "FIN_UNIT_SCOPE", "Unit increments must share the audited extraction")
+        require(value["coverage"]["numeric_unit_unverified_before"] == merged["coverage"]["numeric_unit_unverified_before"],
+                "FIN_UNIT_SCOPE", "Unit audit populations differ")
+        for rule in value["rules"]:
+            key = tuple(rule[k] for k in ("source", "statement", "source_field", "source_title", "currency", "scope"))
+            require(key not in seen, "FIN_UNIT_HISTORY", "Unit increment overlaps an existing rule")
+            seen.add(key)
+            rules.append(rule)
+    recovered = sum(v["coverage"]["numeric_unit_recoverable"] for v in values)
+    total = merged["coverage"]["numeric_unit_unverified_before"]
+    require(recovered <= total, "FIN_UNIT_SCOPE", "Resolved units exceed the audited population")
+    by_statement = {}
+    for value in values:
+        for key, count in value["coverage"]["recovered_by_statement"].items():
+            by_statement[key] = by_statement.get(key, 0) + count
+    merged.update(candidate_id=t.identity("unit-layer-set", ids), rules=rules)
+    merged["coverage"] = dict(merged["coverage"], numeric_unit_recoverable=recovered,
+        numeric_unit_unverified_remaining=total-recovered, rules=len(rules), recovered_by_statement=by_statement)
+    require(contract["candidate_id"] == merged["candidate_id"] and contract["coverage"] == merged["coverage"],
+            "FIN_UNIT_PUBLICATION", "Combined unit proof identity or totals differ")
+    return merged
+
+
+def append_to_manifest(writer, parent, manifest, candidate_root, *, expected_sha256, review_script=None):
+    """Add a disjoint, audited unit layer to a caller-owned common-release draft."""
+    require(writer.lock is not None and writer.root == parent.root, "FIN_WRITER", "Use the locked common writer")
+    require(CONTRACT in parent.manifest and manifest.get(CONTRACT) == parent.manifest[CONTRACT],
+            "FIN_UNIT_HISTORY", "Preserve the immutable unit contract before appending")
+    candidate = units.UnitCandidate(candidate_root, expected_sha256=expected_sha256)
+    candidate.bind(parent.financial())
+    require(candidate.value["candidate_id"] not in [x["candidate_id"] for x in layers(parent.manifest[CONTRACT])],
+            "FIN_UNIT_PUBLICATION", "Unit increment is already present")
+    refs = [candidate.value[k] for k in ("base_candidate", "audit", "review")]
+    review = json.loads(Path(candidate.value["review"]["path"]).read_bytes())
+    refs += review["evidence"]
+    code = {"unit_implementation": Path(units.__file__), "publication_implementation": Path(__file__)}
+    if review.get("derivation_script_sha256"):
+        require(review_script is not None and sha_file(review_script) == review["derivation_script_sha256"],
+                "FIN_UNIT_PUBLICATION", "Supply the checksum-matching definition producer")
+        code["review_derivation"] = Path(review_script)
+    require(sum(x["bytes"] for x in refs) + (Path(candidate_root)/"candidate.json").stat().st_size < 512*1024**2,
+            "MARKET_CAPACITY", "Unit increment exceeds 512 MiB")
+    dependencies = [dict(freeze(writer, units.verify_file(item), "financial_unit_evidence"),
+                         original_path=item["path"]) for item in refs]
+    frozen = freeze(writer, Path(candidate_root)/"candidate.json", "financial_unit_candidate")
+    code_evidence = [dict(freeze(writer, path, "financial_unit_code"), role=role) for role,path in code.items()]
+    operation = t.identity("unit-publication", parent.sha256, expected_sha256, None)
+    layer = dict(schema=SCHEMA, operation_id=operation, candidate=frozen,
+                 candidate_id=candidate.value["candidate_id"], dependencies=dependencies,
+                 code_evidence=code_evidence, coverage=candidate.value["coverage"],
+                 base_release_id=parent.release_id, base_manifest_sha256=parent.sha256,
+                 raw_observations_unchanged=True, historical_visibility_added=False)
+    value = deepcopy(manifest)
+    present = {x["path"] for x in value["evidence"]}
+    for item in [frozen, *dependencies, *code_evidence]:
+        if item["path"] not in present:
+            value["evidence"].append(item)
+            present.add(item["path"])
+    entries = [*layers(parent.manifest[CONTRACT]), layer]
+    total = parent.manifest[CONTRACT]["coverage"]
+    coverage = dict(total)
+    coverage["rules"] += candidate.value["coverage"]["rules"]
+    coverage["numeric_unit_recoverable"] += candidate.value["coverage"]["numeric_unit_recoverable"]
+    coverage["numeric_unit_unverified_remaining"] -= candidate.value["coverage"]["numeric_unit_recoverable"]
+    coverage["recovered_by_statement"] = dict(total["recovered_by_statement"])
+    for key,count in candidate.value["coverage"]["recovered_by_statement"].items():
+        coverage["recovered_by_statement"][key] = coverage["recovered_by_statement"].get(key,0)+count
+    value[CONTRACT] = dict(schema=LAYERS_SCHEMA, layers=entries, operation_id=operation,
+        candidate_id=t.identity("unit-layer-set", [x["candidate_id"] for x in entries]),
+        coverage=coverage, raw_observations_unchanged=True, historical_visibility_added=False,
+        base_release_id=parent.release_id, base_manifest_sha256=parent.sha256)
+    verify_contract(writer.root, value)
+    return value
+
+
+def _compose_increment(parent, candidate_root, *, expected_sha256, review_script, calendar_plan,
+                       free_reserve_bytes):
+    require(calendar_plan is None, "FIN_UNIT_PUBLICATION", "Compose later calendar changes separately")
+    operation = t.identity("unit-publication", parent.sha256, expected_sha256, None)
+    with ReleaseWriter(parent.root, free_reserve_bytes=free_reserve_bytes) as writer:
+        current = MarketRelease(parent.root)
+        if current.manifest.get(CONTRACT, {}).get("operation_id") == operation:
+            verify_contract(current.root, current.manifest)
+            return dict(unchanged=True, already_applied=True, release=current.receipt())
+        require(current.sha256 == parent.sha256, "MARKET_PARENT_CHANGED", "Unit parent advanced")
+        value = append_to_manifest(writer, parent, parent.manifest, candidate_root,
+                                   expected_sha256=expected_sha256, review_script=review_script)
+        value["change_set"] = dict(kind="reviewed_financial_unit_increment", operation_id=operation,
+            market_fact_rows_rewritten=0, financial_observation_rows_rewritten=0,
+            numeric_units_resolved=value[CONTRACT]["coverage"]["numeric_unit_recoverable"]-
+                                   parent.manifest[CONTRACT]["coverage"]["numeric_unit_recoverable"])
+        published = writer.publish(value, expected_parent=parent.release_id, verify_unchanged=False)
+    return dict(unchanged=False, release=published, operation_id=operation,
+                unit_coverage=value[CONTRACT]["coverage"], calendar_sessions_added=0)

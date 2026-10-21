@@ -611,7 +611,7 @@ def insert_same(db, table, values, key_columns):
         db.execute("INSERT INTO " + table + " VALUES (" + ",".join("?" for _ in values) + ")", values)
 
 
-def compose(writer, parent, candidate_root, *, expected_parent_sha256):
+def compose(writer, parent, candidate_root, *, expected_parent_sha256, bounded_append=False):
     """Return a common-release manifest; caller owns the lock and publish decision.
 
     A changed parent is accepted only when explicitly selected by the coordinator
@@ -710,9 +710,14 @@ def compose(writer, parent, candidate_root, *, expected_parent_sha256):
             db.commit()
             c = connection(memory="1GB", threads=2)
             try:
-                table_views(c, [f for f in files if f.get("kind") == "financial_table"],
-                            lambda x: verify_object(writer.root, x))
-                validation = validate_tables(c, db)
+                if bounded_append:
+                    from ashare_data.storage.financial_increment import validate_append
+                    validation = validate_append(c, db, parent, candidate["files"],
+                                                 lambda x: verify_object(writer.root, x))
+                else:
+                    table_views(c, [f for f in files if f.get("kind") == "financial_table"],
+                                lambda x: verify_object(writer.root, x))
+                    validation = validate_tables(c, db)
                 validation["table_set_sha256"] = contract["table_set_sha256"]
             finally:
                 c.close()

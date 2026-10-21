@@ -268,12 +268,24 @@ class ReleaseWriter:
         ):
             from ashare_data.storage.financial_release import verify_manifest_contract
             verify_manifest_contract(self.root, manifest)
-        from ashare_data.storage.unit_publication import CONTRACT as unit_contract, verify_contract as verify_units
+        from ashare_data.storage.unit_publication import (
+            CONTRACT as unit_contract, verify_contract as verify_units, preserves_prior, layers,
+        )
         if old and prior.get(unit_contract):
-            require(manifest.get(unit_contract) == prior[unit_contract], "FIN_UNIT_HISTORY",
+            require(preserves_prior(prior[unit_contract], manifest.get(unit_contract)), "FIN_UNIT_HISTORY",
                     "Preserve the immutable unit contract when publishing unrelated increments")
+        if old and prior.get(unit_contract) and manifest.get(unit_contract) != prior[unit_contract]:
+            added = layers(manifest[unit_contract])[-1]
+            require(added["base_release_id"] == parent and added["base_manifest_sha256"] == old["sha256"],
+                    "FIN_UNIT_HISTORY", "Unit increment must bind the immediately previous release")
         if manifest.get(unit_contract):
             verify_units(self.root, manifest)
+        from ashare_data.storage.reference_coverage import CONTRACT as coverage_contract, validate as validate_coverage
+        if old and prior.get(coverage_contract):
+            require(manifest.get(coverage_contract) == prior[coverage_contract], 'FIN_COVERAGE_HISTORY',
+                    'Preserve prior coverage evidence on unrelated releases')
+        if manifest.get(coverage_contract):
+            validate_coverage(self.root, manifest)
         value = {
             **manifest,
             "schema": SCHEMA,
@@ -454,7 +466,7 @@ class MarketRelease:
         finally:
             c.close()
 
-    def sql(self, *, tables=("bars_1d", "bars_1m"), securities=None):
+    def sql(self, *, tables=("bars_1d", "bars_1m"), securities=None, include_market_evidence=True):
         """Open the two logical fact views over this exact manifest, with explicit paths.
 
         Caller owns the returned in-memory connection. Restrict securities for bounded
@@ -519,7 +531,7 @@ class MarketRelease:
             if item.get("kind") == "bar_day_checks"
             and (ids is None or item.get("instrument_id") in ids)
         ]
-        if checks:
+        if checks and include_market_evidence:
             parts = []
             for version in sorted({x["check_version"] for x in checks}):
                 paths = ",".join(
@@ -563,7 +575,7 @@ class MarketRelease:
                 "source_assets",
                 "source_aliases",
             ):
-                if original not in present:
+                if original not in present or not include_market_evidence:
                     continue
                 cursor = db.execute("SELECT * FROM " + original)
                 frame = pd.DataFrame(cursor.fetchall(), columns=[r[0] for r in cursor.description])

@@ -229,3 +229,37 @@ def test_existing_token_environment_is_removed_from_process_and_never_persisted(
     assert module.main() == 0
     assert "TEST_AUTH_REFERENCE" not in module.os.environ
     assert all(secret.encode() not in p.read_bytes() for p in root.rglob("*") if p.is_file())
+
+
+def test_verified_calendar_supports_daily_pit_and_rejects_tampering(tmp_path, baseline):
+    from ashare_data.financials.official_daily import calendar_sessions, _after
+    root=tmp_path/'calendar-daily'
+    ts.prepare_calendar(root,baseline)
+    def fetch(url):
+        api, params=ts.request_identity(url)
+        return 200,payload(ts.FIELDS[api],[[params['exchange'],f'2010010{i}',int(i in (4,5)),None] for i in range(1,6)]),{}
+    ts.run(root,fetch)
+    sessions=calendar_sessions(root)
+    assert _after(sessions,'XSHG','2010-01-01')['available_from']=='2010-01-04T00:00:00+08:00'
+    assert _after(sessions,'XSHE','2010-01-04')['available_from']=='2010-01-05T00:00:00+08:00'
+    raw=next((root/'raw').glob('*.gz'))
+    raw.write_bytes(gzip.compress(b'changed'))
+    with pytest.raises((ValueError,AssertionError)):
+        calendar_sessions(root)
+
+
+def test_frozen_code_events_change_denominator_but_retain_backfilled_observations():
+    event = dict(old_symbol='sz000043', new_symbol='sz001914', effective_date='2019-12-16', receipt='frozen-official-proof')
+    universe = dict(instruments=[dict(symbol=s, ipo='1994-01-01', out=None) for s in ['sz000043', 'sz001914']],
+                    code_events=[dict(event, body=json.dumps(event))])
+    assert ts.active_codes(universe, '2019-12-13') == {'000043.SZ'}
+    assert ts.active_codes(universe, '2019-12-16') == {'001914.SZ'}
+    task = dict(url=ts.request_url('stk_limit', {'trade_date': '20191213'}))
+    raw = payload('trade_date,ts_code,up_limit,down_limit', [['20191213', '001914.SZ', 11, 9]])
+    rows, coverage = ts.limit_rows(raw, task, universe)
+    assert rows[0]['security'] == '001914.XSHE'
+    assert coverage['missing_target_codes'] == ['000043.SZ']
+    assert coverage['expected_active_codes'] == 1
+    universe['code_events'][0]['effective_date'] = '2019-12-17'
+    with pytest.raises(ValueError, match='evidence differs'):
+        ts.active_codes(universe, '2019-12-13')

@@ -102,7 +102,8 @@ def import_daily_review(builder, specification_path):
     review = json.loads(review_path.read_text())
     correction = json.loads(Path(spec["correction_reviews"]).read_text()) if spec.get("correction_reviews") else None
     verified = official_daily.reader(root, review, reference_root=spec["reference_root"],
-                                    reference_tasks=spec["reference_tasks"], correction_reviews=correction)
+                                    reference_tasks=spec["reference_tasks"], correction_reviews=correction,
+                                    calendar_root=spec.get("calendar_root"))
     ledger = verified._ledger  # Reuse the existing verified contract, not raw review booleans.
     key = t.identity("official-reviewed-batch", sha_file(specification_path), sha_file(review_path), builder.mapping)
     checkpoint = builder.root / ("batch-" + key.split(":")[1] + ".json")
@@ -127,6 +128,18 @@ def import_daily_review(builder, specification_path):
         for kind in ("raw", "normalized"):
             artifact = receipt[kind]
             asset(builder, batch_id, ref_root / artifact["path"], "session_" + kind, artifact["sha256"])
+    if spec.get('calendar_root'):
+        calendar_root = Path(spec['calendar_root'])
+        _, _, calendar_tasks = e.load_batch(calendar_root)
+        for name in ('manifest.json','tasks.json','universe.json'):
+            asset(builder, batch_id, calendar_root/name, 'calendar_plan')
+        for task in calendar_tasks:
+            rp = calendar_root/'receipts'/(task['id']+'.json')
+            receipt = json.loads(rp.read_bytes())
+            asset(builder,batch_id,rp,'session_evidence_receipt')
+            for kind in ('raw','normalized'):
+                item=receipt[kind]
+                asset(builder,batch_id,calendar_root/item['path'],'session_'+kind,item['sha256'])
     projection = t.Projection(instruments=builder.instruments, register_issuer=builder.issuer, mapping_sha256=builder.mapping)
     indices, issuer_ids, captures = {}, {}, {}
     for symbol in sorted({x["symbol"] for x in review["fields"]}):

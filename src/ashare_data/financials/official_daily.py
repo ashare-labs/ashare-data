@@ -60,6 +60,37 @@ def traded_sessions(root, task_ids):
     return sessions
 
 
+def calendar_sessions(root):
+    """Verify complete captured calendar responses; no weekday or suspension inference."""
+    from ashare_data.financials.tushare_reference import calendar_rows
+    root, _, tasks = e.load_batch(root)
+    sessions = {}
+    for task in tasks:
+        if task['kind'] != 'tushare_trade_cal':
+            raise ValueError('Explicit exchange calendar tasks required')
+        path = root / 'receipts' / (task['id'] + '.json')
+        receipt = json.loads(path.read_bytes())
+        if receipt['state'] != 'complete':
+            raise ValueError('Calendar response is incomplete')
+        e.verify_receipt(root, receipt)
+        raw = gzip.decompress((root / receipt['raw']['path']).read_bytes())
+        rows, coverage = calendar_rows(raw, task)
+        if coverage['missing_calendar_dates']:
+            raise ValueError('Calendar response omits dates')
+        for row in rows:
+            if row['is_open']:
+                exchange = {'SSE':'XSHG','SZSE':'XSHE'}[row['exchange']]
+                proof = dict(source='tushare_captured_exchange_calendar', task_id=task['id'],
+                    source_locator=row['source_locator'], response_sha256=e.digest(raw),
+                    receipt_sha256=e.digest(path.read_bytes()), official_exchange_calendar=False)
+                if row['date'] in sessions.setdefault(exchange, {}):
+                    raise ValueError('Overlapping calendar tasks')
+                sessions[exchange][row['date']] = proof
+    if not sessions:
+        raise ValueError('Empty calendar source')
+    return sessions
+
+
 def _source_json(root, key):
     receipt = verified_source(root, key)
     return json.loads(gzip.decompress((root / receipt["path"]).read_bytes())), receipt
@@ -145,7 +176,7 @@ def _correction_scopes(indices, reviewed_fields, specification):
     return exclusions
 
 
-def reader(root, review, *, reference_root, reference_tasks, correction_reviews=None):
+def reader(root, review, *, reference_root, reference_tasks, correction_reviews=None, calendar_root=None):
     """Build FinancialPIT with verified day-level source and known-version boundaries.
 
     Review binds exact PDF/page/field/scope and replacement notices. Known missing
@@ -155,7 +186,7 @@ def reader(root, review, *, reference_root, reference_tasks, correction_reviews=
     """
     root = Path(root).resolve()
     ledger = reviewed_ledger(root, review)
-    sessions = traded_sessions(reference_root, reference_tasks)
+    sessions = calendar_sessions(calendar_root) if calendar_root else traded_sessions(reference_root, reference_tasks)
     indices = {s: _index(root, s) for s in {r["symbol"] for r in review["fields"]}}
     reviewed_fields = {}
     for item in review["fields"]:
