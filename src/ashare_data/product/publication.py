@@ -46,6 +46,9 @@ def _producer():
         package / "storage/immutable.py",
         package / "market/client.py",
         package / "core/model.py",
+        package / "corporate_actions/history.py",
+        package / "corporate_actions/identity.py",
+        package / "financials/tables.py",
     ]
     hashes = {
         str(p.relative_to(package)): hashlib.sha256(p.read_bytes()).hexdigest()
@@ -276,18 +279,20 @@ def _assess(document, bundle, securities, start, end, source, references):
     scope = dict(securities=securities, start=start, end=end, source=source)
     try:
         evidence, schedule, gaps, reads = reference_api.assess(
-            references, securities, start, end, bundle["rows"], document["calendar"]
+            references, securities, start, end, bundle["rows"], document["calendar"],
+            price_release=bundle.get("market_release")
         )
     except DataError as exc:
         evidence, schedule, gaps, reads = None, None, [reference_api.gap(exc)], []
+    assumptions = evidence["market"]["accepted_assumptions"] if evidence and evidence["market"] else []
+    if isinstance(assumptions, dict):
+        assumptions = [{"text": key, "accepted": value} for key, value in assumptions.items()]
     result = dict(
         schema="ad-local-daily-coverage.v1",
         scope=scope,
         ready=not gaps,
         gaps=gaps,
-        assumptions=(
-            evidence["market"]["accepted_assumptions"] if evidence and evidence["market"] else []
-        ),
+        assumptions=assumptions,
         limitations=list(reference_api.LIMITATIONS),
         reference_set=evidence["reference_set"] if evidence else None,
         source_bindings=evidence["source_bindings"] if evidence else {},
@@ -489,19 +494,19 @@ def publish(product, store_root, securities, start, end, source, *, mode, refere
                     "INSERT OR IGNORE INTO local_daily_products VALUES (?,?,?)",
                     (dataset_id, input_hash, now()),
                 )
-    view = LocalDailyProductView(store, dataset_id)
-    return {
-        "dataset_id": dataset_id,
-        "portfolio_input_path": str(view.portfolio_input_path),
-        "portfolio_input_sha256": input_hash,
-        "corporate_schedule_path": str(root / "corporate-schedule.json") if ordinary else None,
-        "corporate_schedule_sha256": manifest.get("corporate_schedule_sha256"),
-        "mode": mode,
-        "reference_set": manifest["reference_set"],
-        "source_bindings": manifest["source_bindings"],
-        "coverage_sha256": manifest["coverage_sha256"],
-        "manifest": view.describe(),
-    }
+        view = LocalDailyProductView(store, dataset_id)
+        return {
+            "dataset_id": dataset_id,
+            "portfolio_input_path": str(view.portfolio_input_path),
+            "portfolio_input_sha256": input_hash,
+            "corporate_schedule_path": str(root / "corporate-schedule.json") if ordinary else None,
+            "corporate_schedule_sha256": manifest.get("corporate_schedule_sha256"),
+            "mode": mode,
+            "reference_set": manifest["reference_set"],
+            "source_bindings": manifest["source_bindings"],
+            "coverage_sha256": manifest["coverage_sha256"],
+            "manifest": view.describe(),
+        }
 
 
 class LocalDailyProductView:

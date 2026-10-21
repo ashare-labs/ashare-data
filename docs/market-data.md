@@ -293,3 +293,25 @@ PYTHONPATH=src python -B scripts/prepare_calendar_extension.py \
 原行必须完整保留，只允许推导出的日历、批次、来源与标记行增加。可以与单位证据
 在同一发布提交。旧版仍读取旧日历；财务参考表自己的日历覆盖不随市场日历隐式扩大。
 准备和失败产物留在指定目录，正式默认通过 deployment 中明确的 release/hash 切换。
+
+## 正式参考表用于普通日级回测
+
+有 `market_release` 的 product profile 可配置
+`"reference_sets": {"released-reference": {"kind": "market_release"}}`，并显式选择
+`default_reference_set="released-reference"`。该组直接使用价格的 release ID、manifest hash
+及冻结文件清单；不能另指定一个参考 release。原有 `daily_execution` / `historical_market`
+参考组仍可保留，旧的已发布输入继续使用其冻结证据，不读取今日默认配置。
+
+此组从正式日线的逐日 `tradestatus/is_st/preclose` 和正式 `reference.security_status`、
+`reference.price_limits` 读取状态与限价；多个非空来源值须一致。未知停牌不按成交量猜测，
+未知限价不按固定百分比补齐。字段引用保留源行/观察 ID 和发布身份，可继续追到冻结批次原件。
+
+公司行动复用现有事件归并和账户日期规则。普通回测接受已采来源范围的回溯证据：批次查询范围
+覆盖窗口，采集晚于窗口，分红/配股及股份来源表解析完整、无未解析/隔离行；现金或股份事件
+仍须具备对应经济字段。显式空表与网络空响应不同；`absence_proved/full_history_proven`
+继续为 false。计划公告和实施公告分别保留，NULL 股份比例不会补零。早年缺少到账日但有更早
+已知上市日的送股，不会无限延伸到多年后的窗口；当期未知到账日仍阻断，日期本身不被填造。
+
+覆盖检查和发布输出都固定参考证据、日级回溯模型及税前现金假设。它不认证严格历史 PIT、
+盘中可见性、全部行动类型或实盘可成交。新增参考记录随显式选择的新行情发布进入消费者，
+不再需要手工扩充八股样本名单；真实缺证仍按证券、日期和字段返回。

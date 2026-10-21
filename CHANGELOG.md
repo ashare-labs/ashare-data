@@ -1,5 +1,10 @@
 # 更新记录
 
+## 0.10.0.dev18
+
+- Connect ordinary daily backtests to release-pinned formal status, price limits and corporate source evidence; preserve legacy reference groups and explicit missing-data blockers.
+- Bound unresolved old stock-credit dates by observed tradability without inventing dates; serialize repeated publication reads with the existing write lock.
+
 ## 0.10.0.dev16
 
 - Validate financial relationship endpoints one type at a time, retaining exact endpoint checks without two simultaneous unions of the full financial fact tables. Reuse verified dev15 candidates without reimporting their captured responses.

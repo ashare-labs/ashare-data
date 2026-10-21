@@ -109,7 +109,12 @@ def resolve(deployment=None, *, profile="product", reference_set=None):
                 kind in KINDS, "PRODUCT_REFERENCE_CONFIGURATION", "Unsupported reference set kind"
             )
             references = {"name": chosen, "kind": kind}
-            for role, expected in {**KINDS[kind], "corporate": "corporate_history"}.items():
+            if kind == "market_release":
+                require(set(spec) == {"kind"} and result["market_release"] is not None,
+                        "PRODUCT_REFERENCE_CONFIGURATION", "Released references use the profile price release")
+                references["release"] = result["market_release"]
+            roles = {} if kind == "market_release" else {**KINDS[kind], "corporate": "corporate_history"}
+            for role, expected in roles.items():
                 setting = "corporate_history_asset" if role == "corporate" else role + "_asset"
                 name = spec[setting]
                 asset = value["assets"][name]

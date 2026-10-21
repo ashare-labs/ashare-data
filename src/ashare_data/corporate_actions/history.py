@@ -50,6 +50,7 @@ ACTION_DATE_ORDER = (
     ("record_date", "new_shares_tradable_date"),
     ("ex_date", "payment_date"),
     ("ex_date", "new_shares_tradable_date"),
+    ("share_credit_date", "new_shares_tradable_date"),
     ("subscription_start", "subscription_end"),
 )
 VALUE_FIELDS = frozenset(

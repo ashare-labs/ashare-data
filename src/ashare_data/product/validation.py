@@ -41,7 +41,7 @@ def _validate(document, schedule):
         kind in KINDS and isinstance(selection["name"], str) and selection["name"],
         "Invalid reference selection",
     )
-    required = {**KINDS[kind], "corporate": "corporate_history"}
+    required = {**KINDS[kind], "corporate": "market_release" if kind == "market_release" else "corporate_history"}
     _check(set(bindings) == set(required), "Source binding roles differ")
     for role, expected in required.items():
         _check(bindings[role]["kind"] == expected, "Source binding kind differs")
@@ -104,6 +104,8 @@ def _validate(document, schedule):
             "Source model acceptance differs",
         )
     else:
+        if kind == "market_release":
+            _released(document, market, bindings)
         _check(
             market["descriptor"]["binding_sha256"] == bindings["market"]["binding_sha256"],
             "Historical binding differs",
@@ -230,3 +232,23 @@ def _validate(document, schedule):
             ),
             "Corporate event count or empty-source proof differs",
         )
+
+
+def _released(document, market, bindings):
+    from ashare_data.product.released_references import ASSUMPTIONS
+
+    descriptor = market["descriptor"]
+    pin = descriptor["release"]
+    _check(market["accepted_assumptions"] == ASSUMPTIONS, "Released reference assumptions differ")
+    _check(descriptor["historical_pit"] is False and descriptor["execution_permission"] is False,
+           "Released references are retrospective only")
+    _check(pin["manifest_sha256"] == bindings["market"]["binding_sha256"]
+           == bindings["corporate"]["binding_sha256"], "Released reference pins differ")
+    prices = [r["receipt"].get("release") for r in document["owner_api_reads"]
+              if r["operation"] == "prices"]
+    _check(prices == [pin], "Price and reference snapshots differ")
+    for row in market["rows"]:
+        for field in FIELDS:
+            for ref in row[field]["source_refs"]:
+                _check(ref["manifest_sha256"] == pin["manifest_sha256"]
+                       and ref["release_id"] == pin["release_id"], "Fact release differs")

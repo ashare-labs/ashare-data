@@ -15,6 +15,7 @@ from ashare_data.storage.immutable import identifier
 KINDS = {
     "daily_execution": {"research": "daily_research", "execution": "daily_execution"},
     "historical_market": {"market": "historical_market"},
+    "market_release": {"market": "market_release"},
 }
 FIELDS = ("suspended", "is_st", "reference_price", "upper_limit", "lower_limit")
 LIMITATIONS = [
@@ -48,6 +49,16 @@ def normalize(references):
         "PRODUCT_REFERENCE_CONFIGURATION",
         "Invalid named reference set",
     )
+    if kind == "market_release":
+        pin = references.get("release")
+        require(isinstance(pin, dict) and isinstance(pin.get("root"), (str, Path))
+                and type(pin.get("release_id")) is int and pin["release_id"] > 0,
+                "PRODUCT_REFERENCE_CONFIGURATION", "A pinned price release is required")
+        frozen = dict(root=str(Path(pin["root"]).expanduser().resolve()),
+                      release_id=pin["release_id"], manifest_sha256=identifier(pin.get("manifest_sha256")))
+        bindings = {role: dict(kind="market_release", binding_sha256=frozen["manifest_sha256"])
+                    for role in ("market", "corporate")}
+        return {"name": name, "kind": kind}, {"release": frozen}, bindings
     required = {**KINDS[kind], "corporate": "corporate_history"}
     pins, bindings = {}, {}
     for role, asset_kind in required.items():
@@ -334,9 +345,11 @@ def _compatible(rows, states, start):
     return gaps
 
 
-def assess(references, securities, start, end, rows, calendar):
+def assess(references, securities, start, end, rows, calendar, *, price_release=None):
     """Return source-bound state and the original corporate response; never write."""
     selection, pins, bindings = normalize(references)
+    if selection["kind"] == "market_release":
+        return _released(selection, pins, bindings, securities, start, end, rows, calendar, price_release)
     days = [d for d in calendar if start <= d <= end]
     gaps, market, schedule = [], None, None
     try:
@@ -382,3 +395,33 @@ def assess(references, securities, start, end, rows, calendar):
     if schedule is not None:
         reads.append(_read("CorporateHistoryView.export_aq", schedule, CorporateHistoryView))
     return evidence, schedule, gaps, reads
+
+
+def _released(selection, pins, bindings, securities, start, end, rows, calendar, price_release):
+    from ashare_data.product.released_corporate import ReleasedCorporateView
+    from ashare_data.product.released_references import ReleasedReferences
+
+    reader = ReleasedReferences(pins["release"], price_release)
+    try:
+        days = [d for d in calendar if start <= d <= end]
+        market, gaps = reader.market(securities, start, end, days, rows)
+        gaps.extend(_compatible(rows, market["rows"], start))
+        view = ReleasedCorporateView(reader, securities, start, end)
+        schedule = view.export_aq(securities, start=start, end=end, tax_model="gross_cash_no_tax",
+                                  accept_source_scoped_coverage=True)
+        events = {row["event_id"]: row for row in schedule["rows"]}
+        gaps.extend(dict(code="PRODUCT_CORPORATE_GAP", field=i.get("field", "corporate_actions"),
+                         security=i.get("security") or events.get(i.get("event_id"), {}).get("security"),
+                         date=events.get(i.get("event_id"), {}).get("ex_date"),
+                         detail=i.get("reason", "Corporate source gap"), owner_issue=i)
+                    for i in schedule["issues"])
+        market["reads"] = [_read("ReleasedReferences.market", market, ReleasedReferences)]
+        evidence = dict(schema="ad-product-reference-evidence.v1",
+                        scope=dict(securities=securities, start=start, end=end),
+                        reference_set=selection, source_bindings=bindings, market=market,
+                        corporate=dict(binding_sha256=reader.release.sha256,
+                                       response_sha256=digest(schedule)))
+        return evidence, schedule, gaps, [*market["reads"],
+                _read("ReleasedCorporateView.export_aq", schedule, ReleasedCorporateView)]
+    finally:
+        reader.close()
