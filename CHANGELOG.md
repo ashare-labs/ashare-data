@@ -1,5 +1,9 @@
 # 更新记录
 
+## 0.10.0.dev16
+
+- Validate financial relationship endpoints one type at a time, retaining exact endpoint checks without two simultaneous unions of the full financial fact tables. Reuse verified dev15 candidates without reimporting their captured responses.
+
 ## 0.10.0.dev15
 
 - Import retained responses from explicitly stopped source batches while recording unvisited tasks only as coverage gaps. Freeze stop evidence and receipt inventories for resumable imports.

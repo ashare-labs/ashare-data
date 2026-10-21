@@ -29,10 +29,11 @@ from ashare_data.storage.market_release import (
 CANDIDATE = "ad.financial-table-candidate.v1"
 CONTRACT_NAME = "financial_reference_tables"
 TERMINAL = {"complete", "partial_source", "empty_unknown", "parse_failed", "failed_retryable", "deferred"}
-# Frozen v1 candidates produced by reviewed commits b4abfe2 and 8e01efb.
+# Frozen v1 candidates produced by reviewed commits b4abfe2, 8e01efb and 952d0de.
 # Additive importer entrypoints change the implementation hash, not these table
 # schemas. Composition still verifies every object, registry and relationship.
 COMPATIBLE_PREPARED_MAPPINGS = frozenset({
+    "580050fe2b45feb5db7767d24390397331e22bc0798bcbc4cd5fa0b2a5568ea7",
     "c4592ca38dccd80a180992debd6eb6fa74a9b0e0e9cad7679a4daf2763ae989f",
     "1e3b970124711dd3e343969f71f78f908ddfb349163964cb249c3a825da7a098",
 })
@@ -173,6 +174,25 @@ def metadata_views(c, db):
         c.unregister("financial_registry_rows")
 
 
+def validate_link_endpoints(c):
+    """Check every typed endpoint without joining two copies of all fact tables."""
+    c.execute("""CREATE OR REPLACE TEMP TABLE financial_required_endpoints AS
+      WITH linked AS MATERIALIZED (
+        SELECT from_type,from_id,to_type,to_id FROM financial.links)
+      SELECT from_type AS kind,from_id AS id FROM linked
+      UNION SELECT to_type,to_id FROM linked""")
+    try:
+        kinds = {r[0] for r in c.execute("SELECT DISTINCT kind FROM financial_required_endpoints").fetchall()}
+        require(kinds <= t.ENDPOINTS.keys(), "FIN_LINK", "Unknown relationship endpoint type")
+        for kind in sorted(kinds):
+            table, key = t.ENDPOINTS[kind]
+            bad = c.execute("SELECT count(*) FROM (SELECT id FROM financial_required_endpoints WHERE kind=?) l "
+                            "ANTI JOIN " + table + " r ON r." + key + "=l.id", [kind]).fetchone()[0]
+            require(bad == 0, "FIN_LINK", "Relationship endpoint is absent: " + kind)
+    finally:
+        c.execute("DROP TABLE financial_required_endpoints")
+
+
 def validate_tables(c, registry):
     counts = {}
     for table, key in t.KEYS.items():
@@ -195,14 +215,7 @@ def validate_tables(c, registry):
       SELECT report_version_id,extraction_version_id,context_id FROM financial.contexts
       GROUP BY ALL HAVING count(*)>1)""").fetchone()[0] == 0,
             "FIN_CONTEXT", "One context identity has different attributes")
-    parts = [f"SELECT '{kind}' AS kind,{key} AS id FROM {table}"
-             for kind, (table, key) in t.ENDPOINTS.items()]
-    c.execute("CREATE OR REPLACE TEMP VIEW financial_endpoints AS " + " UNION ALL ".join(parts))
-    bad = c.execute("""SELECT count(*) FROM financial.links l
-      LEFT JOIN financial_endpoints a ON a.kind=l.from_type AND a.id=l.from_id
-      LEFT JOIN financial_endpoints b ON b.kind=l.to_type AND b.id=l.to_id
-      WHERE a.id IS NULL OR b.id IS NULL""").fetchone()[0]
-    require(bad == 0, "FIN_LINK", "Relationship endpoint is absent")
+    validate_link_endpoints(c)
     allowed = {"captured_in", "extracts", "date_claim", "disclosed_in", "replaces", "unresolved_revision", "proof_input"}
     actual = {r[0] for r in c.execute("SELECT DISTINCT relation FROM financial.links").fetchall()}
     require(actual <= allowed, "FIN_LINK", "Unknown relationship semantics")
