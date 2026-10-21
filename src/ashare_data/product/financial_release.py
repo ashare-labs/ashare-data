@@ -398,6 +398,7 @@ def main(argv=None):
     build = sub.add_parser("prepare")
     build.add_argument("--output", required=True, type=Path)
     build.add_argument("--batch", action="append", type=Path, default=[])
+    build.add_argument("--stopped-batch", action="append", type=Path, default=[])
     build.add_argument("--daily-review-spec", action="append", type=Path, default=[])
     build.add_argument("--official-batch", action="append", type=Path, default=[])
     build.add_argument("--official-repair", action="append", type=Path, default=[])
@@ -424,7 +425,7 @@ def main(argv=None):
     if args.action == "prepare":
         value = prepare(parent, args.output, args.batch, daily_reviews=args.daily_review_spec,
                         official_batches=args.official_batch, share_resolutions=args.share_resolutions,
-                        official_repairs=args.official_repair)
+                        official_repairs=args.official_repair, stopped_batches=args.stopped_batch)
         print(json.dumps({"candidate_id": value["candidate_id"], "published": False,
                           "validation": value["validation"]}, ensure_ascii=False))
     elif args.action == "publish-units":

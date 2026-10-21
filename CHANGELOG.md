@@ -1,5 +1,10 @@
 # 更新记录
 
+## 0.10.0.dev15
+
+- Import retained responses from explicitly stopped source batches while recording unvisited tasks only as coverage gaps. Freeze stop evidence and receipt inventories for resumable imports.
+- Keep the published financial schema and reader contracts unchanged; preserve source values, unknown units, historical visibility restrictions and prior release objects.
+
 ## 0.10.0.dev14
 
 - Publish reviewed source-unit rules with their immutable proof closure; exact source-field queries use the release-bound annotations while preserving original financial observations, missing values and historical visibility restrictions.

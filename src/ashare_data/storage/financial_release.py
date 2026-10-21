@@ -350,11 +350,26 @@ class TableBuilder:
             c.close()
         return files
 
-    def import_batch(self, root):
+    def import_batch(self, root, *, stopped=False):
         root = Path(root).resolve()
         with closed_batch(root):
             _, manifest, tasks = e.load_batch(root)
-            batch_key = t.identity("financial-batch", str(root), sha_file(root / "manifest.json"), self.mapping)
+            stopped_scope = None
+            if stopped:
+                stop, exited = root / "STOP", root / "worker-exit.json"
+                require(stop.is_file() and exited.is_file(), "FIN_BATCH_OPEN",
+                        "Stopped-source import requires retained stop and worker-exit evidence")
+                require(Path(json.loads(stop.read_text())["legacy_batch"]).resolve() == root,
+                        "FIN_SOURCE", "Stop evidence targets another source batch")
+                stopped_scope = dict(stop_sha256=sha_file(stop), exit_sha256=sha_file(exited),
+                                     receipts=[(task["id"], sha_file(path) if path.exists() else None)
+                                               for task in tasks
+                                               for path in [root / "receipts" / (task["id"] + ".json")]])
+                scope_key = t.identity("stopped-source", str(root)).split(":")[1]
+                immutable_json(self.root / ("source-cut-" + scope_key + ".json"), stopped_scope)
+            parts = (str(root), sha_file(root / "manifest.json"), self.mapping)
+            batch_key = t.identity("financial-stopped-batch", *parts, stopped_scope) if stopped else t.identity(
+                "financial-batch", *parts)
             checkpoint = self.root / ("batch-" + batch_key.split(":")[1] + ".json")
             if checkpoint.exists():
                 old = json.loads(checkpoint.read_text())
@@ -364,7 +379,9 @@ class TableBuilder:
             # Validate closure before mapping any rows; explicit failures remain coverage.
             for task in tasks:
                 path = root / "receipts" / (task["id"] + ".json")
-                require(path.exists(), "FIN_BATCH_OPEN", "Unvisited task; close collection before import")
+                require(path.exists() or stopped, "FIN_BATCH_OPEN", "Unvisited task; close collection before import")
+                if not path.exists():
+                    continue  # No response exists; retain a coverage gap, not a capture or fact.
                 state = json.loads(path.read_bytes()).get("state")
                 require(state in TERMINAL, "FIN_BATCH_OPEN", "Pending or running source task")
             batch_id = self.db.execute("SELECT batch_id FROM data_batches WHERE batch_key=?", (batch_key,)).fetchone()
@@ -375,8 +392,10 @@ class TableBuilder:
                 self.db.execute("INSERT INTO data_batches VALUES (?,?,?,?,?,?)",
                                 (batch_id, batch_key, 0, "per_capture_normalizer", self.mapping,
                                  t.text({"source_root": str(root), "manifest": manifest,
-                                         "collection_closed_with_explicit_gaps": True})))
-            for name in ("manifest.json", "tasks.json", "universe.json"):
+                                         "collection_closed_with_explicit_gaps": True,
+                                         **({"stopped_source_scope": stopped_scope} if stopped else {})})))
+            names = ("manifest.json", "tasks.json", "universe.json") + (("STOP", "worker-exit.json") if stopped else ())
+            for name in names:
                 aid = self.asset(root / name, kind="batch_" + name)
                 self.db.execute("INSERT OR IGNORE INTO batch_inputs VALUES (?,?)", (batch_id, aid))
             resume_path = self.root / ("resume-" + batch_key.split(":")[1] + ".json")
@@ -390,15 +409,20 @@ class TableBuilder:
             for item in files:
                 verify_object(self.root, item)
             for task, (task_id, checksum) in zip(tasks[:completed], seen, strict=True):
+                receipt_path = root / "receipts" / (task_id + ".json")
                 require(task["id"] == task_id
-                        and sha_file(root / "receipts" / (task_id + ".json")) == checksum,
+                        and (sha_file(receipt_path) if receipt_path.exists() else None) == checksum,
                         "FIN_CHECKPOINT", "Already imported source receipt changed")
             for task_index, task in enumerate(tasks[completed:], start=completed):
                 receipt_path = root / "receipts" / (task["id"] + ".json")
-                receipt_bytes = receipt_path.read_bytes()
-                receipt = json.loads(receipt_bytes)
-                e.verify_receipt(root, receipt)
-                checksum = hashlib.sha256(receipt_bytes).hexdigest()
+                receipt_bytes = receipt_path.read_bytes() if receipt_path.exists() else None
+                receipt = json.loads(receipt_bytes) if receipt_bytes is not None else {
+                    "state": "unvisited_stopped", "coverage": {"source_response_observed": False,
+                    "collection_state": "stopped", "absence_proved": False},
+                    "parse_error": "not_requested_before_source_stop"}
+                if receipt_bytes is not None:
+                    e.verify_receipt(root, receipt)
+                checksum = hashlib.sha256(receipt_bytes).hexdigest() if receipt_bytes is not None else None
                 seen.append([task["id"], checksum])
                 states[receipt["state"]] += 1
                 assets = {}
@@ -406,7 +430,8 @@ class TableBuilder:
                     if receipt.get(name):
                         item = receipt[name]
                         assets[name] = self.asset(checked_path(root, item["path"]), kind=name, expected=item["sha256"])
-                assets["receipt"] = self.asset(receipt_path, kind="receipt", expected=checksum)
+                if receipt_bytes is not None:
+                    assets["receipt"] = self.asset(receipt_path, kind="receipt", expected=checksum)
                 for aid in assets.values():
                     self.db.execute("INSERT OR IGNORE INTO batch_inputs VALUES (?,?)", (batch_id, aid))
                 response_sha, raw_json = None, None
@@ -457,11 +482,12 @@ class TableBuilder:
                             else:
                                 mapped += 1
                     require(count == receipt["row_count"], "FIN_SOURCE", "Normalized row count differs")
-                projection.add("meta.financial_captures", capture_id=capture, batch_key=batch_key,
-                               task_id=task["id"], source=task["kind"], raw_asset_id=assets.get("raw"),
-                               normalized_asset_id=assets.get("normalized"), response_sha256=response_sha,
-                               receipt_sha256=checksum, observed_at=receipt.get("observed_at"),
-                               source_state=receipt["state"], source_rows=count)
+                if receipt_bytes is not None:
+                    projection.add("meta.financial_captures", capture_id=capture, batch_key=batch_key,
+                                   task_id=task["id"], source=task["kind"], raw_asset_id=assets.get("raw"),
+                                   normalized_asset_id=assets.get("normalized"), response_sha256=response_sha,
+                                   receipt_sha256=checksum, observed_at=receipt.get("observed_at"),
+                                   source_state=receipt["state"], source_rows=count)
                 projection.add("meta.financial_coverage", coverage_id=t.identity("coverage", batch_key, task["id"], checksum),
                                batch_key=batch_key, task_id=task["id"], source=task["kind"],
                                security=e.security(task["symbol"]) if task.get("symbol") else None,
@@ -524,7 +550,7 @@ class TableBuilder:
 
 
 def prepare(parent, root, batches, *, daily_reviews=(), official_batches=(), share_resolutions=(),
-            official_repairs=()):
+            official_repairs=(), stopped_batches=()):
     specification = {
         "batches": [str(Path(p).resolve()) for p in batches],
         "daily_reviews": [str(Path(p).resolve()) for p in daily_reviews],
@@ -532,6 +558,8 @@ def prepare(parent, root, batches, *, daily_reviews=(), official_batches=(), sha
         "share_resolutions": [str(Path(p).resolve()) for p in share_resolutions]}
     if official_repairs:
         specification["official_repairs"] = [str(Path(p).resolve()) for p in official_repairs]
+    if stopped_batches:
+        specification["stopped_batches"] = [str(Path(p).resolve()) for p in stopped_batches]
     candidate = Path(root) / "candidate.json"
     if candidate.exists():
         existing = json.loads(candidate.read_text())
@@ -545,6 +573,7 @@ def prepare(parent, root, batches, *, daily_reviews=(), official_batches=(), sha
         return existing
     with TableBuilder(parent, root) as builder:
         done = [builder.import_batch(p) for p in batches]
+        done.extend(builder.import_batch(p, stopped=True) for p in stopped_batches)
         if daily_reviews or official_batches:
             from ashare_data.financials.table_official import import_daily_review, import_archive
             done.extend(import_archive(builder, p) for p in official_batches)
