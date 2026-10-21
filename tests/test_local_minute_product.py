@@ -127,6 +127,20 @@ def test_selected_failure_has_no_fallback_and_does_not_disable_other_source(depl
             query(owner, source=source)
 
 
+def test_auto_native_masks_invalid_but_explicit_diagnostics_keep_raw(deployment):
+    document = json.loads(deployment.read_text())
+    document["profiles"]["product"]["default_minute_source"] = "neigezhu"
+    deployment.write_text(json.dumps(document))
+    owner = LocalMinuteProduct(deployment)
+    normal, raw = query(owner), query(owner, source="neigezhu")
+    assert len(normal["rows"]) == len(raw["rows"]) == 4
+    assert [r["source_label"] for r in normal["rows"]] == [r["source_label"] for r in raw["rows"]]
+    assert normal["rows"][1]["high"] is None and raw["rows"][1]["high"] == 9
+    assert normal["rows"][1]["missing_reason"] == "confirmed_invalid_price"
+    assert normal["rows"][1]["source_row"] == raw["rows"][1]["source_row"]
+    assert normal["rows"][3]["volume"] == 0  # Zero activity alone is not invalidity.
+
+
 def test_content_and_review_pins_fail_closed(deployment):
     owner = LocalMinuteProduct(deployment)
     (deployment.parent / "assets/review.json").write_text("{}")

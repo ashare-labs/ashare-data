@@ -1,6 +1,7 @@
 """Canonical facts and explicit source observations pinned to one immutable release."""
 
 from contextlib import contextmanager
+from datetime import timedelta
 from decimal import Decimal
 import sqlite3
 import json
@@ -9,6 +10,7 @@ import pandas as pd
 
 from ashare_data.core.model import digest, require, timestamp
 from ashare_data.product.daily import LocalDailyProduct, _sid
+from ashare_data.product.minute_quality import released_invalid_slots, standard_quote
 from ashare_data.storage.local_daily import LocalDailyStore
 from ashare_data.storage.market_release import MarketRelease, FIELDS
 
@@ -381,16 +383,16 @@ def minute_prices(config, security, start, end, source="canonical"):
     )
     series = chosen[0]
     a, b = timestamp(start, minute=True), timestamp(end, minute=True)
-    raw, observed_days = [], set()
+    raw, observed_days = [], {}
     for chosen_series in chosen:
         part = release.read("bars_1m", security, a, b, series_id=chosen_series, max_rows=15000)
         days = {r["trade_date"] for r in part}
         require(
-            not (days & observed_days),
+            not (days & observed_days.keys()),
             "MARKET_MINUTE_SCOPE",
             "Supplements must use separate security days, without guessing label alignment",
         )
-        observed_days.update(days)
+        observed_days.update(dict.fromkeys(days, chosen_series))
         raw.extend(part)
     raw.sort(key=lambda row: row["label_at"])
     require(len(raw) <= 15000, "MARKET_QUERY_BOUND", "Narrow the requested range")
@@ -433,7 +435,29 @@ def minute_prices(config, security, start, end, source="canonical"):
         from ashare_data.research.minute_policy import native_denials
 
         value["use_decision"] = native_denials(value)
-        rows.append(value)
+        rows.append(standard_quote(value))
+    present = {timestamp(r["source_label"], minute=True) for r in rows}
+    for row in released_invalid_slots(release, security, chosen, a, b):
+        label = timestamp(row["source_label"], minute=True)
+        # Respect a published whole-day replacement; never mask its good quote
+        # with an excluded observation from another source.
+        if label.date() not in observed_days:
+            day_start = label.replace(hour=0, minute=0)
+            for other in chosen:
+                if other != row["series_id"] and release.read(
+                    "bars_1m", security, day_start, day_start + timedelta(days=1, minutes=-1),
+                    series_id=other, max_rows=15000,
+                ):
+                    observed_days[label.date()] = other
+                    break
+            observed_days.setdefault(label.date(), row["series_id"])
+        if (
+            label not in present
+            and observed_days.get(label.date(), row["series_id"]) == row["series_id"]
+        ):
+            rows.append(row)
+    rows.sort(key=lambda row: timestamp(row["source_label"], minute=True))
+    require(len(rows) <= 15000, "MARKET_QUERY_BOUND", "Narrow the requested range")
     return {
         "schema": "ad-local-minute-prices.v1",
         "source": source,
@@ -450,6 +474,7 @@ def minute_prices(config, security, start, end, source="canonical"):
             "release": release.receipt(),
             "native_labels_preserved": True,
             "repaired_rows": 0,
+            "unavailable_rows": sum(bool(r.get("missing_fields")) for r in rows),
             "strict_execution_admitted": False,
             "historical_pit": False,
             "limits": LIMITATIONS,

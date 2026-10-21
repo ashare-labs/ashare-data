@@ -108,11 +108,33 @@ def export_minute_research(snapshot, metadata):
             )
             for missing in coverage["missing"]:
                 label = timestamp(missing["bar_start"], minute=True) + timedelta(minutes=1)
+                known = [
+                    r
+                    for r in coverage.get("unavailable_quotes", [])
+                    if r["security"] == missing["symbol"] and timestamp(r["source_label"]) == label
+                ]
+                require(len(known) <= 1, "MINUTE_RESEARCH_GAP_BINDING", "Duplicate missing quote")
+                reason = "no_quote_in_selected_snapshot"
+                if known:
+                    quote = known[0]
+                    require(
+                        quote.get("price_status") == "invalid"
+                        and quote.get("missing_reason") == "confirmed_invalid_price"
+                        and set(quote.get("missing_fields", []))
+                        == {"open", "high", "low", "close", "volume", "amount"}
+                        and all(quote.get(k) is None for k in quote["missing_fields"])
+                        and quote.get("use_decision", {}).get("execution") == "deny"
+                        and quote.get("use_decision", {}).get("fresh_valuation") == "deny"
+                        and quote["source_contract_sha256"] == digest(sources[quote["source_id"]]),
+                        "MINUTE_RESEARCH_GAP_BINDING",
+                        "Missing quote lacks bound invalidity evidence",
+                    )
+                    reason = quote["missing_reason"]
                 gaps.append(
                     {
                         "security": missing["symbol"],
                         "source_label": label.isoformat(),
-                        "reason": "no_quote_in_selected_snapshot",
+                        "reason": reason,
                         "execution": "deny",
                         "fresh_valuation": "deny",
                         "evidence": {

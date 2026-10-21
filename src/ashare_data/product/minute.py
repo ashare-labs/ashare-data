@@ -195,7 +195,8 @@ class LocalMinuteProduct:
             "PRODUCT_MINUTE_QUERY_BOUND",
             "Choose one security and at most 60 days",
         )
-        source = self.default_source if source == "auto" else source
+        standard = source == "auto"
+        source = self.default_source if standard else source
         if self.market_release is not None and (
             source not in self.registry or source in {"canonical", "tdx", "free_stockdb"}
         ):
@@ -264,6 +265,13 @@ class LocalMinuteProduct:
                 "Selected minute source is unavailable",
                 {"source": source, "reason": str(exc)},
             ) from exc
+        if standard:
+            from ashare_data.product.minute_quality import standard_quote
+
+            result["rows"] = [standard_quote(row) for row in result["rows"]]
+            result["report"]["unavailable_rows"] = sum(
+                bool(row.get("missing_fields")) for row in result["rows"]
+            )
         return {
             "schema": "ad-local-minute-prices.v1",
             "source": source,
