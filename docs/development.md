@@ -79,3 +79,7 @@ python scripts/verify_wheel.py dist/ashare_data-0.10.0.dev5-py3-none-any.whl --f
 `verify_wheel.py --offline --cache DIR --full` 使用预备锁定依赖缓存，在无 src 的环境运行安装包及公开测试。还应解开 sdist，检查其文档/测试/示例/脚本能复验并重建 wheel。测试不应读取真实证据目录；需要私有输入的复放与免费源联网抽样另列结果，未做或不可用不得记为通过。
 
 JS、SDK/policy JSON、Alpha191 来源与许可通过相邻路径或 importlib.resources 定位；wheel/sdist 必须保留。源码 `.py/.json/.js` 的路径和内容参与 runtime identity；纯注释和文件移动也可能改变身份，新候选必须记录新摘要。数据 schema、owner policy 和包版本分别维护，不能一起盲改。
+
+## Alpha158 官方独立参考
+
+[Alpha158 官方参考与比较指南](../scripts/alpha158-reference.md) 固定 Qlib v0.9.7，提供小型合成输入、158 列有序定义、官方输出及标准库比较器。Qlib 依赖独立锁定在 `scripts/alpha158-reference-environment/`，不进入 AD 运行依赖；此工具不负责生产因子或 Web 接入。

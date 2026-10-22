@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "reference_id": "qlib-alpha158-v0.9.7-synthetic-v1",
+  "synthetic_only": true,
+  "qlib_version": "0.9.7",
+  "qlib_commit": "da920b7f954f48ab1bb64117c976710de198373e",
+  "qlib_source": "https://github.com/microsoft/qlib",
+  "qlib_license": "MIT",
+  "source_file_sha256": {
+    "qlib/contrib/data/loader.py": "814b7f7ab3d418ae3c87ce352220080b239eba2670eac9e38376b794be4075cb",
+    "qlib/contrib/data/handler.py": "b621481c6009c39066c67c71390fd2bea635f56daf9f2c4e38817eff268e3232",
+    "qlib/data/ops.py": "6f648355725a85a9f17528d864281fc065f8a4f887261a9909f7495d5db42760",
+    "qlib/data/base.py": "30382dd1a3c47506e61514f37533a3407f63fd01c9a9fd5a12b8c0cce85c5d5c",
+    "qlib/data/data.py": "9156bfef585b9e2d22d4d1ba5831efdb63b419d24846ee738eee237090ff6a24",
+    "qlib/data/storage/file_storage.py": "7261420971a2b6cc3de9a9dbac6288216fdc9653e2d99f269df01d1cf5ec55c0",
+    "qlib/data/_libs/rolling.pyx": "58b2e418a78558135cb1ecad88bfcff68cae98b2bb2695d8d2fade8b30c5dbf1",
+    "qlib/data/_libs/expanding.pyx": "0ee3d9d251aa3def6f27884e32a0d7da4122cca05d7868805ebd85fece48dd53"
+  },
+  "generator_sha256": "e125fa3390ab1084d252989ed95b6d6e1cec75163361e606803e2e9c85c30f05",
+  "input_rows": 641,
+  "output_rows": 643,
+  "feature_count": 158,
+  "output_value_counts": {
+    "nan": 15825,
+    "finite": 85630,
+    "positive_inf": 108,
+    "negative_inf": 31
+  },
+  "checks": {
+    "partial_window_ma60_is_available": true,
+    "roc60_requires_60_previous_sessions": true,
+    "sample_std_first_observation_is_nan": true,
+    "constant_rank_uses_average_ties": true,
+    "constant_extremum_uses_first_one_based_position": true,
+    "constant_rsquare_is_nan": true,
+    "near_constant_rsquare_is_nan": true,
+    "zero_volume_keeps_epsilon_scaled_large_value": true,
+    "zero_close_keeps_positive_infinity": true,
+    "missing_vwap_is_not_filled": true,
+    "missing_session_stays_on_calendar": true,
+    "nan_comparison_can_yield_zero_count": true,
+    "short_history_is_not_globally_dropped": true,
+    "short_history_roc60_is_nan": true,
+    "query_slice_retrieves_warmup": true,
+    "future_mutation_does_not_change_past": true
+  },
+  "contract": {
+    "input_columns": [
+      "instrument",
+      "datetime",
+      "open",
+      "high",
+      "low",
+      "close",
+      "volume",
+      "vwap"
+    ],
+    "price_unit": "synthetic currency/share",
+    "volume_unit": "shares",
+    "vwap": "explicit same-unit input; never inferred",
+    "calendar": "80 synthetic weekday sessions; not the Chinese exchange calendar",
+    "session_labels": "Asia/Shanghai session dates, timezone-naive ISO date strings",
+    "binary_storage": "little-endian float32; missing calendar rows become NaN",
+    "output_dtype": "official LocalExpressionProvider float32",
+    "processors": [],
+    "labels": [],
+    "max_previous_sessions": 60,
+    "rolling_windows": [
+      5,
+      10,
+      20,
+      30,
+      60
+    ],
+    "missing_policy": "no fill or row drop",
+    "comparison": "abs(actual-expected) <= atol + rtol * abs(expected); masks exact",
+    "default_rtol": 2e-06,
+    "default_atol": 2e-07
+  },
+  "files": {
+    "calendar.txt": "66eb2e5e3c75ec1fee7333ae56e17c1058084fc2a873f7a53685074cffb12f4a",
+    "instruments.json": "7f073c6e46bea9226c715f13e3ccb73cefdcc62388649131373974c535f79255",
+    "input.csv": "92a2925f3ebbe575f78b32fba736de9b252ef0812e0e2d11476cc918b10510fb",
+    "features.json": "3a69f7ea70f1934fb782f36a151ed970b1ac7df98e1ff708733fa2d2e0ce4e03",
+    "expected.csv.gz": "877eca267f4febb0178f805d1ce17ace5f27819cee47905ed967d28a17a0da75",
+    "environment.json": "86d39c35f3b27d6fa11c2b5568afa807b1499ade89f93d4e3db02c275ee15f22",
+    "qlib-license.txt": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+  }
+}

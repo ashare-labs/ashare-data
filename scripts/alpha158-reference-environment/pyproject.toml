@@ -1,0 +1,24 @@
+[project]
+name = "ashare-alpha158-reference-environment"
+version = "1.0.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "pyqlib @ git+https://github.com/microsoft/qlib.git@da920b7f954f48ab1bb64117c976710de198373e",
+    "numpy==2.5.3",
+    "pandas==2.3.3",
+]
+
+[tool.uv]
+package = false
+build-constraint-dependencies = [
+    "numpy==2.5.3",
+    "cython==3.1.6",
+    "setuptools==80.9.0",
+    "setuptools-scm==8.3.1",
+    "packaging==25.0",
+]
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+default = true

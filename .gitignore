@@ -45,3 +45,6 @@ probes/
 # Separately held third-party pilot material is never part of public source.
 /src/ashare_data/pilot_evidence/
 /tests/fixtures/calendar_pilot/
+
+# Isolated Microsoft Qlib oracle environment.
+.venv-alpha158/
