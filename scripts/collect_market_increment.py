@@ -18,7 +18,7 @@ import time
 from urllib.parse import urlencode
 
 from ashare_data.providers.daily_sources import PublicHTTP, sohu_daily, tencent_daily
-from ashare_data.market.increment import sohu_capture
+from ashare_data.market.increment import sohu_capture, DEFAULT_MINUTE_WINDOW, LEGACY_MINUTE_WINDOW, minute_window
 from ashare_data.storage.market_release import MarketRelease, atomic_write, canonical, sha_file
 
 
@@ -158,6 +158,7 @@ def main():
     p.add_argument("--active-since", required=True)
     p.add_argument("--limit", type=int)
     p.add_argument("--retry-errors", action="store_true")
+    p.add_argument("--minute-window", type=int, default=DEFAULT_MINUTE_WINDOW)
     p.add_argument(
         "--refresh-sohu",
         action="store_true",
@@ -165,6 +166,7 @@ def main():
     )
     p.add_argument("--sohu-batch-size", type=int, default=20, choices=range(1, 21))
     a = p.parse_args()
+    minute_window(a.minute_window)
     assert datetime.fromisoformat(a.start) <= datetime.fromisoformat(a.end)
     assert (datetime.fromisoformat(a.end) - datetime.fromisoformat(a.start)).days <= 7
     a.root.mkdir(parents=True, exist_ok=True)
@@ -174,6 +176,7 @@ def main():
     scope_path = a.root / "scope.json"
     if scope_path.exists():
         scope = json.loads(scope_path.read_bytes())
+        a.minute_window = scope.get("minute_window", LEGACY_MINUTE_WINDOW)
         assert scope["parent"]["manifest_sha256"] == r.sha256
         assert (scope["start"], scope["end"], scope["active_since"]) == (
             a.start,
@@ -206,7 +209,8 @@ def main():
             active_since=a.active_since,
             instruments=identifiers,
             basis="Prior release observed daily scopes with last_date>=active_since; not a complete listed-market claim",
-            minute_scope="Existing SH/SZ identifiers only; Sina bounded latest 1023 labels; no arbitrary historical paging",
+            minute_scope="Existing SH/SZ identifiers only; bounded latest source labels; no arbitrary historical paging",
+            minute_window=a.minute_window,
             source_priority={"sohu": 3, "tencent": 4},
             budget_bytes=8 * 1024**3,
             free_reserve_bytes=150 * 1024**3,
@@ -308,13 +312,13 @@ def main():
             if source == "sina_minute":
                 url = (
                     "https://quotes.sina.cn/cn/api/json_v2.php/CN_MarketDataService.getKLineData?"
-                    + urlencode(dict(symbol=symbol, scale=1, ma="no", datalen=1023))
+                    + urlencode(dict(symbol=symbol, scale=1, ma="no", datalen=a.minute_window))
                 )
                 raw, receipts = http.get(url, "https://finance.sina.com.cn/")
                 rows = json.loads(raw)
                 assert rows is None or isinstance(rows, list), "unexpected minute envelope"
                 rows = rows or []
-                assert len(rows) <= 1023
+                assert len(rows) <= a.minute_window
                 labels = [x["day"] for x in rows]
                 value.update(
                     rows=len(rows),

@@ -44,6 +44,7 @@ def parser():
     sub = p.add_subparsers(dest="command", required=True)
     sub.add_parser("product", help="Configured local product queries, including registered minute sources")
     sub.add_parser("cmes", help="Offline CMES file import and isolated candidate queries")
+    sub.add_parser("daily-update", help="Recoverable daily all-market public-source updates")
     from ashare_data.cli.zzshare import add_parsers as add_zzshare_parsers
 
     add_zzshare_parsers(sub)
@@ -340,6 +341,10 @@ def parser():
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
+    if argv[:1] == ["daily-update"]:
+        from ashare_data.cli.daily_increment import main as daily_increment_main
+
+        return daily_increment_main(argv[1:])
     if argv[:1] == ["cmes"]:
         from ashare_data.cli.cmes import main as cmes_main
 

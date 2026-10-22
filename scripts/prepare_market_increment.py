@@ -400,7 +400,7 @@ def prepare(root, build_name="build"):
         admitted_by_day=by_day,
         canonical_minute_series=[2, 4, MINUTE_SERIES],
         expected_coverage="unknown; no newly inferred listings or calendar",
-        future_historical_gaps="Sina cannot paginate beyond its latest 1023 source labels. Earlier per-security gaps remain visible, not silently certified complete.",
+        future_historical_gaps="Sina provides a bounded recent label window, not arbitrary historical paging. Earlier per-security gaps remain visible, not silently certified complete.",
     )
     acceptance = stage / "increment-summary.json"
     atomic_write(acceptance, canonical(report))
