@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ashare-data"
-version = "0.10.0.dev18"
+version = "0.10.0.dev19"
 description = "A数达: direct A-share market data with optional local caching"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
@@ -16,6 +16,9 @@ dependencies = [
 
 [project.optional-dependencies]
 local-data = ["openpyxl==3.1.5", "quickjs==1.19.4", "baostock==0.9.4"]
+factor-evaluation = [
+    "alphalens-reloaded==0.5.0",
+]
 
 [project.scripts]
 ashare-data = "ashare_data.cli:main"

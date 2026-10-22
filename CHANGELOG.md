@@ -1,5 +1,10 @@
 # 更新记录
 
+## 0.10.0.dev19
+
+- Add optional offline single-factor diagnostics backed by pinned Alphalens Reloaded 0.5.0: lagged session labels, Pearson IC, Spearman RankIC, quantile returns/spreads, stability, turnover and explicit cohort cost sensitivity.
+- Preserve signal-date membership before label filtering, reject ambiguous quantile ties, expose coverage, and keep incomplete quantile returns undefined. No execution simulation or market-data acquisition is introduced.
+
 ## 0.10.0.dev18
 
 - Connect ordinary daily backtests to release-pinned formal status, price limits and corporate source evidence; preserve legacy reference groups and explicit missing-data blockers.

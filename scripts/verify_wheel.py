@@ -38,7 +38,7 @@ print(json.dumps({
 """
 
 
-def run(wheel, *, offline=False, cache=None, full=False):
+def run(wheel, *, offline=False, cache=None, full=False, extras=(), test_paths=()):
     project = Path(__file__).resolve().parents[1]
     env = {k: v for k, v in os.environ.items() if not k.startswith(("UV_", "PIP_", "PYTHON"))}
     env.update(UV_PYTHON_DOWNLOADS="never", PYTHONDONTWRITEBYTECODE="1")
@@ -59,8 +59,9 @@ def run(wheel, *, offline=False, cache=None, full=False):
                 "uv",
                 "export",
                 "--locked",
-                *([] if full else ["--no-dev"]),
+                *([] if full or test_paths else ["--no-dev"]),
                 "--no-emit-project",
+                *[argument for extra in extras for argument in ("--extra", extra)],
                 "--no-config",
                 "--format",
                 "requirements-txt",
@@ -136,6 +137,7 @@ def run(wheel, *, offline=False, cache=None, full=False):
         assert amount_comparison["production_eligible"] is False
         result = {
             "wheel": Path(wheel).name,
+            "extras": list(extras),
             "isolated_import_confirmed": True,
             "editable_install": False,
             "identity": installed,
@@ -149,7 +151,7 @@ def run(wheel, *, offline=False, cache=None, full=False):
             "catalog_import": catalog,
             "amount_comparison": amount_comparison,
         }
-        if full:
+        if full or test_paths:
             validation = root / "validation"
             validation.mkdir()
             # The test tree has no src directory, editable installation or source path.
@@ -169,7 +171,7 @@ def run(wheel, *, offline=False, cache=None, full=False):
                     "no:cacheprovider",
                     "--basetemp",
                     str(root / "test-output"),
-                    "tests",
+                    *(["tests"] if full else test_paths),
                 ],
                 validation,
             )
@@ -183,6 +185,8 @@ if __name__ == "__main__":
     parser.add_argument("wheel")
     parser.add_argument("--offline", action="store_true")
     parser.add_argument("--cache", type=Path)
+    parser.add_argument("--extra", action="append", default=[], help="Locked optional dependency group")
+    parser.add_argument("--test", action="append", default=[], help="Selected test path in isolated wheel tree")
     parser.add_argument(
         "--full",
         action="store_true",
@@ -191,7 +195,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(
         json.dumps(
-            run(args.wheel, offline=args.offline, cache=args.cache, full=args.full),
+            run(args.wheel, offline=args.offline, cache=args.cache, full=args.full, extras=args.extra,
+                test_paths=args.test),
             ensure_ascii=False,
             indent=2,
         )

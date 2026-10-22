@@ -36,3 +36,81 @@ print(factor_catalog.catalog("joinquant"))
 ## 输入与开发工具
 
 采集、固定解码、计算、比较的分工、命令和依赖见 [开发指南](development.md#其他工具与生成链)。比较既检查共同证券的数值/排名，也检查两侧可选股票池的 top/bottom 变化；共同池相关性不能掩盖缺失候选造成的替换。最小用例见 `tests/test_factor_selection.py`。
+
+## 单因子效果评价
+
+安装 `ashare-data[factor-evaluation]`，或开发时执行
+`uv sync --locked --no-config --python 3.12 --extra factor-evaluation`。
+这是纯本地诊断，不取数、不生成因子、不下单；账户回测仍交给既有 A宽。
+`ashare_data.factors.evaluation` 的普通导入不加载可选分析库；调用时检查固定版本。
+
+```python
+from ashare_data.factors.evaluation import EvaluationConfig, evaluate
+
+config = EvaluationConfig(
+    input_id="caller-frozen-input-sha256",
+    universe_label="调用方已冻结的股票池及选股理由",
+    universe_mode="fixed_sample",  # 或 point_in_time；调用方负责证明历史成员可见性
+    price_basis="已冻结同口径复权收盘价及其来源身份",
+    horizons=(1, 5, 10), quantiles=5, lag=1,
+    direction=1, min_assets=5, cost_bps=(0, 5, 10, 20), rolling_window=20,
+    # start_date/end_date 可显式限定信号窗口；价格仍保留后续标签缓冲。
+)
+report = evaluate(values, prices, membership=membership, config=config)
+```
+
+`values` 是一个因子的 DataFrame；`prices` 是同口径收盘价格；`membership` 是当日已知的布尔池成员。
+三者必须有完全一致且已排序的证券列、真实交易日 DatetimeIndex（无时区的午夜日期标签）。
+保留完整交易日网格和未来标签缓冲，不能把跨年不连续的多个样本窗口拼成连续交易日。
+未计算/无效因子状态先转换成 NaN；证券代码、重复日期、乱序、未知池成员、无穷值、非正价格均拒绝。
+不自动复权、重采样、填充或静默换源。`price_basis` 必须说明 raw 或实际复权口径；raw 收益会受公司行动影响，
+不等同于持有期总回报。价格与因子口径一致由输入所有者负责，纯数值矩阵无法验证来源时点。
+
+默认信号窗口为首末存在有限因子值的日期，保留中间的全缺失日期；全缺失时使用整个输入网格。
+要区分预热、标签缓冲与全缺失的信号首尾，显式提供在网格上的 `start_date/end_date`。
+当日收盘后已知因子，标签为 `P[t+lag+h]/P[t+lag]-1`，lag 至少 1，h 按提供的交易日计数。
+默认是下一交易日收盘至之后 h 个交易日收盘；不是次日开盘，也不保证撮合或可交易性。
+持有区间含首尾任一天缺价格，标签即缺失；尾部缺缓冲单列原因。未来交易状态不参与信号排序。
+调用者须保证因子输入本身不含未来财报或未来成分信息，冻结文件的哈希不能认证历史 PIT。
+
+| 指标 | 定义与缺失口径 |
+| --- | --- |
+| `ic` / `rank_ic` | 每日横截面的 Pearson / Spearman 相关；每个预测期独立使用观察到的因子-收益对。少于 `min_assets`、恒定因子或恒定收益返回 null，同时提供 n。 |
+| `quantile_membership` | 仅按信号日有效因子和成员分组；先乘显式 direction，再用 Alphalens qcut。高值为 Qmax。不按证券代码强行拆 ties；无法生成全部组时披露失败日期。 |
+| `quantile_returns` | 每日每组等权原始 h 期简单收益；`selected_n` 是信号时成员数，`n` 是有完整标签数。两者不等则收益 null，不将未来存活股重新等权。 |
+| `spread` | 原始 Qmax−Q1。Alphalens 0.5.0 默认按 100% 总敞口除以二，本适配明确乘二恢复一单位多头和一单位空头的诊断差。不是融券策略、账户净值或可成交利润。 |
+| `turnover` | Alphalens 的“本日新进入该组的证券数/本日组证券数”，比较相邻提供的交易日。首日或前一日分组缺失则 null，不跨缺口比较；不是权重换手或成交量。 |
+| `stability` | 按信号日期的月度均值和 trailing `rolling_window` 个交易日均值。滚动窗口不足或任一指标缺值时该滚动均值 null。该统计仅在相应未来标签成熟后可知，不能当作当日实时指标。 |
+| `summary` | 各期限的日均值、样本标准差、有效日期数、正值占比、未年化 mean/std。标准差不超过 `8*float64_eps*max(1,max_abs_value)` 时比值 null。没有假设重叠标签独立的 t 值、年化收益或夏普。 |
+
+`cost_sensitivity` 使用独立等权持有期 cohort：每个多头组固定入场名义本金支付一进一出，
+扣 `2*单边bps/10000`；诊断双边头尾差扣 `4*单边bps/10000`。
+`top_mean` 和 `bottom_mean` 分别是两组各自做多的成本后均值，`spread_mean` 是多高组、空低组的成本后差，
+不等于两组净均值相减。三者使用头尾都有完整标签的相同日期，返回 n。
+假设费用按入场固定本金计、无净额抵消，无借券费和持有期权重漂移；这是敏感性情景，非税费/冲击模型。
+不同期限每日 cohort 重叠，不将它们串乘成策略净值。
+
+输出是 `ad.factor-evaluation.v1` 的 JSON 安全字典（未定义值为 null），包含 config、engine、summary、
+coverage、上述指标数组、assumptions 和 warnings。`engine.input_sha256` 绑定三个完整数值矩阵与轴，
+同时记录适配器和依赖版本；`input_id` 绑定调用者自己的来源身份。coverage 列出实际证券、每日成员/因子/分组数、
+每期限观察对及缺失原因。固定样本明确提示幸存者/事后选股偏差；point_in_time 只是调用方声明，不自动认证。
+未模拟 T+1、涨跌停、停牌、整手、流动性和融券可得性。
+
+离线复放：`scripts/evaluate_factor.py --input INPUT --sha256 SHA256 --output NEW_REPORT`。
+INPUT 的 schema 为 `ad.factor-evaluation-input.v1`，含 `dates`、`securities`、三个二维数组
+`values/prices/membership`、config 及可选 provenance。源文件只读、SHA 不符拒绝、输出文件已存在拒绝覆盖。
+输入/报告存仓外；不得把真实文件当单元测试写入目标。数学边界测试见 `tests/test_factor_evaluation.py`。
+
+### 依赖选择与许可
+
+选用 [Alphalens Reloaded 0.5.0](https://pypi.org/project/alphalens-reloaded/0.5.0/)，
+[源码/许可](https://github.com/stefan-jansen/alphalens-reloaded) 为 Apache-2.0，作为外部可选依赖，未复制其源码。
+直接依赖 numpy、pandas、pytz、tzdata、scipy、statsmodels、matplotlib、seaborn、IPython、empyrical-reloaded；
+实际传递依赖固定在 uv.lock。上游 import 会加载其绘图模块，但本入口仅调用 utils/performance 的数值函数，
+不生成 tear sheet、不联网、不要求 Zipline。利用其分位数、RankIC、组均值、头尾差、换手，Pearson 使用 scipy。
+自行实现的部分限于严格输入/时点对齐、缺失覆盖、JSON 输出及显式成本公式。
+
+[jqfactor_analyzer](https://github.com/JoinQuant/jqfactor_analyzer) 也支持给 FactorAnalyzer 直接提供本地
+pandas 因子与 prices；便捷 analyze_factor 路径另接 DataApi。其 PyPI 1.1.0 额外依赖 jqdatasdk、pyarrow、
+SQLAlchemy、fastcache、cached_property、six，未选择安装。仓库 LICENSE 标 MIT，setup.py 元数据标 Apache v2，
+这里保留该实际差异，不推断新的授权。Alphalens 的本地面板接口和已有 pandas/numpy 边界更直接。
