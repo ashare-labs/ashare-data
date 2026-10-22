@@ -11,6 +11,8 @@ import hashlib
 import json
 from pathlib import Path
 import time
+from functools import lru_cache
+from urllib.parse import parse_qs, urlsplit
 
 from ashare_data.market.increment import normalize_values, sohu_capture
 from ashare_data.providers.cmes import native_security
@@ -31,6 +33,18 @@ def verify(root, day, candidate=None):
     missing_assets = []
     try:
         with store.writer():
+            store.register_request_cache(day)
+            @lru_cache(maxsize=2)
+            def capture(asset):
+                receipt_row = store.db.execute("SELECT body FROM captures WHERE sha256=?", (asset,)).fetchone()
+                if receipt_row is None:
+                    return None
+                receipt = json.loads(receipt_row[0])
+                path = Path(receipt.get("path", receipt.get("capture_path", "")))
+                raw = gzip.decompress(path.read_bytes())
+                assert hashlib.sha256(raw).hexdigest() == asset, "raw capture changed"
+                contexts = [json.loads(r[0]) for r in store.db.execute("SELECT body FROM capture_requests WHERE asset_id=?", (asset,))]
+                return receipt, raw, contexts
             coverage = store.db.execute("SELECT * FROM coverage WHERE day=? AND kind IN ('daily','minute') ORDER BY kind,security", (day,)).fetchall()
             for number, entry in enumerate(coverage, 1):
                 body = json.loads(entry["body"])
@@ -39,16 +53,15 @@ def verify(root, day, candidate=None):
                 if not asset:
                     counts["unavailable_or_no_capture"] += 1
                     continue
-                receipt_row = store.db.execute("SELECT body FROM captures WHERE sha256=?", (asset,)).fetchone()
-                if receipt_row is None:
+                retained = capture(asset)
+                if retained is None:
                     missing_assets.append([entry["security"], asset])
                     continue
-                receipt = json.loads(receipt_row[0])
-                path = Path(receipt.get("path", receipt.get("capture_path", "")))
-                raw = gzip.decompress(path.read_bytes())
-                assert hashlib.sha256(raw).hexdigest() == asset, "raw capture changed"
+                receipt, raw, contexts = retained
                 counts["verified_captures"] += 1
                 if frequency == "1m":
+                    symbol = native_security(entry["security"]).replace(".", "").lower()
+                    assert any(parse_qs(urlsplit(r.get("url", "")).query).get("symbol") == [symbol] for r in contexts), "minute request identity missing"
                     parsed, summary = assess_minutes(raw, day, store.config["minute_window"], trade_status=body.get("trade_status"))
                     for key in ("input_rows", "adopted", "equal_duplicate", "resolved_unused", "quarantined", "format_rejected"):
                         dispositions[key] += summary[key]
@@ -89,6 +102,11 @@ def verify(root, day, candidate=None):
                           minute_label_patterns=[dict(json.loads(k), securities=v) for k, v in patterns.items()],
                           duplicate_key_value_rows=duplicate_keys, coverage=store.report(day),
                           elapsed_seconds=time.monotonic() - started, task_bytes=store.budget())
+            bao_accounting = store.root / "runs" / day / "baostock-accounting.json"
+            if bao_accounting.exists():
+                result["baostock_raw_dispositions"] = json.loads(bao_accounting.read_bytes())
+                for value in result["baostock_raw_dispositions"].values():
+                    assert value["input_rows"] == sum(value[k] for k in ("adopted", "equal_duplicate", "resolved_unused", "quarantined", "format_rejected"))
             if candidate:
                 release = MarketRelease(candidate)
                 result["candidate"] = dict(release.receipt(), files=len(release.files),

@@ -84,6 +84,7 @@ def metadata(store, parent, writer, day, digest, batch_id):
     CREATE TABLE IF NOT EXISTS increment_factors(day TEXT,security TEXT,source TEXT,row_hash TEXT,body TEXT,
       PRIMARY KEY(day,security,source,row_hash));
     CREATE TABLE IF NOT EXISTS increment_instruments(security TEXT PRIMARY KEY,body TEXT);
+    CREATE TABLE IF NOT EXISTS increment_capture_requests(request_id TEXT PRIMARY KEY,asset_id TEXT,body TEXT);
     CREATE TABLE IF NOT EXISTS increment_rejections(day TEXT,security TEXT,kind TEXT,asset_id TEXT,
       source_row INTEGER,reason TEXT,native TEXT,PRIMARY KEY(day,security,kind,asset_id,source_row));
     """)
@@ -120,7 +121,10 @@ def metadata(store, parent, writer, day, digest, batch_id):
         require(row is not None, "INCREMENT_LINEAGE", "Observation has no retained source capture")
         db.execute("INSERT OR IGNORE INTO source_assets VALUES(?,?)", (asset, row[0]))
         db.execute("INSERT OR IGNORE INTO batch_inputs VALUES(?,?)", (batch_id, asset))
+        for request in store.db.execute("SELECT * FROM capture_requests WHERE asset_id=?", (asset,)):
+            db.execute("INSERT OR IGNORE INTO increment_capture_requests VALUES(?,?,?)", tuple(request))
     contract = dict(schema=VERSION, source_priority=store.config["daily_sources"],
+                    source_selection="priority at first successful collection; completed security/day choice is frozen, later captures do not replace it",
                     raw_prices=True, volume_unit="share", amount_unit="CNY",
                     sohu_volume_precision="rounded source lots multiplied by 100",
                     minute_label_timezone="Asia/Shanghai", interval_semantics="source labels, unverified boundaries",
@@ -129,6 +133,9 @@ def metadata(store, parent, writer, day, digest, batch_id):
     db.execute("INSERT INTO data_batches VALUES(?,?,?,?,?,?)", (
         batch_id, digest, parent.release_id + 1, sha_file(__file__), hashlib.sha256(canonical(contract)).hexdigest(), canonical(contract).decode()))
     db.execute("INSERT OR REPLACE INTO release_contracts VALUES('free_daily_increment',?)", (canonical(contract).decode(),))
+    accounting_path = store.root / "runs" / day / "baostock-accounting.json"
+    if accounting_path.exists():
+        db.execute("INSERT OR REPLACE INTO release_contracts VALUES(?,?)", ("free_daily_input_accounting_" + day, accounting_path.read_text()))
     daily_contract = json.loads(db.execute("SELECT body FROM series_contracts WHERE series_id=1").fetchone()[0])
     daily_contract.update(source="release_pinned_selection", sources=["cmes", *store.config["daily_sources"]],
                           source_transition="after each baseline security's observed daily end only",
@@ -166,6 +173,7 @@ def build_candidate(root, day, output):
                     "INCREMENT_OUTPUT", "Output is not owned by this candidate workflow")
         output.mkdir(parents=True, exist_ok=True)
         with store.writer(), CandidateWriter(output, store) as writer:
+            store.register_request_cache(day)
             if not marker.exists():
                 atomic_write(marker, canonical(identity))
             if not (output / "CURRENT.json").exists():

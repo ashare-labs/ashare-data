@@ -85,11 +85,24 @@ def prepare(store, day, http, *, retry_sources=False):
     calendar_from_batches(store, batches)
     load_base_calendar(store)
     basics = batches.get("query_stock_basic", {}).get("rows", [])
-    if store.db.execute("SELECT 1 FROM scopes WHERE day=?", (day,)).fetchone() is None:
-        if day < datetime.now(ZoneInfo("Asia/Shanghai")).date().isoformat():
-            historical_members(store, day, members["rows"], batches)
-        else:
-            store.plan(day, members["rows"], basics)
+    dated = batches.get("query_all_stock", {})
+    qualified = {r["code"] for r in basics if r.get("type") == "1"}
+    selected = {r["security"]: r for r in members["rows"]}
+    supplement = []
+    for number, row in enumerate(dated.get("rows", [])):
+        security = equity_security(row.get("code"))
+        if security and security not in selected and row["code"] in qualified:
+            value = dict(security=security, name=row.get("code_name"), source="baostock_dated_membership",
+                         source_asset_id=dated["capture_sha256"], source_row=number,
+                         observed_at=dated["observed_at"], membership_date=day)
+            selected[security] = value
+            supplement.append(value)
+    if supplement:
+        atomic_write(path.with_name("universe-supplement.json"), canonical(dict(day=day, rows=supplement)))
+    if day < datetime.now(ZoneInfo("Asia/Shanghai")).date().isoformat():
+        historical_members(store, day, list(selected.values()), batches)
+    else:
+        store.plan(day, list(selected.values()), basics)
     with store.db:
         for receipt in members["receipts"]:
             store.capture(dict(receipt, path=str(http.root / "raw" / (receipt["sha256"] + ".gz"))))
@@ -102,6 +115,9 @@ def prepare(store, day, http, *, retry_sources=False):
 def apply_bao(store, day, batches):
     daily = batches.get("query_daily_history_k_AStock", {})
     by_security = {}
+    accounting = {}
+    daily_counts = Counter(input_rows=len(daily.get("rows", [])), adopted=0, equal_duplicate=0,
+                           resolved_unused=len(daily.get("rows", [])), quarantined=0, format_rejected=0)
     for number, row in enumerate(daily.get("rows", [])):
         security = equity_security(row.get("code"))
         if security:
@@ -113,6 +129,7 @@ def apply_bao(store, day, batches):
             if len(native) != 1:
                 continue  # Explicit Sohu supplement or a visible missing task.
             number, row = native[0]
+            daily_counts["resolved_unused"] -= 1
             try:
                 if row.get("date") != day or row.get("adjustflag") != "3":
                     raise ValueError("BaoStock daily date/basis mismatch")
@@ -127,17 +144,25 @@ def apply_bao(store, day, batches):
                             tradestatus=values["tradestatus"], source_asset_id=daily["capture_sha256"],
                             input_rows=1, adopted=1, **result))
                 store.finish(day, security, "daily")
+                daily_counts["adopted" if result["added"] else "equal_duplicate"] += 1
             except (ValueError, KeyError) as error:
+                daily_counts["quarantined"] += 1
                 store.rejected(day, security, "daily", daily["capture_sha256"],
                                dict(source_row=number, native=row, reason=str(error)))
                 store.cover(day, security, "daily", dict(state="quality_gap", observed_count=0, reason=str(error)))
                 store.finish(day, security, "daily", error=str(error))
         factors = batches.get("query_daily_adjust_factor", {})
+        factor_counts = Counter(input_rows=len(factors.get("rows", [])), adopted=0, equal_duplicate=0,
+                                resolved_unused=len(factors.get("rows", [])), quarantined=0, format_rejected=0)
         grouped = {}
         for number, row in enumerate(factors.get("rows", [])):
             security = equity_security(row.get("code"))
             if security:
                 grouped.setdefault(security, []).append((number, row))
+        dated = {equity_security(r.get("code")) for r in batches.get("query_all_stock", {}).get("rows", [])}
+        date_scoped = (factors.get("status") == "ok" and
+                       set(factors.get("fields", [])) == {"code", "dividOperateDate", "foreAdjustFactor", "backAdjustFactor", "adjustFactor"} and
+                       all(r.get("dividOperateDate") == day for r in factors.get("rows", [])))
         for job in store.pending(day, "factor"):
             security = job["security"]
             if factors.get("status") != "ok":
@@ -151,13 +176,39 @@ def apply_bao(store, day, batches):
                               basis="provider native adjustment factors; no automatic CMES rebasing",
                               historical_available_at=None, compatible_with_cmes_unverified=True)
                 digest = hashlib.sha256(canonical(row)).hexdigest()
-                store.db.execute("INSERT OR IGNORE INTO factors VALUES(?,?,?,?,?)",
-                                 (day, security, "baostock", digest, canonical(record).decode()))
+                inserted = store.db.execute("INSERT OR IGNORE INTO factors VALUES(?,?,?,?,?)",
+                                            (day, security, "baostock", digest, canonical(record).decode())).rowcount
+                factor_counts["adopted" if inserted else "equal_duplicate"] += 1
+                factor_counts["resolved_unused"] -= 1
             # Empty event batches are retained as observations, not fabricated unit factors.
-            store.cover(day, security, "factor", dict(state="complete" if rows else "empty_unknown",
+            state = "complete" if rows else "no_factor_event" if date_scoped and security in dated else "source_unsupported" if security.startswith("BJ.") and security not in dated else "empty_unknown"
+            store.cover(day, security, "factor", dict(state=state,
                                                       observed_count=len(rows), source="baostock",
-                                                      source_asset_id=factors["capture_sha256"]))
+                                                      source_asset_id=factors["capture_sha256"],
+                                                      event_scope="date-scoped source factor feed only; not absence of corporate actions",
+                                                      cmes_basis_bridge="unverified"))
             store.finish(day, security, "factor")
+        for kind, batch, counts in (("daily", daily, daily_counts), ("factor", factors, factor_counts)):
+            if batch.get("status") == "ok":
+                accounting[kind] = dict(source_asset_id=batch["capture_sha256"], **counts,
+                                        unused_reason="outside the frozen A-equity scope or already-completed security/day; no replacement")
+        # Source-declared daily trading status is separate evidence, not a field filled into another price source.
+        for security, native in by_security.items():
+            if len(native) != 1:
+                continue
+            number, row = native[0]
+            if row.get("date") != day or row.get("tradestatus") not in {"0", "1"}:
+                continue
+            current = store.db.execute("SELECT body FROM coverage WHERE day=? AND security=? AND kind='daily'", (day, security)).fetchone()
+            if current:
+                value = json.loads(current[0])
+                value["trading_status_evidence"] = dict(source="baostock", source_asset_id=daily["capture_sha256"],
+                                                       source_row=number, tradestatus=row["tradestatus"],
+                                                       evidence_status="source_declared")
+                store.cover(day, security, "daily", value)
+    path = store.root / "runs" / day / "baostock-accounting.json"
+    if accounting and not path.exists():
+        atomic_write(path, canonical(accounting))
 
 
 def collect_sohu(store, day, http, stopped):
@@ -227,11 +278,17 @@ def collect_minutes(store, day, http, stopped, *, maximum=None):
     iterator = iter(tasks)
     completed = 0
     window = store.config["minute_window"]
-    statuses = {row[0]: json.loads(row[1]).get("tradestatus") for row in
-                store.db.execute("SELECT security,body FROM coverage WHERE day=? AND kind='daily'", (day,))}
+    statuses = {}
+    for security, body in store.db.execute("SELECT security,body FROM coverage WHERE day=? AND kind='daily'", (day,)):
+        value = json.loads(body)
+        statuses[security] = value.get("tradestatus") or value.get("trading_status_evidence", {}).get("tradestatus")
 
     def fetch(job):
-        body, receipt = fetch_minute(http, job["security"], window)
+        http.history.refresh = job.get("error") == "refresh_not_ready" and statuses.get(job["security"]) != "0"
+        try:
+            body, receipt = fetch_minute(http, job["security"], window)
+        finally:
+            http.history.refresh = False
         return body, receipt, assess_minutes(body, day, window, trade_status=statuses.get(job["security"]))
 
     with ThreadPoolExecutor(max_workers=2) as pool:
@@ -299,6 +356,7 @@ def run(root, day, *, phase="all", max_minute_jobs=None, retry_sources=False, ca
     started = time.monotonic()
     try:
         with store.writer():
+            store.register_request_cache(capture_day or day)
             atomic_write(directory / "process.json", canonical(dict(pid=__import__('os').getpid(), started_at=utc_now(), day=day, phase=phase)))
             store.budget()
             http = IncrementHTTP(store.root / "runs" / (capture_day or day) / "http", store.root,

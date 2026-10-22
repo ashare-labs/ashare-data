@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS jobs(day TEXT,security TEXT,kind TEXT,state TEXT,atte
 CREATE TABLE IF NOT EXISTS coverage(day TEXT,security TEXT,kind TEXT,state TEXT,
  observed_count INTEGER,body TEXT,PRIMARY KEY(day,security,kind));
 CREATE TABLE IF NOT EXISTS captures(sha256 TEXT PRIMARY KEY,body TEXT);
+CREATE TABLE IF NOT EXISTS capture_requests(request_id TEXT PRIMARY KEY,asset_id TEXT,body TEXT);
+CREATE INDEX IF NOT EXISTS capture_requests_asset ON capture_requests(asset_id);
 CREATE TABLE IF NOT EXISTS observations(source TEXT,frequency TEXT,security TEXT,trade_date TEXT,
  label_at TEXT,open_price TEXT,high_price TEXT,low_price TEXT,close_price TEXT,volume_shares INTEGER,
  turnover_cny TEXT,preclose TEXT,tradestatus TEXT,is_st TEXT,asset_id TEXT,source_row INTEGER,
@@ -146,6 +148,7 @@ class IncrementStore:
         from ashare_data.providers.daily_increment import equity_security
         current = {r["security"]: r for r in members}
         with self.db:
+            prior = {r["security"] for r in self.db.execute("SELECT security FROM instruments WHERE state IN ('active','absent_unknown')")}
             for row in basics:
                 security = equity_security(row.get("code")) if row.get("type") == "1" else None
                 if not security:
@@ -155,7 +158,6 @@ class IncrementStore:
                                 state="retired" if retired else "active" if security in current else "membership_unknown",
                                 listed_on=row.get("ipoDate") or None, delisted_on=row.get("outDate") or None,
                                 body={"source": "baostock_basic", "native": row})
-            prior = {r["security"] for r in self.db.execute("SELECT security FROM instruments WHERE state IN ('active','absent_unknown')")}
             for security, row in current.items():
                 self.instrument(security, name=row.get("name"), state="active", body=row)
                 self.db.execute("INSERT OR REPLACE INTO scopes VALUES(?,?,'expected',?)", (day, security, row["source"]))
@@ -175,8 +177,19 @@ class IncrementStore:
 
     def capture(self, receipt):
         key = receipt.get("capture_sha256", receipt.get("sha256"))
-        self.db.execute("INSERT OR IGNORE INTO captures VALUES(?,?)", (key, canonical(receipt).decode()))
+        body = canonical(receipt)
+        self.db.execute("INSERT OR IGNORE INTO captures VALUES(?,?)", (key, body.decode()))
+        self.db.execute("INSERT OR IGNORE INTO capture_requests VALUES(?,?,?)",
+                        (hashlib.sha256(body).hexdigest(), key, body.decode()))
         return key
+
+    def register_request_cache(self, day):
+        """Retain URL/time contexts even when different requests return identical bytes."""
+        http = self.root / "runs" / day / "http"
+        with self.db:
+            for path in sorted((http / "raw" / "requests").glob("*.json")):
+                receipt = json.loads(path.read_bytes())
+                self.capture(dict(receipt, path=str(http / "raw" / (receipt["sha256"] + ".gz"))))
 
     def start(self, day, security, kind):
         with self.db:

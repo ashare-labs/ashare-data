@@ -134,11 +134,14 @@ def assess_minutes(body, day, window, *, trade_status=None):
         state = "window_expired"
     if not labels and source_labels and source_labels[-1][:10] < day:
         state = "not_yet_available"
+    suspended = not labels and trade_status == "0"
+    if suspended:
+        state, missing = "suspended", []
     if rejected:
         state = "quality_gap"
     counts = {key: sum(r["disposition"] == key for r in rows) for key in
               ("adopted", "equal_duplicate", "resolved_unused", "quarantined", "format_rejected")}
-    return rows, dict(state=state, observed_count=len(labels), expected_regular_labels=240,
+    return rows, dict(state=state, observed_count=len(labels), expected_regular_labels=0 if suspended else 240,
                       missing_regular_labels=len(missing), missing_labels=missing,
                       extra_labels=sorted(labels - session_labels(day)),
                       first_source_label=source_labels[0] if source_labels else None,

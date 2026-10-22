@@ -92,7 +92,9 @@ def historical_members(store, day, current, batches):
                 old = store.db.execute("SELECT * FROM instruments WHERE security=?", (security,)).fetchone()
             outside = old["listed_on"] and day < old["listed_on"] or old["delisted_on"] and day > old["delisted_on"]
             expected = "not_applicable" if outside else "expected" if security in proven else "unknown"
-            store.db.execute("INSERT OR IGNORE INTO scopes VALUES(?,?,?,?)", (day, security, expected, row["source"]))
+            store.db.execute("INSERT INTO scopes VALUES(?,?,?,?) ON CONFLICT(day,security) DO UPDATE SET "
+                             "expected_state=excluded.expected_state,source=excluded.source WHERE scopes.expected_state='unknown'",
+                             (day, security, expected, row["source"]))
             for kind in ("daily", "minute", "factor"):
                 state = "not_applicable" if outside else "pending"
                 store.db.execute("INSERT OR IGNORE INTO jobs(day,security,kind,state) VALUES(?,?,?,?)", (day, security, kind, state))
@@ -102,8 +104,12 @@ def historical_members(store, day, current, batches):
 
 def retry_not_ready(store, day):
     with store.db:
-        store.db.execute("UPDATE jobs SET state='pending' WHERE day=? AND EXISTS(SELECT 1 FROM coverage c "
-                         "WHERE c.day=jobs.day AND c.security=jobs.security AND c.kind=jobs.kind AND c.state='not_yet_available')", (day,))
+        rows = store.db.execute("SELECT c.security,c.kind,j.completed_at FROM coverage c JOIN jobs j USING(day,security,kind) "
+                                "WHERE c.day=? AND c.state='not_yet_available' AND j.state='done'", (day,)).fetchall()
+        for security, kind, completed in rows:
+            if completed and (datetime.now(ZoneInfo("UTC")) - datetime.fromisoformat(completed)).total_seconds() >= 3600:
+                store.db.execute("UPDATE jobs SET state='pending',error='refresh_not_ready' WHERE day=? AND security=? AND kind=?",
+                                 (day, security, kind))
 
 
 def known_complete(store, day, kind):
