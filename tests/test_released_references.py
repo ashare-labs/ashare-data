@@ -220,3 +220,101 @@ def test_public_coverage_has_renderable_assumptions_and_frozen_bindings(released
         {"text": "accept_source_observed_limits", "accepted": True},
     ]
     assert evidence["source_bindings"]["market"]["binding_sha256"] == schedule["binding_sha256"]
+
+
+def semantic_rows(*, empty=False):
+    """Constructed alternate-provider evidence, never a claim about CMES packages."""
+    data = rows()
+    count = 0 if empty else 1
+    tables = {
+        role: {"source_table": "captured/" + role, "row_count": count if role == "distributions" else 0,
+               "state": "business_rows_observed" if count and role == "distributions"
+               else "provider_no_rows_reported", "explicit_empty_marker": True}
+        for role in ("distributions", "rights_issues", "capital_changes")
+    }
+    coverage = data["meta.financial_coverage"][0]
+    coverage.update(source="alternate_ledger", task_id="alternate", coverage_id="alternate",
+                    input_rows=count, mapped_rows=count,
+                    coverage_json=json.dumps({"source_status": "parsed_provider_tables",
+                        "counts": {"actions": count}, "corporate_coverage": {
+                            "schema": "ad.corporate-coverage.v1", "start": "2010-01-01",
+                            "end": "2026-12-31", "tables": tables}}))
+    data["meta.financial_coverage"] = [coverage]
+    capture = data["meta.financial_captures"][0]
+    capture.update(source="alternate_ledger", task_id="alternate", capture_id="alternate")
+    data["meta.financial_captures"] = [capture]
+    for row in data["corporate_action.events"]:
+        row["source"] = "alternate_ledger"
+    if empty:
+        data["corporate_action.events"] = []
+    return data
+
+
+def export_data(tmp_path, data):
+    release = publish(market(tmp_path / "market"), data)
+    r = reader(release)
+    try:
+        return ReleasedCorporateView(r, [SID], DAY, DAY).export_aq(
+            [SID], start=DAY, end=DAY, tax_model="gross_cash_no_tax",
+            accept_source_scoped_coverage=True)
+    finally:
+        r.close()
+
+
+@pytest.mark.parametrize("empty", [False, True])
+def test_equivalent_semantic_coverage_accepts_other_provider_and_explicit_empty(tmp_path, empty):
+    result = export_data(tmp_path, semantic_rows(empty=empty))
+    assert result["ready_for_declared_date_model"] and not result["issues"]
+    assert len(result["rows"]) == (0 if empty else 1)
+    coverage = result["coverage"]["rows"][0]
+    assert coverage["covered_table_roles"] == ["capital_changes", "distributions", "rights_issues"]
+    assert {v["kind"] for v in coverage["source_coverage"].values()} == {"alternate_ledger"}
+    assert coverage["absence_proved"] is False
+
+
+@pytest.mark.parametrize("defect", [
+    "declaration", "role", "locator", "count", "empty_marker", "scope", "date", "capture", "capture_invalid", "capture_source",
+    "quarantine", "unparsed", "payment", "stock_dates",
+])
+def test_semantic_coverage_does_not_bypass_evidence_or_event_fields(tmp_path, defect):
+    data = semantic_rows()
+    coverage = data["meta.financial_coverage"][0]
+    native = json.loads(coverage["coverage_json"])
+    declaration = native["corporate_coverage"]
+    if defect == "declaration":
+        native.pop("corporate_coverage")
+    elif defect == "role":
+        declaration["tables"].pop("capital_changes")
+    elif defect == "locator":
+        declaration["tables"]["distributions"]["source_table"] = ""
+    elif defect == "count":
+        declaration["tables"]["distributions"]["row_count"] = 2
+    elif defect == "empty_marker":
+        declaration["tables"]["rights_issues"]["explicit_empty_marker"] = False
+    elif defect == "scope":
+        declaration["start"] = "2024-05-01"
+    elif defect == "date":
+        declaration["end"] = "2024-13-40"
+    elif defect == "capture":
+        data["meta.financial_captures"][0]["observed_at"] = "2024-04-01T00:00:00+00:00"
+    elif defect == "capture_invalid":
+        data["meta.financial_captures"][0]["observed_at"] = "invalid"
+    elif defect == "capture_source":
+        data["meta.financial_captures"][0]["source"] = "unrelated_statement"
+    elif defect == "quarantine":
+        coverage["quarantined_rows"] = 1
+    elif defect == "unparsed":
+        native["counts"]["unparsed_records"] = 1
+    elif defect == "payment":
+        data["corporate_action.events"][1]["payment_date"] = None
+    elif defect == "stock_dates":
+        event = data["corporate_action.events"][0]
+        fields = json.loads(event["source_fields_json"])
+        fields["fields"]["bonus_share_ratio"] = "0.1"
+        event["source_fields_json"] = json.dumps(fields)
+    coverage["coverage_json"] = json.dumps(native)
+    result = export_data(tmp_path, data)
+    assert not result["ready_for_declared_date_model"] and result["issues"]
+    if defect in {"payment", "stock_dates"}:
+        required = {"payment_date"} if defect == "payment" else {"share_credit_date", "new_shares_tradable_date"}
+        assert required <= {row.get("field") for row in result["issues"]}

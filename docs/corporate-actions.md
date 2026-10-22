@@ -61,6 +61,23 @@ if not schedule["ready_for_declared_date_model"]:
 
 输出 schema 为 `ad.aq-corporate-actions.v1`，包含日期级事件、字段血缘、覆盖与阻断项。显式接受来源范围仅表示消费者接受该研究样本边界；`economic_result_certified`、`historical_pit`、`execution_permission`、`strategy_visible` 始终为 false。默认不接受范围，CLI `export-aq` 被阻断时退出码为 2。
 
+覆盖门禁按表的语义角色检查分红送转（`distributions`）、配股（`rights_issues`）、股本变动（`capital_changes`），不限定供应商名称。既有 `sina_actions` / `sina_structure` 保留兼容映射；其他来源须在封存的 `source_coverage`，或 release 的 `meta.financial_coverage.coverage_json` 中提供 `corporate_coverage`：
+
+```json
+{
+  "schema": "ad.corporate-coverage.v1",
+  "start": "2024-01-01",
+  "end": "2024-12-31",
+  "tables": {
+    "distributions": {"source_table": "captured/distributions", "state": "business_rows_observed", "row_count": 1},
+    "rights_issues": {"source_table": "captured/rights", "state": "provider_no_rows_reported", "row_count": 0, "explicit_empty_marker": true},
+    "capital_changes": {"source_table": "captured/capital", "state": "provider_no_rows_reported", "row_count": 0, "explicit_empty_marker": true}
+  }
+}
+```
+
+这是生产者的证据声明格式，不是任何供应商已覆盖的证明。每个角色须有源表定位、完整解析结果及业务行数；零行必须来自明确空表证据，不能由未下载或未解析推断。可由多个来源合计覆盖三个角色。查询窗口须包含在声明范围内，同源成功采集时间须晚于窗口末日；release 还校验批次范围、输入/映射行数、隔离行和未解析行。实际采集时间从绑定回执取得，不能自行补历史时钟。显式空表只允许来源范围内的空结果，`absence_proved` 仍为 false；事件的登记、除权、支付、股份到账和可卖日期仍按实际事件类型逐项验证。当前 CMES 日线/因子包没有此项公司行动覆盖声明。
+
 消费者须检查 `event_identity_version=2`，按 `entitlement_key` 建立一次权益，并按 `settlement_keys` 中的登记、现金、股票到账、可卖阶段分别去重；跨窗口或重复查询不得再次发放。`revision_observation_ids` 用于检测修订。已经结算的更正需要账户显式冲正/差额处理，不能只因键相同就忽略。旧日期式 ID 与 v2 ID 不可混用，迁移须对账。以上是 AD 接口契约，尚不是 AQ 原生账户去重或更正执行的实现；隆基股票到账与可卖分日也仍需 AQ 适配。
 
 经济单位及职责：
@@ -106,7 +123,7 @@ ashare-data corporate-history coverage --binding /isolated/package/binding.json 
 
 离线构建不写共享数据库，所有输入按内容寻址封存；重复构建固定输出须逐字节一致，否则拒绝覆盖。HTTP 错误原文及“200 但非 PDF”均保留为获取失败，不作为无事件证据。单次原文上限 15 MB，标准化包总量上限 256 MiB，东方财富若返回多页则明确拒绝不完整结果；扩大范围时必须分批并验证分页，不能截取当成全量。
 
-解析失败保留原文、回执及 `source_coverage.status="parse_failed"`、`parse_error`，行数为未知而非零，`absence_proved=False`；包仍可打开、检查血缘与查询其他证券。部分未知业务行保留在 `unparsed_records`，相应证券导出返回 `source_parse_incomplete`。完全空的来源返回 `source_has_no_locatable_history`；已有可定位历史的正常无事件子区间可返回 `empty_source_scoped_interval`，仍不证明全类型无事件。有引文的公告可补足无效源字段，原错误诊断不会删除。
+解析失败保留原文、回执及 `source_coverage.status="parse_failed"`、`parse_error`，行数为未知而非零，`absence_proved=False`；包仍可打开、检查血缘与查询其他证券。部分未知业务行保留在 `unparsed_records`，相应证券导出返回 `source_parse_incomplete`。完全空且没有上述显式空表覆盖证据的来源返回 `source_has_no_locatable_history`；已有可定位历史的正常无事件子区间可返回 `empty_source_scoped_interval`，仍不证明全类型无事件。有引文的公告可补足无效源字段，原错误诊断不会删除。
 
 ### 尚待完成
 

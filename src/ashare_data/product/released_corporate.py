@@ -9,6 +9,7 @@ import json
 
 from ashare_data.corporate_actions.history import CorporateHistoryView, DATE_FIELDS, VALUE_FIELDS
 from ashare_data.corporate_actions.identity import associate_actions
+from ashare_data.corporate_actions.coverage import LEGACY_ROLES, declared_tables
 
 
 class ReleasedCorporateView(CorporateHistoryView):
@@ -20,17 +21,21 @@ class ReleasedCorporateView(CorporateHistoryView):
         self._data = dict(sources={}, source_coverage={}, shares=[], security_boundaries=[])
         coverage = reader.query(
             "meta.financial_coverage",
-            "security IN (" + ",".join("?" for _ in securities) + ") AND source IN ('sina_actions','sina_structure')",
+            "security IN (" + ",".join("?" for _ in securities) + ")",
             securities,
         )
         for row in coverage:
             native = json.loads(row["coverage_json"])
+            declaration = native.get("corporate_coverage")
+            if row["source"] not in LEGACY_ROLES and declaration is None:
+                continue  # Financial statements do not attest corporate action coverage.
             with reader.release.metadata() as db:
                 batch = db.execute("SELECT body FROM data_batches WHERE batch_key=?", [row["batch_key"]]).fetchone()
             manifest = json.loads(batch[0]).get("manifest", {}) if batch else {}
             captures = reader.query("meta.financial_captures", "batch_key=? AND task_id=?",
                                     [row["batch_key"], row["task_id"]])
-            capture_after_window = any(c["source_state"] == "complete" and c["observed_at"]
+            capture_after_window = any(c["source"] == row["source"]
+                                       and c["source_state"] == "complete" and c["observed_at"]
                                        and c["observed_at"][:10] > end for c in captures)
             in_scope = (manifest.get("target_start", "9999") <= start
                         and end <= manifest.get("target_end", "0000"))
@@ -39,7 +44,12 @@ class ReleasedCorporateView(CorporateHistoryView):
                         and native.get("source_status") == "parsed_provider_tables"
                         and not native.get("counts", {}).get("unparsed_records")
                         and in_scope and capture_after_window)
-            if row["source"] == "sina_actions":
+            if declaration is not None:
+                tables = declared_tables(declaration)
+                complete = complete and tables is not None and (
+                    declaration["start"] <= start <= end <= declaration["end"]
+                ) and all(t["row_count"] <= row["input_rows"] for t in tables.values())
+            elif row["source"] == "sina_actions":
                 tables = native.get("table_states") or {}
                 complete = complete and all(
                     (tables.get(name, {}).get("state") == "business_rows_observed"
@@ -58,6 +68,10 @@ class ReleasedCorporateView(CorporateHistoryView):
                 query_start=manifest.get("target_start"), query_end=manifest.get("target_end"),
                 captures=captures, parsed_coverage=native, quarantined_rows=row["quarantined_rows"],
                 absence_proved=False, full_history_proven=False,
+                **({"corporate_coverage": declaration, "coverage_observed_at": max(
+                    (c["observed_at"] for c in captures if c["source"] == row["source"]
+                     and c["source_state"] == "complete" and c["observed_at"]), default=None,
+                )} if declaration is not None else {}),
             )
             self._data["source_coverage"][row["coverage_id"]] = source
         observations = []

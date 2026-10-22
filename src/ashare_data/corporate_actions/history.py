@@ -18,6 +18,9 @@ from zoneinfo import ZoneInfo
 from ashare_data.core.model import DataError, day, require, symbol, timestamp
 from ashare_data.storage.immutable import identifier
 from ashare_data.corporate_actions.identity import associate_actions
+from ashare_data.corporate_actions.coverage import (
+    ACTION_ROLES, ROLES, covered_roles, declared_tables, is_corporate_source,
+)
 
 SCHEMA = "ad.corporate-history-binding.v1"
 DATA_SCHEMA = "ad.corporate-history-data.v1"
@@ -435,6 +438,8 @@ class CorporateHistoryView:
                 "Invalid source coverage claim",
             )
             entry.setdefault("absence_proved", False)
+            if "corporate_coverage" in entry:
+                entry["coverage_observed_at"] = sources[key]["observed_at"]
             for name in ("native_action_rows", "native_share_rows", "nonimplemented_rows"):
                 entry.setdefault(name, None)
             entry.setdefault("unparsed_records", [])
@@ -996,12 +1001,7 @@ class CorporateHistoryView:
             }
             source_gaps = []
             for source_id, source in sources.items():
-                if source["kind"] in {
-                    "sina_actions",
-                    "sina_structure",
-                    "sina_action_detail",
-                    "eastmoney_dividends",
-                }:
+                if is_corporate_source(source):
                     if (
                         source["status"] in {"parse_failed", "partial_provider_tables"}
                         or source["unparsed_records"]
@@ -1015,14 +1015,22 @@ class CorporateHistoryView:
                                 parse_error=source.get("parse_error"),
                             )
                         )
+                    if ("corporate_coverage" in source
+                            and declared_tables(source["corporate_coverage"]) is None):
+                        source_gaps.append(dict(source_id=source_id,
+                                                reason="source_corporate_coverage_invalid"))
             history_observed = any(
                 r["security"] == security and not unlocated(r) for r in self._actions
             )
-            ledger = [v for v in sources.values() if v["kind"] == "sina_actions"]
+            ledger = [v for v in sources.values()
+                      if covered_roles(v, start, end) & ACTION_ROLES]
+            covered = set().union(*(covered_roles(v, start, end) for v in sources.values()))
+            empty = set().union(*(covered_roles(v, start, end, empty_only=True)
+                                  for v in sources.values()))
             blank_source = not history_observed and not any(
                 (v.get("native_action_rows") or 0) + (v.get("nonimplemented_rows") or 0) > 0
                 for v in ledger
-            )
+            ) and not ACTION_ROLES <= empty
             if blank_source:
                 source_gaps.append(dict(reason="source_has_no_locatable_history"))
             result.append(
@@ -1059,13 +1067,8 @@ class CorporateHistoryView:
                         for kind in ("sina_structure", "sina_float")
                     },
                     source_coverage=sources,
-                    provider_tables_captured=all(
-                        any(
-                            v["kind"] == k and v["status"] == "parsed_provider_tables"
-                            for v in sources.values()
-                        )
-                        for k in ("sina_actions", "sina_structure")
-                    ),
+                    provider_tables_captured=ROLES <= covered,
+                    covered_table_roles=sorted(covered),
                     economic_schedule_fields_complete=bool(events) and not missing,
                     identity_boundaries=[
                         deepcopy(b)
