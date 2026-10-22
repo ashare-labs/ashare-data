@@ -324,10 +324,16 @@ class LocalDailyProduct:
             "limitations": list(LIMITATIONS),
         }
 
-    def prices(self, securities, start, end, source="auto"):
+    def prices(
+        self, securities, start, end, source="auto", *,
+        adjustment=None, basis_date=None, factors=None,
+    ):
+        from ashare_data.providers.cmes_factors import adjust_prices
+
         securities, start, end = _selection(securities, start, end, source)
         with self._read() as store:
-            return self._prices(store, securities, start, end, source)
+            raw = self._prices(store, securities, start, end, source)
+        return adjust_prices(raw, factors=factors, adjustment=adjustment, basis_date=basis_date)
 
     def coverage(self, securities, start, end, source="auto", *, references=None):
         from ashare_data.product.publication import coverage

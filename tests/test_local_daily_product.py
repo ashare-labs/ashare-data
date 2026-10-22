@@ -118,6 +118,37 @@ def test_catalogue_search_pagination_coverage_and_read_only(library):
     json.dumps(result, allow_nan=False)
 
 
+def test_explicit_cmes_adjustment_uses_existing_prices_without_library_writes(library, tmp_path):
+    import zipfile
+    from decimal import Decimal
+    from ashare_data.providers.cmes_factors import CMESFactorView, import_cmes_factors
+
+    root, days = library
+    product = LocalDailyProduct(root)
+    paths = {}
+    for kind, first, second in (("hfq", "1", "2"), ("qfq", "2", "1")):
+        paths[kind] = tmp_path / (kind + ".zip")
+        with zipfile.ZipFile(paths[kind], "w") as archive:
+            archive.writestr("SZ.000858.csv", f"date,{kind}_factor\n{days[1]},{second}\n1900-01-01,{first}\n")
+    store = Store.init(tmp_path / "factors")
+    factor_id = import_cmes_factors(
+        store, hfq_path=paths["hfq"], qfq_path=paths["qfq"],
+        members={IDS[0]: "SZ.000858.csv"}, through=days[-1],
+    )
+    factors = CMESFactorView(store, factor_id)
+    before = (root / "daily.sqlite3").read_bytes()
+    raw = product.prices([IDS[0]], days[0], days[1], "baostock")
+    pre = product.prices([IDS[0]], days[0], days[1], "baostock", adjustment="pre",
+                         basis_date=days[1], factors=factors)
+    post = product.prices([IDS[0]], days[0], days[1], "baostock", adjustment="post",
+                          basis_date=days[1], factors=factors)
+    assert [Decimal(r["close"]) for r in pre["rows"]] == [Decimal("5.25"), Decimal("10.50")]
+    assert [Decimal(r["close"]) for r in post["rows"]] == [Decimal("10.50"), Decimal("21.00")]
+    assert pre["receipt"]["raw_receipt"] == raw["receipt"]
+    assert product.prices([IDS[0]], days[0], days[1], "baostock", factors=factors) == raw
+    assert (root / "daily.sqlite3").read_bytes() == before
+
+
 def test_prices_preserve_decimal_units_provenance_and_explicit_source(library):
     root, days = library
     product = LocalDailyProduct(root)

@@ -77,6 +77,86 @@ BaoStock 早期工具用 archive_only=True，原件进入 raw/early-baostock，�
 
 `LocalDailyProduct` 从显式选择的 `daily.sqlite3` 提供证券搜索、分页覆盖和原价查询。每个请求使用只读 SQLite 事务，返回 JSON 数值字符串、缺口、原始来源行 hash、响应摘要与读回执；不联网、不搬库。目录中的来源范围是公共日历内的已有观察，名称不是历史名称；实际查询还受上市和代码有效期约束。日历之外的早期原观察仍保留在主库，由早期观察接口读取，不能当作完整产品日历。
 
+### 固定 CMES 复权因子
+
+`prices(..., adjustment=None)` 保持原价默认；`adjustment="pre"/"post"` 显式传入
+`CMESFactorView` 和 `basis_date`。本地产品和 `ReleasedDailyProduct` 共用这个入口。
+它只投影查询结果，原库、正式部署选择、发布及公司行动接口不变。
+
+```python
+from pathlib import Path
+from ashare_data import Store
+from ashare_data.product import LocalDailyProduct
+from ashare_data.providers.cmes_factors import CMESFactorView, import_cmes_factors
+
+product = LocalDailyProduct("data/local-daily")
+packages = Path("data/cmes-packages")
+factor_store = Store.init("data/research-factors")  # 独立、显式输出目录
+factor_id = import_cmes_factors(
+    factor_store,
+    hfq_path=packages / "adjustment_factors/hfq/all-market-history.zip",
+    qfq_path=packages / "adjustment_factors/qfq/all-market-history.zip",
+    members={"600000.XSHG": "SH.600000.csv"},  # 日线证券映射所有者提供；不猜别名
+    through="2026-10-21",  # 数据截止日，不是历史可见性证明
+)
+factors = CMESFactorView(factor_store, factor_id)  # 保存完整 factor_id；禁止 latest
+print(factors.factor_at("600000.XSHG", "2024-07-18"))
+adjusted = product.prices(
+    ["600000.XSHG"], "2024-07-17", "2024-07-18",
+    adjustment="pre", basis_date="2024-07-18", factors=factors,
+)
+```
+
+CMES 两列采用同一解析/匹配流程，但方向不同：`hfq_factor` 乘价格，
+`qfq_factor` 除价格。每只证券的两列事件日期必须一致，`hfq*qfq` 在整份源历史中
+相对误差不超过 `1e-10`；冲突直接报错。计算始终使用冻结的 HFQ 累计因子：
+
+| 查询 | OHLC 换算 | 价格基准 |
+|---|---|---|
+| 原价 `None` | 不变，不读取因子 | 原价 |
+| 前复权 `pre` | `raw(t) * H(t) / H(basis_date)` | 显式 `basis_date` |
+| 后复权 `post` | `raw(t) * H(t) / H(first_anchor)` | 固定版本中最早源锚点；通常 1900-01-01、H=1 |
+
+与已有日频研究约定一致，两种复权的 `basis_date` 都是显式因子截止日，必须覆盖
+所有请求日期且不超过导入的 `through`。后复权另在 `price_anchor_dates` 报告其价格锚点，
+不会用查询窗口第一天重新定基。前复权可等价理解为 `raw(t)*Q(basis_date)/Q(t)`，
+**不能直接乘 Q(t)，也不能直接除以今天归一化的 Q(t) 来表示历史基准日**。
+
+按证券精确匹配；日期选择最后一个 `effective_date <= date` 的事件，除权当日即生效，
+周末基准日沿用之前的因子。第一条事件之前不回填，缺证券/锚点、重复日期、非正/非有限
+数值、超过固定截止日均报错。导入不推导上市、停牌或交易日历；1900 锚点不是上市日。
+Decimal 34 位、ROUND_HALF_EVEN，保留结果字符串，不按分位截断。仅调整 OHLC；
+volume/amount/money、源 preclose 及状态字段保持原价语义，详见 `adjustment.unadjusted_fields`。
+不要把未调整的源 preclose 与复权 OHLC 混用为收益公式。
+
+最小跨模块契约：日线导入方提供现有原价 envelope：`price_basis="raw"`、`rows` 中
+`security/date/open/high/low/close`（明确缺失可为 `None`）及原价 `receipt`；若提供
+`receipt.rows_sha256` 则必须与行一致。可直接调用
+`factors.adjust_prices(raw_result, adjustment="pre", basis_date="2024-07-18")`，
+无需复制日线解析或因子流程。结果保留 gaps、calendar、原来源字段，新增每行
+`adjustment_factor/factor_effective_date`，新 receipt 绑定原价 receipt、输入/输出行摘要、
+因子版本、算法策略和基准日；原价对象不被修改。
+
+固定版本封存所选原始 CSV 内容、成员 SHA256、两个 ZIP 的 SHA256、显式证券映射与策略。
+重开验证完整哈希；追加/修订只生成新 id，不更新旧版本或默认指针。旧回测还须固定
+原价 market release 或原价输入/receipt，同时固定 ashare-data 版本/提交；
+可变本地库加固定因子并不冻结原价。
+当前快照是事后研究观察，不能证明过去已知这些值。现金分红支付日、股份到账/可卖日、
+现金和持仓账务继续由公司行动事实及账户模型负责，因子不替代这些证据。
+
+少量真实窗口可复验：
+
+```sh
+python scripts/validate_cmes_factors.py --packages "$CMES_PACKAGES" \
+  --output "$NEW_VALIDATION_DIR" --through 2026-10-21
+```
+
+此脚本只读取两个因子 ZIP 和明确列出的两个证券日线 ZIP，比较除权前收的复权值与源除权
+参考价（允许源分位舍入的 0.005 元误差），核对 HFQ/QFQ 方向及固定版本重开。
+它仅用于价格约定验证；不能据此认证公告、送转支付日期或账户收益。输出写入显式新目录。
+
+### 原价查询与发布
+
 ```python
 from ashare_data.product import LocalDailyProduct
 from ashare_data import Store

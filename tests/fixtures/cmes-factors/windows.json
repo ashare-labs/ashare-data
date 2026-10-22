@@ -1,0 +1,72 @@
+{
+  "description": "Minimal extracted numeric regression; deliberately incomplete factor history, not an importable full market dataset or corporate-action record. Provenance refers to source packages, not these transformed bytes.",
+  "provenance": {
+    "hfq": {
+      "archive_sha256": "faa32044758967a83d7603b44314fd6e50aa0f05aa1a4dff72e7cd910fbdd579",
+      "member": "SH.600000.csv",
+      "member_sha256": "6ee4b3eca4ef252fa92fb2a5def54e719e52c7c468282a13373d414f14ae1fc0"
+    },
+    "qfq": {
+      "archive_sha256": "79adf16e46c280507e838f781d3a2c3a964f6c842284e87d0308e7a612e7cf04",
+      "member": "SH.600000.csv",
+      "member_sha256": "8382a6a7e0175b137f6bf87fa47b6a4d41b5d32776ff18b28fb9abd74114da44"
+    },
+    "daily": {
+      "archive_sha256": "5e18b9f1e6e17f4c93aaa81ee38a2f84c0b3a1587dfb604c4268700b26a4e975",
+      "member": "SH.600000.csv",
+      "member_sha256": "4dae0d6ea6bfdc3654409a6170a7e049caa3e77fee4f383f8336c1d6f6881a5d"
+    }
+  },
+  "windows": [
+    {
+      "security": "600000.XSHG",
+      "previous_date": "2017-05-24",
+      "ex_date": "2017-05-25",
+      "previous_close": "15.47",
+      "ex_close": "12.93",
+      "ex_reference_price": "11.75",
+      "events": [
+        {
+          "date": "1900-01-01",
+          "hfq_factor": "1.0000000000000000",
+          "qfq_factor": "17.3916341988312000"
+        },
+        {
+          "date": "2016-06-23",
+          "hfq_factor": "9.2710670167499010",
+          "qfq_factor": "1.8759042694234000"
+        },
+        {
+          "date": "2017-05-25",
+          "hfq_factor": "12.2102441895126000",
+          "qfq_factor": "1.4243477795284000"
+        }
+      ]
+    },
+    {
+      "security": "600000.XSHG",
+      "previous_date": "2024-07-17",
+      "ex_date": "2024-07-18",
+      "previous_close": "9.04",
+      "ex_close": "8.77",
+      "ex_reference_price": "8.72",
+      "events": [
+        {
+          "date": "1900-01-01",
+          "hfq_factor": "1.0000000000000000",
+          "qfq_factor": "17.3916341988312000"
+        },
+        {
+          "date": "2023-07-21",
+          "hfq_factor": "15.5459152080763000",
+          "qfq_factor": "1.1187269431263000"
+        },
+        {
+          "date": "2024-07-18",
+          "hfq_factor": "16.1182559331356000",
+          "qfq_factor": "1.0790022364068000"
+        }
+      ]
+    }
+  ]
+}
