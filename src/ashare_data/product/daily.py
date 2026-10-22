@@ -9,7 +9,7 @@ from ashare_data.core.model import DataError, day, digest, require
 from ashare_data.market.client import _security
 from ashare_data.storage.local_daily import LocalDailyStore
 
-SOURCES = ("auto", "canonical", "baostock", "eastmoney", "sina", "sohu", "tencent", "free_stockdb")
+SOURCES = ("auto", "canonical", "baostock", "eastmoney", "sina", "sohu", "tencent", "free_stockdb", "cmes")
 MAX_SECURITIES = 100
 MAX_SECURITY_SESSIONS = 100_000
 LIMITATIONS = [
@@ -218,9 +218,9 @@ class LocalDailyProduct:
 
     def _prices(self, store, securities, start, end, source, *, selected_sources=None):
         require(
-            source != "free_stockdb" or hasattr(store, "release"),
+            source not in ("free_stockdb", "cmes") or hasattr(store, "release"),
             "MARKET_SOURCE_SCOPE",
-            "free_stockdb daily reads require a pinned market release",
+            "File-source daily reads require a pinned market release",
         )
         calendar = [
             dict(r)

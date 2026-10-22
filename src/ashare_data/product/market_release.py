@@ -55,6 +55,11 @@ class FrozenDailyStore(LocalDailyStore):
 
     def get_price(self, security, start="2010-01-01", end=None, source="auto", **unused):
         selected = "canonical" if source in ("auto", "canonical") else source
+        cmes = getattr(self.release, "manifest", {}).get("cmes")
+        if cmes or selected == "cmes":
+            require(cmes and selected in ("canonical", "cmes"), "MARKET_SOURCE_SCOPE",
+                    "CMES candidates contain only their explicit file source; no fallback")
+            selected = "canonical"
         if selected not in ("canonical", "free_stockdb"):
             from ashare_data.storage.source_observations import daily_source, incremental_daily
 
@@ -134,6 +139,8 @@ class FrozenDailyStore(LocalDailyStore):
                 batch_id=r["batch_id"],
                 series_id=r["series_id"],
             )
+            if cmes:
+                row.update({key: r.get(key) for key in ("source_asset_id", "source_member", "source_row")})
             for name, field in zip(("open", "high", "low", "close", "volume", "amount"), FIELDS):
                 value = r[field]
                 row[name] = None if value is None else str(value)
@@ -158,6 +165,8 @@ class FrozenDailyStore(LocalDailyStore):
             "batch_id",
             "series_id",
         ]
+        if cmes:
+            columns += ["source_asset_id", "source_member", "source_row"]
         frame = pd.DataFrame(public, columns=columns)
         frame.attrs = {
             "source": selected,
@@ -173,6 +182,10 @@ class FrozenDailyStore(LocalDailyStore):
             "no_request_window_reranking": True,
             "historical_pit_verified": False,
         }
+        if cmes:
+            frame.attrs.update(source="cmes", source_selection=source,
+                               mapping_version=cmes["mapping_version"],
+                               mapping_sha256=cmes["mapping_sha256"], fallback="none")
         return frame
 
     def close(self):
@@ -246,7 +259,7 @@ class ReleasedDailyProduct(LocalDailyProduct):
         value = super()._prices(*args, **kwargs)
         value["limitations"] = list(LIMITATIONS)
         value["market_release"] = self.release.receipt()
-        if value["source"] in ("auto", "canonical", "free_stockdb") or value["rows"]:
+        if value["source"] in ("auto", "canonical", "free_stockdb", "cmes") or value["rows"]:
             known = set(value["calendar"])
             missing_listing = {
                 gap["security"] for gap in value["gaps"] if gap["code"] == "SECURITY_UNAVAILABLE"
@@ -290,11 +303,18 @@ class ReleasedDailyProduct(LocalDailyProduct):
             value["limitations"].append(
                 "This source filter returns only the release-admitted free-stockdb supplement, not all original provider observations."
             )
-        elif value["source"] not in ("auto", "canonical"):
+        elif value["source"] not in ("auto", "canonical", "cmes"):
             value["access"] = "explicit_frozen_source_observation"
             value["limitations"] = [
                 "Explicit source observations retain the original provider values and listing/calendar filters.",
                 "These records are not silently promoted to canonical facts; historical PIT is unverified.",
+            ]
+        if self.release.manifest.get("cmes"):
+            value["limitations"] = [
+                "CMES raw prices with explicit file unit profiles; no fallback or field filling.",
+                "ST membership is positive evidence only; absence, suspension and listing history remain unknown.",
+                "Calendar flags are provider observations; common sessions require SH/SZ agreement; BJ is not inferred.",
+                "Historical code changes and publication times are unverified; file retrieval is not historical PIT.",
             ]
         return value
 

@@ -43,6 +43,7 @@ def parser():
     p.add_argument("--store", help="高级离线快照目录；直接行情查询无需此参数")
     sub = p.add_subparsers(dest="command", required=True)
     sub.add_parser("product", help="Configured local product queries, including registered minute sources")
+    sub.add_parser("cmes", help="Offline CMES file import and isolated candidate queries")
     from ashare_data.cli.zzshare import add_parsers as add_zzshare_parsers
 
     add_zzshare_parsers(sub)
@@ -339,6 +340,10 @@ def parser():
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
+    if argv[:1] == ["cmes"]:
+        from ashare_data.cli.cmes import main as cmes_main
+
+        return cmes_main(argv[1:])
     if argv[:1] == ["product"]:
         from ashare_data.product.__main__ import main as product_main
 

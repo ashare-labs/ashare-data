@@ -244,3 +244,66 @@ python -m ashare_data.product.release_cli --root "$BACKUP" restore --destination
 文件清单保留被替换块，从而重现旧版本；本实现没有混用稀疏行历史后删除旧文件。发布时检查重复逻辑键、引用、输入去向、逐值回转和父版本 CAS。这是受控管道保证，事实文件没有数据库物理 PK/FK 索引。局部修订会保留旧块，有明确容量代价。
 
 本地 release 重现不等于严格市场 PIT。修订公开可知时间未知时保持未知，不能拿本地导入时间或 bar 结束时间代替。
+## CMES 离线文件候选
+
+`ashare-data cmes import` 将显式选择的 ZIP/CSV 转成标准 `MarketRelease`，复用
+`ReleaseWriter` 的不可变对象、校验与发布。输出必须是新候选目录；它不发现或修改部署配置。
+ZIP 在原位置流式读取，不解压或复制原包进代码仓库。目录参数只查看直接子文件，不递归跟随下载目录。
+
+```sh
+# RAW_ROOT 和 CANDIDATE 均由调用方显式选择；CANDIDATE 位于源码和原始包目录之外。
+ashare-data cmes import --root "$CANDIDATE" \
+  --daily "$RAW_ROOT/split_daily" \
+  --calendar "$RAW_ROOT/trading_references/trade_calendar/SSE.zip" \
+             "$RAW_ROOT/trading_references/trade_calendar/SZSE.zip" \
+  --st "$RAW_ROOT/trading_references/st_list/ST股票列表.zip" \
+  --security SH.600000 SZ.000001 BJ.920000
+ashare-data cmes query --root "$CANDIDATE" --security 600000.XSHG \
+  --start 2024-01-02 --end 2024-01-05
+```
+
+省略 `--security` 会处理所有显式文件内的证券；选择证券时，具名 ZIP/CSV 成员在解压前过滤。
+CSV 默认 UTF-8（支持 BOM），其他编码需显式 `--encoding gb18030`。证券要求明确交易所：
+`SH.600000 → 600000.XSHG`、`SZ.000001 → 000001.XSHE`、`BJ.920000 → BJ.920000`。
+不根据裸代码猜交易所，也不根据新旧代码猜同一发行人；`instrument_id` 仅在该发布中有意义。
+
+| 配置 | 原始量/额 | 标准量/额 | 用途 |
+|---|---|---|---|
+| `daily-lots-kcny` | 手 / 千元 | 股 / 元，分别乘 100 / 1000 | `--daily` 的日线配置 |
+| `minute-shares-cny` | 股 / 元 | 不缩放 | 全市场日包分钟配置 |
+| `minute-lots-cny` | 手 / 元 | 量乘 100 | 另一种单股分钟导出配置 |
+
+分钟复用同一读取、转换、发布流程，须显式传入 `--minute FILE --minute-profile PROFILE`。
+不能仅由频率判断单位。分钟标签按 `Asia/Shanghai` 解析，保留源分钟，不重采样或补齐网格。
+日线为 `bars_1d` / series 1，分钟为 `bars_1m` / series 7。价格及金额采用精确 Decimal，
+成交量必须是整数股；缺失量额仍为 null。源昨收保留为 `preclose`，不计算复权。
+
+```python
+from ashare_data.storage.market_release import MarketRelease
+from ashare_data.product.market_release import ReleasedDailyProduct
+
+release = MarketRelease(candidate_root, release_id=1, expected_manifest_sha256=manifest_sha256)
+rows = release.read("bars_1d", "600000.XSHG", "2024-01-02", "2024-01-05")
+product = ReleasedDailyProduct({"market_release": {
+    "root": str(release.root), "release_id": release.release_id,
+    "manifest_sha256": release.sha256,
+}})
+prices = product.prices(["600000.XSHG"], "2024-01-02", "2024-01-05", source="cmes")
+```
+
+公共文件协议位于 `providers.cmes`：`normalize_security`、`normalize_date`、`source_asset`、
+`csv_members`、`csv_rows` 可供因子等非 K 线类别复用。`source_version` 为原 ZIP/CSV 的 SHA256，
+`mapping_version` 为 `cmes-files.v1`，`mapping_sha256` 固定本次转换代码。
+每条行情保留来源对象 ID、CSV 成员名、从表头之后的第 2 条开始编号的 CSV 记录号。
+文件的获取时刻和历史发布时间均不猜测；默认 `observed_at` 未知。
+
+原始日历按交易所完整保存在元数据 `cmes_calendar`；旧公共日历表只投影沪深共同确认的交易日，
+不把沪深日历套给北交所。ST 正向记录在 `cmes_st`，日线命中日期时 `is_st='1'`，未命中为未知。
+不由首尾行情推断上市日期，不由零量推断停牌。参考记录的成员、记录号、源版本均保留。
+可通过 `release.metadata()` 查询这两个表以及 `source_assets`。
+
+同源重复键数值相同只保留一条，数值冲突拒绝发布；无效价格、非整数股等记录保存在
+`cmes_rejections`，并计入 manifest 的 `input_dispositions`。异常不由其他供应商补齐。
+重复执行完全相同的文件、范围与转换版本返回 `unchanged=true`，不增加发布或行数；
+改动输入、范围或转换代码须选新候选目录。中断可用相同输入重建未发布候选。
+本入口不把分笔、盘口、财务或复权因子塞进 K 线表，也不提供正式数据切换。
