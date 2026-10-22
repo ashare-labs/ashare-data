@@ -373,9 +373,13 @@ prices = product.prices(["600000.XSHG"], "2024-01-02", "2024-01-05", source="cme
 
 公共文件协议位于 `providers.cmes`：`normalize_security`、`normalize_date`、`source_asset`、
 `csv_members`、`csv_rows` 可供因子等非 K 线类别复用。`source_version` 为原 ZIP/CSV 的 SHA256，
-`mapping_version` 为 `cmes-files.v1`，`mapping_sha256` 固定本次转换代码。
+`mapping_version` 为 `cmes-files.v2`，`mapping_sha256` 固定本次转换代码。
 每条行情保留来源对象 ID、CSV 成员名、从表头之后的第 2 条开始编号的 CSV 记录号。
-文件的获取时刻和历史发布时间均不猜测；默认 `observed_at` 未知。
+`observed_at` 记录本候选首次完成源文件哈希校验时的实际 UTC 时间，绑定源 SHA256，
+同一源文件的日线和分钟投影沿用该时间。候选记录先冻结这一观察，重复导入及中断恢复
+沿用首次时间，不按重试时钟重置。它不是下载时间、文件修改时间、行情历史发布时间或
+历史可见性证明；`historical_available_at` 仍为 null，历史 PIT 仍为 false。
+旧候选保持原样，缺失的观察时间不会事后补写；新转换版本需要新候选目录。
 
 原始日历按交易所完整保存在元数据 `cmes_calendar`；旧公共日历表只投影沪深共同确认的交易日，
 不把沪深日历套给北交所。ST 正向记录在 `cmes_st`，日线命中日期时 `is_st='1'`，未命中为未知。

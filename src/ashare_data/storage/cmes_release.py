@@ -9,7 +9,7 @@ import sqlite3
 
 import pandas as pd
 
-from ashare_data.core.model import DataError, require
+from ashare_data.core.model import DataError, require, timestamp
 from ashare_data.providers import cmes
 from ashare_data.storage.local_daily import SCHEMA as LOCAL_SCHEMA
 from ashare_data.storage.market_release import (
@@ -73,6 +73,15 @@ def _insert_bars(db, buffer):
         buffer.clear()
 
 
+def _request_identity(spec):
+    # Later revalidation is not a new first observation. All other inputs,
+    # source hashes, semantics and conversion identity must still match exactly.
+    return {**spec, "inputs": [
+        {key: value for key, value in asset.items() if key != "observed_at"}
+        for asset in spec["inputs"]
+    ]}
+
+
 def _reference(db, asset, *, encoding, securities):
     kind = asset["kind"]
     count = Counter(input_rows=0, adopted=0, equal_duplicate=0)
@@ -132,18 +141,25 @@ def import_cmes(root, *, daily=(), minute=(), minute_profile=None, calendars=(),
     spec = dict(schema=SCHEMA, source="cmes", mapping_version=cmes.MAPPING_VERSION,
                 mapping_sha256=mapping, inputs=inputs, securities=selected, encoding=encoding,
                 price_basis="raw", volume_unit="share", amount_unit="CNY")
-    import_id = hashlib.sha256(canonical(spec)).hexdigest()
     root = Path(root).expanduser().resolve()
     require(all(not Path(x["path"]).is_relative_to(root) for x in inputs),
             "CMES_OUTPUT", "Candidate output must not contain an original input")
     marker = root / "CMES-CANDIDATE.json"
     if root.exists() and any(root.iterdir()):
-        require(marker.is_file() and json.loads(marker.read_bytes()) == spec,
+        require(marker.is_file(),
                 "CMES_OUTPUT", "Use a new isolated candidate root for changed inputs; never a live release")
     root.mkdir(parents=True, exist_ok=True)
     with ReleaseWriter(root, free_reserve_bytes=free_reserve_bytes, budget_bytes=budget_bytes) as writer:
-        if not marker.exists():
+        if marker.exists():
+            frozen = json.loads(marker.read_bytes())
+            require(_request_identity(frozen) == _request_identity(spec), "CMES_OUTPUT",
+                    "Use a new isolated candidate root for changed inputs; never a live release")
+            for asset in frozen["inputs"]:
+                timestamp(asset["observed_at"])  # Require a timezone-aware frozen observation.
+            spec, inputs = frozen, frozen["inputs"]
+        else:
             atomic_write(marker, canonical(spec))
+        import_id = hashlib.sha256(canonical(spec)).hexdigest()
         if (root / "CURRENT.json").exists():
             release = MarketRelease(root)
             require(release.manifest.get("cmes_import_id") == import_id,
@@ -164,6 +180,9 @@ def import_cmes(root, *, daily=(), minute=(), minute_profile=None, calendars=(),
                 low_price DECIMAL(38,12),close_price DECIMAL(38,12),volume_shares BIGINT,
                 turnover_cny DECIMAL(38,12),preclose DECIMAL(38,12),source_symbol VARCHAR,
                 source_asset_id VARCHAR,source_member VARCHAR,source_row BIGINT)""")
+            db.execute("CREATE TABLE source_observations(source_asset_id VARCHAR PRIMARY KEY,observed_at VARCHAR)")
+            db.executemany("INSERT INTO source_observations VALUES(?,?)",
+                           [(asset["asset_id"], asset["observed_at"]) for asset in inputs])
             dispositions, seen_securities = {}, set()
             for asset in inputs:
                 writer.budget()
@@ -257,11 +276,14 @@ def import_cmes(root, *, daily=(), minute=(), minute_profile=None, calendars=(),
                 instrument_id = ids[security]
                 query = """SELECT a.* EXCLUDE(table_name,security,preclose),preclose::VARCHAR preclose,
                     ?::INTEGER instrument_id,
-                    1::INTEGER batch_id,'cmes' AS source,NULL::VARCHAR response_id,NULL::VARCHAR observed_at,
+                    1::INTEGER batch_id,'cmes' AS source,NULL::VARCHAR response_id,observation.observed_at,
+                    NULL::VARCHAR historical_available_at,
                     NULL::VARCHAR tradestatus,CASE WHEN EXISTS(SELECT 1 FROM st_membership s
                     WHERE s.security=a.security AND s.trade_date=a.trade_date) THEN '1' END is_st,
-                    sha256(concat_ws('|',source_asset_id,source_member,source_row::VARCHAR)) row_hash
-                    FROM accepted a WHERE table_name=? AND series_id=? AND security=?
+                    sha256(concat_ws('|',a.source_asset_id,source_member,source_row::VARCHAR)) row_hash
+                    FROM accepted a JOIN source_observations observation
+                    ON observation.source_asset_id=a.source_asset_id
+                    WHERE table_name=? AND series_id=? AND security=?
                     ORDER BY trade_date,label_at"""
                 obj = writer.parquet(db, query, [instrument_id, table, series_id, security],
                                      f"cmes-{series_id}-{instrument_id}")

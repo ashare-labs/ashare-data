@@ -2,7 +2,7 @@
 
 from contextlib import contextmanager
 import csv
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal, localcontext
 from io import TextIOWrapper
 from pathlib import Path
@@ -13,7 +13,7 @@ from ashare_data.core.model import DataError, TZ, day, require
 from ashare_data.market.increment import exact_number, normalize_values
 from ashare_data.storage.market_release import fingerprint, sha_file
 
-MAPPING_VERSION = "cmes-files.v1"
+MAPPING_VERSION = "cmes-files.v2"
 # Different CMES exports of the same frequency can have different units.
 BAR_PROFILES = {
     "daily-lots-kcny": {"table": "bars_1d", "series_id": 1, "volume": 100, "amount": 1000},
@@ -54,7 +54,12 @@ def normalize_date(value):
     return day(value)
 
 
+def _observation_time():
+    return datetime.now(timezone.utc).isoformat()
+
+
 def source_asset(path, *, kind, profile=None):
+    """Observe bytes now; the importer freezes the first observation in its candidate."""
     path = Path(path).expanduser().resolve()
     require(path.is_file() and path.suffix.lower() in {".zip", ".csv"},
             "CMES_INPUT", "Choose an existing ZIP or CSV", {"path": str(path)})
@@ -66,7 +71,9 @@ def source_asset(path, *, kind, profile=None):
         "path": str(path), "sha256": digest, "bytes": before[0], "kind": kind,
         "profile": profile, "mapping_version": MAPPING_VERSION,
         "original_retention": "external file; never copied or modified by importer",
-        "observed_at": None, "historical_pit_verified": False,
+        "observed_at": _observation_time(),
+        "observed_at_semantics": "local file hash validation; first observation within this candidate import",
+        "historical_available_at": None, "historical_pit_verified": False,
     }
 
 

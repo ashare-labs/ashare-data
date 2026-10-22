@@ -1,9 +1,11 @@
 """Synthetic vendor protocol fixtures; no real packages or deployment discovery."""
 
 import csv
+from datetime import datetime, timezone
 from decimal import Decimal
 from io import StringIO
 import json
+import os
 import subprocess
 import sys
 from zipfile import ZipFile
@@ -89,7 +91,9 @@ def test_full_candidate_standard_api_sql_references_and_replay(tmp_path):
     root = tmp_path / "candidate"
     args = dict(daily=sources, minute=[minute], minute_profile="minute-shares-cny", calendars=calendars, st=[st])
     originals = {path: sha_file(path) for path in [*sources, minute, *calendars, st]}
+    before_observation = datetime.now(timezone.utc)
     result = build(root, **args)
+    after_observation = datetime.now(timezone.utc)
     release = MarketRelease(root, 1, expected_manifest_sha256=result["manifest_sha256"])
     assert len(release.files) == 4
     assert sum(f["rows"] for f in release.files) == 4
@@ -101,11 +105,22 @@ def test_full_candidate_standard_api_sql_references_and_replay(tmp_path):
         assert db.execute("SELECT count(*) FROM calendar").fetchone()[0] == 1
         assert db.execute("SELECT count(*) FROM cmes_st").fetchone()[0] == 1
         assert db.execute("SELECT count(*) FROM listing_facts").fetchone()[0] == 0
+        observations = {asset["asset_id"]: asset for (body,) in db.execute("SELECT body FROM source_assets")
+                        for asset in [json.loads(body)]}
+    for asset in observations.values():
+        observed_at = datetime.fromisoformat(asset["observed_at"])
+        assert before_observation <= observed_at <= after_observation
+        assert asset["historical_available_at"] is None
+        assert asset["historical_pit_verified"] is False
+    minute_row = release.read("bars_1m", "600000.XSHG", "2024-01-02T00:00:00Z", "2024-01-02T23:59:59Z")[0]
+    assert minute_row["observed_at"] == observations[minute_row["source_asset_id"]]["observed_at"]
+    assert minute_row["historical_available_at"] is None
     config = {"market_release": {"root": str(root), "release_id": 1, "manifest_sha256": release.sha256}}
     product = ReleasedDailyProduct(config)
     prices = product.prices(list(release.identifiers), "2024-01-02", "2024-01-03", "cmes")
     assert len(prices["rows"]) == 3
     assert all(r["source"] == "cmes" and Decimal(r["volume"]) == 125 for r in prices["rows"])
+    assert all(r["observed_at"] == observations[r["source_asset_id"]]["observed_at"] for r in prices["rows"])
     assert {r["security"]: r["is_st"] for r in prices["rows"]} == {
         "600000.XSHG": "1", "000001.XSHE": None, "BJ.920000": None,
     }
@@ -193,10 +208,13 @@ def test_replay_detects_changed_objects_and_original_changes(tmp_path):
 
 def test_interrupted_pointer_publication_resumes_identically(tmp_path, monkeypatch):
     import ashare_data.storage.market_release as module
+    import ashare_data.providers.cmes as provider
 
     source = daily(tmp_path / "daily.zip")
     root = tmp_path / "candidate"
     write = module.atomic_write
+    first_observed_at = "2026-10-22T12:00:00+00:00"
+    monkeypatch.setattr(provider, "_observation_time", lambda: first_observed_at)
 
     def interrupt(path, body):
         if path.name == "CURRENT.json":
@@ -209,8 +227,42 @@ def test_interrupted_pointer_publication_resumes_identically(tmp_path, monkeypat
     assert not (root / "CURRENT.json").exists()
     before = (root / "releases/00000001.json").read_bytes()
     monkeypatch.setattr(module, "atomic_write", write)
+    monkeypatch.setattr(provider, "_observation_time", lambda: "2026-10-23T12:00:00+00:00")
     assert build(root, daily=[source])["release_id"] == 1
     assert before == (root / "releases/00000001.json").read_bytes()
+    assert MarketRelease(root).read("bars_1d", "600000.XSHG", "2024-01-02", "2024-01-02")[0]["observed_at"] == first_observed_at
+
+
+def test_first_file_observation_survives_later_revalidation(tmp_path, monkeypatch):
+    import ashare_data.providers.cmes as provider
+
+    sources = [daily(tmp_path / "SH.600000.zip"), daily(tmp_path / "SZ.000001.zip", "SZ.000001")]
+    for source in sources:
+        os.utime(source, (946684800, 946684800))  # A file timestamp is not an import observation.
+    first_times = iter(["2026-10-22T12:00:00+00:00", "2026-10-22T12:01:00+00:00"])
+    monkeypatch.setattr(provider, "_observation_time", lambda: next(first_times))
+    root = tmp_path / "candidate"
+    first = build(root, daily=sources)
+    release = MarketRelease(root)
+    config = {"market_release": dict(root=str(root), release_id=1, manifest_sha256=release.sha256)}
+    prices = ReleasedDailyProduct(config).prices(list(release.identifiers), "2024-01-02", "2024-01-02", "cmes")
+    assert {r["security"]: r["observed_at"] for r in prices["rows"]} == {
+        "600000.XSHG": "2026-10-22T12:00:00+00:00", "000001.XSHE": "2026-10-22T12:01:00+00:00",
+    }
+    assert all(r["is_st"] is None and r["tradestatus"] is None for r in prices["rows"])
+    marker_path = root / "CMES-CANDIDATE.json"
+    checkpoint = marker_path.read_bytes()
+    monkeypatch.setattr(provider, "_observation_time", lambda: "2026-11-01T15:00:00+00:00")
+    replay = build(root, daily=sources)
+    assert replay["unchanged"] and replay["manifest_sha256"] == first["manifest_sha256"]
+    assert marker_path.read_bytes() == checkpoint
+    assert ReleasedDailyProduct(config).prices(list(release.identifiers), "2024-01-02", "2024-01-02", "cmes") == prices
+    tampered = json.loads(checkpoint)
+    tampered["inputs"][0]["observed_at"] = "2026-11-01T15:00:00+00:00"
+    marker_path.write_text(json.dumps(tampered))
+    with pytest.raises(DataError, match="different import"):
+        build(root, daily=sources)
+    assert MarketRelease(root).sha256 == release.sha256
 
 
 def test_corrupt_archive_cli_reports_failure_without_publication(tmp_path):
