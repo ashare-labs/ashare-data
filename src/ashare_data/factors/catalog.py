@@ -8,6 +8,7 @@ from ashare_data.factors.joinquant import panel as joinquant_batch
 from ashare_data.factors.joinquant import research_view as factor_research
 from ashare_data.factors.alpha191 import VERSION as ALPHA191_VERSION, VERSIONS as ALPHA191_VERSIONS
 from ashare_data.factors.alpha191 import coverage as alpha191_coverage
+from ashare_data.factors.qlib_alpha158 import coverage as alpha158_coverage
 
 __all__ = ["libraries", "catalog"]
 CATALOG_VERSION = "ashare-data.factor-libraries.v1"
@@ -16,7 +17,7 @@ _GOAL = "explicit definitions and reproducible calculation; exact JQ equality is
 
 
 def libraries():
-    """List the two source libraries, counts, and unchanged calculation entrypoints."""
+    """List source libraries, feature counts, and calculation entrypoints."""
     return pd.DataFrame(
         [
             {
@@ -44,6 +45,17 @@ def libraries():
                 "goal": _GOAL,
                 "definition_versions": ALPHA191_VERSIONS,
                 "note": "public.v1 retains 183 definitions and 8 ambiguities; opt-in explicit.v1 defines all 191 with documented interpretations, external dependencies and explicit 143/146 inputs. No JQ category mapping.",
+            },
+            {
+                "library": "qlib_alpha158",
+                "namespace": "qlib_alpha158",
+                "label": "Qlib Alpha158",
+                "catalog_version": CATALOG_VERSION,
+                "entry_count": 158,
+                "api_field_count": 158,
+                "entrypoints": ("ashare_data.factors.qlib_alpha158.Alpha158.compute",),
+                "goal": "Pinned official default feature semantics over explicit inputs",
+                "note": "158 engineered features, not effective strategy counts; no training.",
             },
         ]
     ).set_index("library")
@@ -93,14 +105,14 @@ def _joinquant_catalog():
 
 
 def catalog(library=None, *, alpha191_version=ALPHA191_VERSION):
-    """One discovery entrypoint; select 'joinquant', 'alpha191', or both with None.
+    """One discovery entrypoint; select a namespace, or all with None.
 
     The (library, factor) key is a catalog identity, not a new compute alias.
     ``api_fields`` and ``entrypoint`` tell callers which existing API/field to use.
     JoinQuant entries correspond to named fields. Alpha IDs have no inferred taxonomy.
     """
-    if library not in {None, "joinquant", "alpha191"}:
-        raise ValueError("library must be 'joinquant' or 'alpha191'")
+    if library not in {None, "joinquant", "alpha191", "qlib_alpha158"}:
+        raise ValueError("library must be 'joinquant', 'alpha191' or 'qlib_alpha158'")
     frames = []
     if library in {None, "joinquant"}:
         frames.append(_joinquant_catalog())
@@ -117,4 +129,6 @@ def catalog(library=None, *, alpha191_version=ALPHA191_VERSION):
             "No JQ equality claim; see formula provenance and validation"
         )
         frames.append(alpha)
+    if library in {None, "qlib_alpha158"}:
+        frames.append(alpha158_coverage().reset_index())
     return pd.concat(frames, ignore_index=True).set_index(["library", "factor"])

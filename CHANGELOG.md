@@ -1,5 +1,9 @@
 # 更新记录
 
+## 0.10.0.dev20
+
+- Add isolated `qlib_alpha158` namespace with the official v0.9.7 default 158 features, explicit float32/input-basis contracts, and independently generated reference comparisons. Preserve CMES, Alpha191 and evaluation APIs.
+
 ## 0.10.0.dev19
 
 - Add optional offline single-factor diagnostics backed by pinned Alphalens Reloaded 0.5.0: lagged session labels, Pearson IC, Spearman RankIC, quantile returns/spreads, stability, turnover and explicit cohort cost sensitivity.

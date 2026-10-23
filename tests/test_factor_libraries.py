@@ -13,13 +13,13 @@ from ashare_data.factors.alpha191 import Alpha191, coverage
 def test_catalog_module_import_provides_discovery_functions():
     import ashare_data.factors.catalog as factor_catalog
 
-    assert list(factor_catalog.libraries().index) == ["joinquant", "alpha191"]
+    assert list(factor_catalog.libraries().index) == ["joinquant", "alpha191", "qlib_alpha158"]
     assert len(factor_catalog.catalog("joinquant")) == 19
 
 
 def test_two_source_libraries_and_named_field_accounting():
     lib = libraries()
-    assert list(lib.index) == ["joinquant", "alpha191"]
+    assert list(lib.index) == ["joinquant", "alpha191", "qlib_alpha158"]
     assert lib.loc["joinquant", "label"] == "聚宽主因子库（部分实现）"
     assert lib.loc["alpha191", "label"] == "Alpha191"
     assert lib.loc["joinquant", "entry_count"] == 19
@@ -39,9 +39,9 @@ def test_two_source_libraries_and_named_field_accounting():
 
 def test_combined_catalog_namespace_and_no_invented_taxonomy():
     all_factors = catalog()
-    assert len(all_factors) == 19 + 191
+    assert len(all_factors) == 19 + 191 + 158
     assert all_factors.index.is_unique and all_factors.qualified_name.is_unique
-    assert set(all_factors.namespace) == {"joinquant", "alpha191"}
+    assert set(all_factors.namespace) == {"joinquant", "alpha191", "qlib_alpha158"}
     assert not {"basic", "fundamental", "quality", "growth", "momentum"} & set(
         all_factors.namespace
     )

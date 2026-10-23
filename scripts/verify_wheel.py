@@ -23,6 +23,8 @@ for name in ('baostock-sdk.json', 'sina-decode.js', 'sina-decoder-notice.txt'):
     assert files('ashare_data.providers').joinpath(name).read_bytes()
 for name in ('sources.json', 'NOTICE', 'LICENSE.dolphindb'):
     assert files('ashare_data.factors.alpha191').joinpath(name).read_bytes()
+for name in ('features.json', 'qlib-license.txt'):
+    assert files('ashare_data.factors.qlib_alpha158').joinpath(name).read_bytes()
 assert _profile_bytes() and _policy()
 print(json.dumps({'version': ashare_data.__version__, 'runtime': code_identity(), 'parser': source_identity()}))
 """
@@ -121,7 +123,7 @@ def run(wheel, *, offline=False, cache=None, full=False, extras=(), test_paths=(
         catalog = json.loads(command([str(executable), "-I", "-c", CATALOG_IMPORT], root))
         assert catalog == {
             "module": "ashare_data.factors.catalog",
-            "libraries": ["joinquant", "alpha191"],
+            "libraries": ["joinquant", "alpha191", "qlib_alpha158"],
             "joinquant_fields": 19,
         }
         amount_comparison = json.loads(

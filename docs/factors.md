@@ -114,3 +114,68 @@ INPUT 的 schema 为 `ad.factor-evaluation-input.v1`，含 `dates`、`securities
 pandas 因子与 prices；便捷 analyze_factor 路径另接 DataApi。其 PyPI 1.1.0 额外依赖 jqdatasdk、pyarrow、
 SQLAlchemy、fastcache、cached_property、six，未选择安装。仓库 LICENSE 标 MIT，setup.py 元数据标 Apache v2，
 这里保留该实际差异，不推断新的授权。Alphalens 的本地面板接口和已有 pandas/numpy 边界更直接。
+
+
+## Qlib Alpha158
+
+`ashare_data.factors.qlib_alpha158.Alpha158` computes the **official default**
+158 engineered features, not a count of effective strategies. Discovery uses
+`ashare_data.factors.catalog.catalog("qlib_alpha158")`; identifiers such as
+`qlib_alpha158:ROC5` are separate from GTJA `alpha191:alpha158`.
+Qlib v0.9.7 is pinned to `da920b7f954f48ab1bb64117c976710de198373e`.
+The packaged `features.json` records exact official order, expressions and
+lookback/lookahead; `qlib-license.txt` retains the Microsoft MIT license.
+The [official reference and comparator](../scripts/alpha158-reference.md) are
+independent test tooling. Production does not depend on Qlib or a model framework.
+
+```python
+from ashare_data.factors.qlib_alpha158 import Alpha158
+result = Alpha158(
+    data, universe=membership, adjustment="raw",
+    volume_basis="actual share volume",
+    vwap_basis="explicit same-row CNY amount / share volume; zero volume is NaN",
+    input_id="immutable-input-id",
+).compute(["ROC5", "MA60", "VWAP0"])
+values = result.between("2024-07-01", "2024-08-30").values
+```
+
+`data` maps open/high/low/close/volume/vwap (optional unused amount) to
+numeric date × security DataFrames, exactly aligned to explicit Boolean
+`universe`. Dates are unique increasing timezone-naive midnight session labels.
+No resampling, collection, sorting, fill, price adjustment or VWAP inference occurs.
+Absent fields give `MISSING_DEPENDENCY`; NaN observations remain part of the grid.
+Price units are CNY/share and volume is shares; adjusted inputs require an
+`adjusted:<immutable snapshot/policy>` identity and same-basis OHLC/VWAP.
+Caller must describe actual `volume_basis` and `vwap_basis`. This implementation
+does not promise equality with an unspecified vendor's adjusted price/volume
+feed. Existing raw CMES amount/share-volume VWAP is a declared daily ratio, not
+certification of Qlib vendor VWAP, tick VWAP or total-return adjustment.
+
+Inputs are quantized to float32 like official local binary storage; intermediate
+operator dtypes follow Qlib and final values are float32. Infinite inputs and
+float32 input overflow are rejected; zero prices are permitted for explicit edge
+probes. Outputs preserve NaN and signed infinity. `status_labels()` distinguishes
+`QLIB_NAN`, `POSITIVE_INFINITY`, `NEGATIVE_INFINITY`, missing dependencies and
+membership exclusions. `QLIB_NAN` may mean missing observation, insufficient
+history or undefined arithmetic; it does not assert a single inferred cause.
+Finite CNTP can be zero even when all close inputs are NaN, as official comparisons
+return false. Do not replace these values using Alpha191's missingness policy.
+
+Rolling windows are 5/10/20/30/60, include today and use `min_periods=1`.
+`full_window_rows` means available context, **not** a compulsory warmup mask:
+MA60 can be available on day one; ROC60 needs 61 rows. Std uses ddof=1; Rank is
+the average tied percentile; IdxMax/Min uses the first one-based position and
+upstream NaN behavior. Corr/Rsquare preserve Qlib's absolute 2e-5 degeneracy rule.
+Only the expressions' original epsilon constants are used. No fitted processor,
+label, training, cross-security rank or model is added. Membership masks output
+only and does not erase calculation history. Optional `instrument_ranges` names
+every security's inclusive lifetime; missing rows within a lifetime still count
+as sessions. Compute over all needed history, then slice via `between`; metadata
+records the history start because floating-point recurrences depend on it.
+
+AQ reuses frozen source registration, bounded workers and the existing evaluator.
+JSON/plots expose nonfinite values as null with their explicit status (and `inf`
+text for signed infinities); evaluator input uses only finite OK values. Raw
+feature exploration and adjusted evaluation-return prices remain separately
+identified in provenance. Package tests compare every official synthetic row and
+column, including IEEE masks, without selecting only a finite intersection.

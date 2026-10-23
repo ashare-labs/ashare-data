@@ -1,0 +1,1129 @@
+{
+  "qlib_version": "0.9.7",
+  "qlib_commit": "da920b7f954f48ab1bb64117c976710de198373e",
+  "source": "https://github.com/microsoft/qlib/blob/da920b7f954f48ab1bb64117c976710de198373e/qlib/contrib/data/loader.py",
+  "call": "Alpha158DL.get_feature_config()",
+  "default_config": {
+    "kbar": {},
+    "price": {
+      "windows": [
+        0
+      ],
+      "feature": [
+        "OPEN",
+        "HIGH",
+        "LOW",
+        "VWAP"
+      ]
+    },
+    "rolling": {}
+  },
+  "features": [
+    {
+      "index": 0,
+      "name": "KMID",
+      "expression": "($close-$open)/$open",
+      "lookback": 0,
+      "lookahead": 0
+    },
+    {
+      "index": 1,
+      "name": "KLEN",
+      "expression": "($high-$low)/$open",
+      "lookback": 0,
+      "lookahead": 0
+    },
+    {
+      "index": 2,
+      "name": "KMID2",
+      "expression": "($close-$open)/($high-$low+1e-12)",
+      "lookback": 0,
+      "lookahead": 0
+    },
+    {
+      "index": 3,
+      "name": "KUP",
+      "expression": "($high-Greater($open, $close))/$open",
+      "lookback": 0,
+      "lookahead": 0
+    },
+    {
+      "index": 4,
+      "name": "KUP2",
+      "expression": "($high-Greater($open, $close))/($high-$low+1e-12)",
+      "lookback": 0,
+      "lookahead": 0
+    },
+    {
+      "index": 5,
+      "name": "KLOW",
+      "expression": "(Less($open, $close)-$low)/$open",
+      "lookback": 0,
+      "lookahead": 0
+    },
+    {
+      "index": 6,
+      "name": "KLOW2",
+      "expression": "(Less($open, $close)-$low)/($high-$low+1e-12)",
+      "lookback": 0,
+      "lookahead": 0
+    },
+    {
+      "index": 7,
+      "name": "KSFT",
+      "expression": "(2*$close-$high-$low)/$open",
+      "lookback": 0,
+      "lookahead": 0
+    },
+    {
+      "index": 8,
+      "name": "KSFT2",
+      "expression": "(2*$close-$high-$low)/($high-$low+1e-12)",
+      "lookback": 0,
+      "lookahead": 0
+    },
+    {
+      "index": 9,
+      "name": "OPEN0",
+      "expression": "$open/$close",
+      "lookback": 0,
+      "lookahead": 0
+    },
+    {
+      "index": 10,
+      "name": "HIGH0",
+      "expression": "$high/$close",
+      "lookback": 0,
+      "lookahead": 0
+    },
+    {
+      "index": 11,
+      "name": "LOW0",
+      "expression": "$low/$close",
+      "lookback": 0,
+      "lookahead": 0
+    },
+    {
+      "index": 12,
+      "name": "VWAP0",
+      "expression": "$vwap/$close",
+      "lookback": 0,
+      "lookahead": 0
+    },
+    {
+      "index": 13,
+      "name": "ROC5",
+      "expression": "Ref($close, 5)/$close",
+      "lookback": 5,
+      "lookahead": 0
+    },
+    {
+      "index": 14,
+      "name": "ROC10",
+      "expression": "Ref($close, 10)/$close",
+      "lookback": 10,
+      "lookahead": 0
+    },
+    {
+      "index": 15,
+      "name": "ROC20",
+      "expression": "Ref($close, 20)/$close",
+      "lookback": 20,
+      "lookahead": 0
+    },
+    {
+      "index": 16,
+      "name": "ROC30",
+      "expression": "Ref($close, 30)/$close",
+      "lookback": 30,
+      "lookahead": 0
+    },
+    {
+      "index": 17,
+      "name": "ROC60",
+      "expression": "Ref($close, 60)/$close",
+      "lookback": 60,
+      "lookahead": 0
+    },
+    {
+      "index": 18,
+      "name": "MA5",
+      "expression": "Mean($close, 5)/$close",
+      "lookback": 4,
+      "lookahead": 0
+    },
+    {
+      "index": 19,
+      "name": "MA10",
+      "expression": "Mean($close, 10)/$close",
+      "lookback": 9,
+      "lookahead": 0
+    },
+    {
+      "index": 20,
+      "name": "MA20",
+      "expression": "Mean($close, 20)/$close",
+      "lookback": 19,
+      "lookahead": 0
+    },
+    {
+      "index": 21,
+      "name": "MA30",
+      "expression": "Mean($close, 30)/$close",
+      "lookback": 29,
+      "lookahead": 0
+    },
+    {
+      "index": 22,
+      "name": "MA60",
+      "expression": "Mean($close, 60)/$close",
+      "lookback": 59,
+      "lookahead": 0
+    },
+    {
+      "index": 23,
+      "name": "STD5",
+      "expression": "Std($close, 5)/$close",
+      "lookback": 4,
+      "lookahead": 0
+    },
+    {
+      "index": 24,
+      "name": "STD10",
+      "expression": "Std($close, 10)/$close",
+      "lookback": 9,
+      "lookahead": 0
+    },
+    {
+      "index": 25,
+      "name": "STD20",
+      "expression": "Std($close, 20)/$close",
+      "lookback": 19,
+      "lookahead": 0
+    },
+    {
+      "index": 26,
+      "name": "STD30",
+      "expression": "Std($close, 30)/$close",
+      "lookback": 29,
+      "lookahead": 0
+    },
+    {
+      "index": 27,
+      "name": "STD60",
+      "expression": "Std($close, 60)/$close",
+      "lookback": 59,
+      "lookahead": 0
+    },
+    {
+      "index": 28,
+      "name": "BETA5",
+      "expression": "Slope($close, 5)/$close",
+      "lookback": 4,
+      "lookahead": 0
+    },
+    {
+      "index": 29,
+      "name": "BETA10",
+      "expression": "Slope($close, 10)/$close",
+      "lookback": 9,
+      "lookahead": 0
+    },
+    {
+      "index": 30,
+      "name": "BETA20",
+      "expression": "Slope($close, 20)/$close",
+      "lookback": 19,
+      "lookahead": 0
+    },
+    {
+      "index": 31,
+      "name": "BETA30",
+      "expression": "Slope($close, 30)/$close",
+      "lookback": 29,
+      "lookahead": 0
+    },
+    {
+      "index": 32,
+      "name": "BETA60",
+      "expression": "Slope($close, 60)/$close",
+      "lookback": 59,
+      "lookahead": 0
+    },
+    {
+      "index": 33,
+      "name": "RSQR5",
+      "expression": "Rsquare($close, 5)",
+      "lookback": 4,
+      "lookahead": 0
+    },
+    {
+      "index": 34,
+      "name": "RSQR10",
+      "expression": "Rsquare($close, 10)",
+      "lookback": 9,
+      "lookahead": 0
+    },
+    {
+      "index": 35,
+      "name": "RSQR20",
+      "expression": "Rsquare($close, 20)",
+      "lookback": 19,
+      "lookahead": 0
+    },
+    {
+      "index": 36,
+      "name": "RSQR30",
+      "expression": "Rsquare($close, 30)",
+      "lookback": 29,
+      "lookahead": 0
+    },
+    {
+      "index": 37,
+      "name": "RSQR60",
+      "expression": "Rsquare($close, 60)",
+      "lookback": 59,
+      "lookahead": 0
+    },
+    {
+      "index": 38,
+      "name": "RESI5",
+      "expression": "Resi($close, 5)/$close",
+      "lookback": 4,
+      "lookahead": 0
+    },
+    {
+      "index": 39,
+      "name": "RESI10",
+      "expression": "Resi($close, 10)/$close",
+      "lookback": 9,
+      "lookahead": 0
+    },
+    {
+      "index": 40,
+      "name": "RESI20",
+      "expression": "Resi($close, 20)/$close",
+      "lookback": 19,
+      "lookahead": 0
+    },
+    {
+      "index": 41,
+      "name": "RESI30",
+      "expression": "Resi($close, 30)/$close",
+      "lookback": 29,
+      "lookahead": 0
+    },
+    {
+      "index": 42,
+      "name": "RESI60",
+      "expression": "Resi($close, 60)/$close",
+      "lookback": 59,
+      "lookahead": 0
+    },
+    {
+      "index": 43,
+      "name": "MAX5",
+      "expression": "Max($high, 5)/$close",
+      "lookback": 4,
+      "lookahead": 0
+    },
+    {
+      "index": 44,
+      "name": "MAX10",
+      "expression": "Max($high, 10)/$close",
+      "lookback": 9,
+      "lookahead": 0
+    },
+    {
+      "index": 45,
+      "name": "MAX20",
+      "expression": "Max($high, 20)/$close",
+      "lookback": 19,
+      "lookahead": 0
+    },
+    {
+      "index": 46,
+      "name": "MAX30",
+      "expression": "Max($high, 30)/$close",
+      "lookback": 29,
+      "lookahead": 0
+    },
+    {
+      "index": 47,
+      "name": "MAX60",
+      "expression": "Max($high, 60)/$close",
+      "lookback": 59,
+      "lookahead": 0
+    },
+    {
+      "index": 48,
+      "name": "MIN5",
+      "expression": "Min($low, 5)/$close",
+      "lookback": 4,
+      "lookahead": 0
+    },
+    {
+      "index": 49,
+      "name": "MIN10",
+      "expression": "Min($low, 10)/$close",
+      "lookback": 9,
+      "lookahead": 0
+    },
+    {
+      "index": 50,
+      "name": "MIN20",
+      "expression": "Min($low, 20)/$close",
+      "lookback": 19,
+      "lookahead": 0
+    },
+    {
+      "index": 51,
+      "name": "MIN30",
+      "expression": "Min($low, 30)/$close",
+      "lookback": 29,
+      "lookahead": 0
+    },
+    {
+      "index": 52,
+      "name": "MIN60",
+      "expression": "Min($low, 60)/$close",
+      "lookback": 59,
+      "lookahead": 0
+    },
+    {
+      "index": 53,
+      "name": "QTLU5",
+      "expression": "Quantile($close, 5, 0.8)/$close",
+      "lookback": 4,
+      "lookahead": 0
+    },
+    {
+      "index": 54,
+      "name": "QTLU10",
+      "expression": "Quantile($close, 10, 0.8)/$close",
+      "lookback": 9,
+      "lookahead": 0
+    },
+    {
+      "index": 55,
+      "name": "QTLU20",
+      "expression": "Quantile($close, 20, 0.8)/$close",
+      "lookback": 19,
+      "lookahead": 0
+    },
+    {
+      "index": 56,
+      "name": "QTLU30",
+      "expression": "Quantile($close, 30, 0.8)/$close",
+      "lookback": 29,
+      "lookahead": 0
+    },
+    {
+      "index": 57,
+      "name": "QTLU60",
+      "expression": "Quantile($close, 60, 0.8)/$close",
+      "lookback": 59,
+      "lookahead": 0
+    },
+    {
+      "index": 58,
+      "name": "QTLD5",
+      "expression": "Quantile($close, 5, 0.2)/$close",
+      "lookback": 4,
+      "lookahead": 0
+    },
+    {
+      "index": 59,
+      "name": "QTLD10",
+      "expression": "Quantile($close, 10, 0.2)/$close",
+      "lookback": 9,
+      "lookahead": 0
+    },
+    {
+      "index": 60,
+      "name": "QTLD20",
+      "expression": "Quantile($close, 20, 0.2)/$close",
+      "lookback": 19,
+      "lookahead": 0
+    },
+    {
+      "index": 61,
+      "name": "QTLD30",
+      "expression": "Quantile($close, 30, 0.2)/$close",
+      "lookback": 29,
+      "lookahead": 0
+    },
+    {
+      "index": 62,
+      "name": "QTLD60",
+      "expression": "Quantile($close, 60, 0.2)/$close",
+      "lookback": 59,
+      "lookahead": 0
+    },
+    {
+      "index": 63,
+      "name": "RANK5",
+      "expression": "Rank($close, 5)",
+      "lookback": 4,
+      "lookahead": 0
+    },
+    {
+      "index": 64,
+      "name": "RANK10",
+      "expression": "Rank($close, 10)",
+      "lookback": 9,
+      "lookahead": 0
+    },
+    {
+      "index": 65,
+      "name": "RANK20",
+      "expression": "Rank($close, 20)",
+      "lookback": 19,
+      "lookahead": 0
+    },
+    {
+      "index": 66,
+      "name": "RANK30",
+      "expression": "Rank($close, 30)",
+      "lookback": 29,
+      "lookahead": 0
+    },
+    {
+      "index": 67,
+      "name": "RANK60",
+      "expression": "Rank($close, 60)",
+      "lookback": 59,
+      "lookahead": 0
+    },
+    {
+      "index": 68,
+      "name": "RSV5",
+      "expression": "($close-Min($low, 5))/(Max($high, 5)-Min($low, 5)+1e-12)",
+      "lookback": 4,
+      "lookahead": 0
+    },
+    {
+      "index": 69,
+      "name": "RSV10",
+      "expression": "($close-Min($low, 10))/(Max($high, 10)-Min($low, 10)+1e-12)",
+      "lookback": 9,
+      "lookahead": 0
+    },
+    {
+      "index": 70,
+      "name": "RSV20",
+      "expression": "($close-Min($low, 20))/(Max($high, 20)-Min($low, 20)+1e-12)",
+      "lookback": 19,
+      "lookahead": 0
+    },
+    {
+      "index": 71,
+      "name": "RSV30",
+      "expression": "($close-Min($low, 30))/(Max($high, 30)-Min($low, 30)+1e-12)",
+      "lookback": 29,
+      "lookahead": 0
+    },
+    {
+      "index": 72,
+      "name": "RSV60",
+      "expression": "($close-Min($low, 60))/(Max($high, 60)-Min($low, 60)+1e-12)",
+      "lookback": 59,
+      "lookahead": 0
+    },
+    {
+      "index": 73,
+      "name": "IMAX5",
+      "expression": "IdxMax($high, 5)/5",
+      "lookback": 4,
+      "lookahead": 0
+    },
+    {
+      "index": 74,
+      "name": "IMAX10",
+      "expression": "IdxMax($high, 10)/10",
+      "lookback": 9,
+      "lookahead": 0
+    },
+    {
+      "index": 75,
+      "name": "IMAX20",
+      "expression": "IdxMax($high, 20)/20",
+      "lookback": 19,
+      "lookahead": 0
+    },
+    {
+      "index": 76,
+      "name": "IMAX30",
+      "expression": "IdxMax($high, 30)/30",
+      "lookback": 29,
+      "lookahead": 0
+    },
+    {
+      "index": 77,
+      "name": "IMAX60",
+      "expression": "IdxMax($high, 60)/60",
+      "lookback": 59,
+      "lookahead": 0
+    },
+    {
+      "index": 78,
+      "name": "IMIN5",
+      "expression": "IdxMin($low, 5)/5",
+      "lookback": 4,
+      "lookahead": 0
+    },
+    {
+      "index": 79,
+      "name": "IMIN10",
+      "expression": "IdxMin($low, 10)/10",
+      "lookback": 9,
+      "lookahead": 0
+    },
+    {
+      "index": 80,
+      "name": "IMIN20",
+      "expression": "IdxMin($low, 20)/20",
+      "lookback": 19,
+      "lookahead": 0
+    },
+    {
+      "index": 81,
+      "name": "IMIN30",
+      "expression": "IdxMin($low, 30)/30",
+      "lookback": 29,
+      "lookahead": 0
+    },
+    {
+      "index": 82,
+      "name": "IMIN60",
+      "expression": "IdxMin($low, 60)/60",
+      "lookback": 59,
+      "lookahead": 0
+    },
+    {
+      "index": 83,
+      "name": "IMXD5",
+      "expression": "(IdxMax($high, 5)-IdxMin($low, 5))/5",
+      "lookback": 4,
+      "lookahead": 0
+    },
+    {
+      "index": 84,
+      "name": "IMXD10",
+      "expression": "(IdxMax($high, 10)-IdxMin($low, 10))/10",
+      "lookback": 9,
+      "lookahead": 0
+    },
+    {
+      "index": 85,
+      "name": "IMXD20",
+      "expression": "(IdxMax($high, 20)-IdxMin($low, 20))/20",
+      "lookback": 19,
+      "lookahead": 0
+    },
+    {
+      "index": 86,
+      "name": "IMXD30",
+      "expression": "(IdxMax($high, 30)-IdxMin($low, 30))/30",
+      "lookback": 29,
+      "lookahead": 0
+    },
+    {
+      "index": 87,
+      "name": "IMXD60",
+      "expression": "(IdxMax($high, 60)-IdxMin($low, 60))/60",
+      "lookback": 59,
+      "lookahead": 0
+    },
+    {
+      "index": 88,
+      "name": "CORR5",
+      "expression": "Corr($close, Log($volume+1), 5)",
+      "lookback": 4,
+      "lookahead": 0
+    },
+    {
+      "index": 89,
+      "name": "CORR10",
+      "expression": "Corr($close, Log($volume+1), 10)",
+      "lookback": 9,
+      "lookahead": 0
+    },
+    {
+      "index": 90,
+      "name": "CORR20",
+      "expression": "Corr($close, Log($volume+1), 20)",
+      "lookback": 19,
+      "lookahead": 0
+    },
+    {
+      "index": 91,
+      "name": "CORR30",
+      "expression": "Corr($close, Log($volume+1), 30)",
+      "lookback": 29,
+      "lookahead": 0
+    },
+    {
+      "index": 92,
+      "name": "CORR60",
+      "expression": "Corr($close, Log($volume+1), 60)",
+      "lookback": 59,
+      "lookahead": 0
+    },
+    {
+      "index": 93,
+      "name": "CORD5",
+      "expression": "Corr($close/Ref($close,1), Log($volume/Ref($volume, 1)+1), 5)",
+      "lookback": 5,
+      "lookahead": 0
+    },
+    {
+      "index": 94,
+      "name": "CORD10",
+      "expression": "Corr($close/Ref($close,1), Log($volume/Ref($volume, 1)+1), 10)",
+      "lookback": 10,
+      "lookahead": 0
+    },
+    {
+      "index": 95,
+      "name": "CORD20",
+      "expression": "Corr($close/Ref($close,1), Log($volume/Ref($volume, 1)+1), 20)",
+      "lookback": 20,
+      "lookahead": 0
+    },
+    {
+      "index": 96,
+      "name": "CORD30",
+      "expression": "Corr($close/Ref($close,1), Log($volume/Ref($volume, 1)+1), 30)",
+      "lookback": 30,
+      "lookahead": 0
+    },
+    {
+      "index": 97,
+      "name": "CORD60",
+      "expression": "Corr($close/Ref($close,1), Log($volume/Ref($volume, 1)+1), 60)",
+      "lookback": 60,
+      "lookahead": 0
+    },
+    {
+      "index": 98,
+      "name": "CNTP5",
+      "expression": "Mean($close>Ref($close, 1), 5)",
+      "lookback": 5,
+      "lookahead": 0
+    },
+    {
+      "index": 99,
+      "name": "CNTP10",
+      "expression": "Mean($close>Ref($close, 1), 10)",
+      "lookback": 10,
+      "lookahead": 0
+    },
+    {
+      "index": 100,
+      "name": "CNTP20",
+      "expression": "Mean($close>Ref($close, 1), 20)",
+      "lookback": 20,
+      "lookahead": 0
+    },
+    {
+      "index": 101,
+      "name": "CNTP30",
+      "expression": "Mean($close>Ref($close, 1), 30)",
+      "lookback": 30,
+      "lookahead": 0
+    },
+    {
+      "index": 102,
+      "name": "CNTP60",
+      "expression": "Mean($close>Ref($close, 1), 60)",
+      "lookback": 60,
+      "lookahead": 0
+    },
+    {
+      "index": 103,
+      "name": "CNTN5",
+      "expression": "Mean($close<Ref($close, 1), 5)",
+      "lookback": 5,
+      "lookahead": 0
+    },
+    {
+      "index": 104,
+      "name": "CNTN10",
+      "expression": "Mean($close<Ref($close, 1), 10)",
+      "lookback": 10,
+      "lookahead": 0
+    },
+    {
+      "index": 105,
+      "name": "CNTN20",
+      "expression": "Mean($close<Ref($close, 1), 20)",
+      "lookback": 20,
+      "lookahead": 0
+    },
+    {
+      "index": 106,
+      "name": "CNTN30",
+      "expression": "Mean($close<Ref($close, 1), 30)",
+      "lookback": 30,
+      "lookahead": 0
+    },
+    {
+      "index": 107,
+      "name": "CNTN60",
+      "expression": "Mean($close<Ref($close, 1), 60)",
+      "lookback": 60,
+      "lookahead": 0
+    },
+    {
+      "index": 108,
+      "name": "CNTD5",
+      "expression": "Mean($close>Ref($close, 1), 5)-Mean($close<Ref($close, 1), 5)",
+      "lookback": 5,
+      "lookahead": 0
+    },
+    {
+      "index": 109,
+      "name": "CNTD10",
+      "expression": "Mean($close>Ref($close, 1), 10)-Mean($close<Ref($close, 1), 10)",
+      "lookback": 10,
+      "lookahead": 0
+    },
+    {
+      "index": 110,
+      "name": "CNTD20",
+      "expression": "Mean($close>Ref($close, 1), 20)-Mean($close<Ref($close, 1), 20)",
+      "lookback": 20,
+      "lookahead": 0
+    },
+    {
+      "index": 111,
+      "name": "CNTD30",
+      "expression": "Mean($close>Ref($close, 1), 30)-Mean($close<Ref($close, 1), 30)",
+      "lookback": 30,
+      "lookahead": 0
+    },
+    {
+      "index": 112,
+      "name": "CNTD60",
+      "expression": "Mean($close>Ref($close, 1), 60)-Mean($close<Ref($close, 1), 60)",
+      "lookback": 60,
+      "lookahead": 0
+    },
+    {
+      "index": 113,
+      "name": "SUMP5",
+      "expression": "Sum(Greater($close-Ref($close, 1), 0), 5)/(Sum(Abs($close-Ref($close, 1)), 5)+1e-12)",
+      "lookback": 5,
+      "lookahead": 0
+    },
+    {
+      "index": 114,
+      "name": "SUMP10",
+      "expression": "Sum(Greater($close-Ref($close, 1), 0), 10)/(Sum(Abs($close-Ref($close, 1)), 10)+1e-12)",
+      "lookback": 10,
+      "lookahead": 0
+    },
+    {
+      "index": 115,
+      "name": "SUMP20",
+      "expression": "Sum(Greater($close-Ref($close, 1), 0), 20)/(Sum(Abs($close-Ref($close, 1)), 20)+1e-12)",
+      "lookback": 20,
+      "lookahead": 0
+    },
+    {
+      "index": 116,
+      "name": "SUMP30",
+      "expression": "Sum(Greater($close-Ref($close, 1), 0), 30)/(Sum(Abs($close-Ref($close, 1)), 30)+1e-12)",
+      "lookback": 30,
+      "lookahead": 0
+    },
+    {
+      "index": 117,
+      "name": "SUMP60",
+      "expression": "Sum(Greater($close-Ref($close, 1), 0), 60)/(Sum(Abs($close-Ref($close, 1)), 60)+1e-12)",
+      "lookback": 60,
+      "lookahead": 0
+    },
+    {
+      "index": 118,
+      "name": "SUMN5",
+      "expression": "Sum(Greater(Ref($close, 1)-$close, 0), 5)/(Sum(Abs($close-Ref($close, 1)), 5)+1e-12)",
+      "lookback": 5,
+      "lookahead": 0
+    },
+    {
+      "index": 119,
+      "name": "SUMN10",
+      "expression": "Sum(Greater(Ref($close, 1)-$close, 0), 10)/(Sum(Abs($close-Ref($close, 1)), 10)+1e-12)",
+      "lookback": 10,
+      "lookahead": 0
+    },
+    {
+      "index": 120,
+      "name": "SUMN20",
+      "expression": "Sum(Greater(Ref($close, 1)-$close, 0), 20)/(Sum(Abs($close-Ref($close, 1)), 20)+1e-12)",
+      "lookback": 20,
+      "lookahead": 0
+    },
+    {
+      "index": 121,
+      "name": "SUMN30",
+      "expression": "Sum(Greater(Ref($close, 1)-$close, 0), 30)/(Sum(Abs($close-Ref($close, 1)), 30)+1e-12)",
+      "lookback": 30,
+      "lookahead": 0
+    },
+    {
+      "index": 122,
+      "name": "SUMN60",
+      "expression": "Sum(Greater(Ref($close, 1)-$close, 0), 60)/(Sum(Abs($close-Ref($close, 1)), 60)+1e-12)",
+      "lookback": 60,
+      "lookahead": 0
+    },
+    {
+      "index": 123,
+      "name": "SUMD5",
+      "expression": "(Sum(Greater($close-Ref($close, 1), 0), 5)-Sum(Greater(Ref($close, 1)-$close, 0), 5))/(Sum(Abs($close-Ref($close, 1)), 5)+1e-12)",
+      "lookback": 5,
+      "lookahead": 0
+    },
+    {
+      "index": 124,
+      "name": "SUMD10",
+      "expression": "(Sum(Greater($close-Ref($close, 1), 0), 10)-Sum(Greater(Ref($close, 1)-$close, 0), 10))/(Sum(Abs($close-Ref($close, 1)), 10)+1e-12)",
+      "lookback": 10,
+      "lookahead": 0
+    },
+    {
+      "index": 125,
+      "name": "SUMD20",
+      "expression": "(Sum(Greater($close-Ref($close, 1), 0), 20)-Sum(Greater(Ref($close, 1)-$close, 0), 20))/(Sum(Abs($close-Ref($close, 1)), 20)+1e-12)",
+      "lookback": 20,
+      "lookahead": 0
+    },
+    {
+      "index": 126,
+      "name": "SUMD30",
+      "expression": "(Sum(Greater($close-Ref($close, 1), 0), 30)-Sum(Greater(Ref($close, 1)-$close, 0), 30))/(Sum(Abs($close-Ref($close, 1)), 30)+1e-12)",
+      "lookback": 30,
+      "lookahead": 0
+    },
+    {
+      "index": 127,
+      "name": "SUMD60",
+      "expression": "(Sum(Greater($close-Ref($close, 1), 0), 60)-Sum(Greater(Ref($close, 1)-$close, 0), 60))/(Sum(Abs($close-Ref($close, 1)), 60)+1e-12)",
+      "lookback": 60,
+      "lookahead": 0
+    },
+    {
+      "index": 128,
+      "name": "VMA5",
+      "expression": "Mean($volume, 5)/($volume+1e-12)",
+      "lookback": 4,
+      "lookahead": 0
+    },
+    {
+      "index": 129,
+      "name": "VMA10",
+      "expression": "Mean($volume, 10)/($volume+1e-12)",
+      "lookback": 9,
+      "lookahead": 0
+    },
+    {
+      "index": 130,
+      "name": "VMA20",
+      "expression": "Mean($volume, 20)/($volume+1e-12)",
+      "lookback": 19,
+      "lookahead": 0
+    },
+    {
+      "index": 131,
+      "name": "VMA30",
+      "expression": "Mean($volume, 30)/($volume+1e-12)",
+      "lookback": 29,
+      "lookahead": 0
+    },
+    {
+      "index": 132,
+      "name": "VMA60",
+      "expression": "Mean($volume, 60)/($volume+1e-12)",
+      "lookback": 59,
+      "lookahead": 0
+    },
+    {
+      "index": 133,
+      "name": "VSTD5",
+      "expression": "Std($volume, 5)/($volume+1e-12)",
+      "lookback": 4,
+      "lookahead": 0
+    },
+    {
+      "index": 134,
+      "name": "VSTD10",
+      "expression": "Std($volume, 10)/($volume+1e-12)",
+      "lookback": 9,
+      "lookahead": 0
+    },
+    {
+      "index": 135,
+      "name": "VSTD20",
+      "expression": "Std($volume, 20)/($volume+1e-12)",
+      "lookback": 19,
+      "lookahead": 0
+    },
+    {
+      "index": 136,
+      "name": "VSTD30",
+      "expression": "Std($volume, 30)/($volume+1e-12)",
+      "lookback": 29,
+      "lookahead": 0
+    },
+    {
+      "index": 137,
+      "name": "VSTD60",
+      "expression": "Std($volume, 60)/($volume+1e-12)",
+      "lookback": 59,
+      "lookahead": 0
+    },
+    {
+      "index": 138,
+      "name": "WVMA5",
+      "expression": "Std(Abs($close/Ref($close, 1)-1)*$volume, 5)/(Mean(Abs($close/Ref($close, 1)-1)*$volume, 5)+1e-12)",
+      "lookback": 5,
+      "lookahead": 0
+    },
+    {
+      "index": 139,
+      "name": "WVMA10",
+      "expression": "Std(Abs($close/Ref($close, 1)-1)*$volume, 10)/(Mean(Abs($close/Ref($close, 1)-1)*$volume, 10)+1e-12)",
+      "lookback": 10,
+      "lookahead": 0
+    },
+    {
+      "index": 140,
+      "name": "WVMA20",
+      "expression": "Std(Abs($close/Ref($close, 1)-1)*$volume, 20)/(Mean(Abs($close/Ref($close, 1)-1)*$volume, 20)+1e-12)",
+      "lookback": 20,
+      "lookahead": 0
+    },
+    {
+      "index": 141,
+      "name": "WVMA30",
+      "expression": "Std(Abs($close/Ref($close, 1)-1)*$volume, 30)/(Mean(Abs($close/Ref($close, 1)-1)*$volume, 30)+1e-12)",
+      "lookback": 30,
+      "lookahead": 0
+    },
+    {
+      "index": 142,
+      "name": "WVMA60",
+      "expression": "Std(Abs($close/Ref($close, 1)-1)*$volume, 60)/(Mean(Abs($close/Ref($close, 1)-1)*$volume, 60)+1e-12)",
+      "lookback": 60,
+      "lookahead": 0
+    },
+    {
+      "index": 143,
+      "name": "VSUMP5",
+      "expression": "Sum(Greater($volume-Ref($volume, 1), 0), 5)/(Sum(Abs($volume-Ref($volume, 1)), 5)+1e-12)",
+      "lookback": 5,
+      "lookahead": 0
+    },
+    {
+      "index": 144,
+      "name": "VSUMP10",
+      "expression": "Sum(Greater($volume-Ref($volume, 1), 0), 10)/(Sum(Abs($volume-Ref($volume, 1)), 10)+1e-12)",
+      "lookback": 10,
+      "lookahead": 0
+    },
+    {
+      "index": 145,
+      "name": "VSUMP20",
+      "expression": "Sum(Greater($volume-Ref($volume, 1), 0), 20)/(Sum(Abs($volume-Ref($volume, 1)), 20)+1e-12)",
+      "lookback": 20,
+      "lookahead": 0
+    },
+    {
+      "index": 146,
+      "name": "VSUMP30",
+      "expression": "Sum(Greater($volume-Ref($volume, 1), 0), 30)/(Sum(Abs($volume-Ref($volume, 1)), 30)+1e-12)",
+      "lookback": 30,
+      "lookahead": 0
+    },
+    {
+      "index": 147,
+      "name": "VSUMP60",
+      "expression": "Sum(Greater($volume-Ref($volume, 1), 0), 60)/(Sum(Abs($volume-Ref($volume, 1)), 60)+1e-12)",
+      "lookback": 60,
+      "lookahead": 0
+    },
+    {
+      "index": 148,
+      "name": "VSUMN5",
+      "expression": "Sum(Greater(Ref($volume, 1)-$volume, 0), 5)/(Sum(Abs($volume-Ref($volume, 1)), 5)+1e-12)",
+      "lookback": 5,
+      "lookahead": 0
+    },
+    {
+      "index": 149,
+      "name": "VSUMN10",
+      "expression": "Sum(Greater(Ref($volume, 1)-$volume, 0), 10)/(Sum(Abs($volume-Ref($volume, 1)), 10)+1e-12)",
+      "lookback": 10,
+      "lookahead": 0
+    },
+    {
+      "index": 150,
+      "name": "VSUMN20",
+      "expression": "Sum(Greater(Ref($volume, 1)-$volume, 0), 20)/(Sum(Abs($volume-Ref($volume, 1)), 20)+1e-12)",
+      "lookback": 20,
+      "lookahead": 0
+    },
+    {
+      "index": 151,
+      "name": "VSUMN30",
+      "expression": "Sum(Greater(Ref($volume, 1)-$volume, 0), 30)/(Sum(Abs($volume-Ref($volume, 1)), 30)+1e-12)",
+      "lookback": 30,
+      "lookahead": 0
+    },
+    {
+      "index": 152,
+      "name": "VSUMN60",
+      "expression": "Sum(Greater(Ref($volume, 1)-$volume, 0), 60)/(Sum(Abs($volume-Ref($volume, 1)), 60)+1e-12)",
+      "lookback": 60,
+      "lookahead": 0
+    },
+    {
+      "index": 153,
+      "name": "VSUMD5",
+      "expression": "(Sum(Greater($volume-Ref($volume, 1), 0), 5)-Sum(Greater(Ref($volume, 1)-$volume, 0), 5))/(Sum(Abs($volume-Ref($volume, 1)), 5)+1e-12)",
+      "lookback": 5,
+      "lookahead": 0
+    },
+    {
+      "index": 154,
+      "name": "VSUMD10",
+      "expression": "(Sum(Greater($volume-Ref($volume, 1), 0), 10)-Sum(Greater(Ref($volume, 1)-$volume, 0), 10))/(Sum(Abs($volume-Ref($volume, 1)), 10)+1e-12)",
+      "lookback": 10,
+      "lookahead": 0
+    },
+    {
+      "index": 155,
+      "name": "VSUMD20",
+      "expression": "(Sum(Greater($volume-Ref($volume, 1), 0), 20)-Sum(Greater(Ref($volume, 1)-$volume, 0), 20))/(Sum(Abs($volume-Ref($volume, 1)), 20)+1e-12)",
+      "lookback": 20,
+      "lookahead": 0
+    },
+    {
+      "index": 156,
+      "name": "VSUMD30",
+      "expression": "(Sum(Greater($volume-Ref($volume, 1), 0), 30)-Sum(Greater(Ref($volume, 1)-$volume, 0), 30))/(Sum(Abs($volume-Ref($volume, 1)), 30)+1e-12)",
+      "lookback": 30,
+      "lookahead": 0
+    },
+    {
+      "index": 157,
+      "name": "VSUMD60",
+      "expression": "(Sum(Greater($volume-Ref($volume, 1), 0), 60)-Sum(Greater(Ref($volume, 1)-$volume, 0), 60))/(Sum(Abs($volume-Ref($volume, 1)), 60)+1e-12)",
+      "lookback": 60,
+      "lookahead": 0
+    }
+  ]
+}

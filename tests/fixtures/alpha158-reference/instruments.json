@@ -1,0 +1,74 @@
+[
+  {
+    "instrument": "SYN_ALL_MISSING",
+    "start_index": 0,
+    "end_index": 79,
+    "start_date": "2024-01-02",
+    "end_date": "2024-04-22",
+    "description": "Every input field NaN; comparisons can still yield false/zero."
+  },
+  {
+    "instrument": "SYN_CONSTANT",
+    "start_index": 0,
+    "end_index": 79,
+    "start_date": "2024-01-02",
+    "end_date": "2024-04-22",
+    "description": "All prices 10 and volume 1000; zero spread and exact ties."
+  },
+  {
+    "instrument": "SYN_MISSING",
+    "start_index": 0,
+    "end_index": 79,
+    "start_date": "2024-01-02",
+    "end_date": "2024-04-22",
+    "description": "Missing rows at 20/21; isolated missing close, volume, high/low and vwap."
+  },
+  {
+    "instrument": "SYN_NEAR_CONSTANT",
+    "start_index": 0,
+    "end_index": 79,
+    "start_date": "2024-01-02",
+    "end_date": "2024-04-22",
+    "description": "Price changes below Qlib's 2e-5 degeneracy tolerance."
+  },
+  {
+    "instrument": "SYN_NORMAL",
+    "start_index": 0,
+    "end_index": 79,
+    "start_date": "2024-01-02",
+    "end_date": "2024-04-22",
+    "description": "Nonconstant positive prices and volume; deterministic arithmetic."
+  },
+  {
+    "instrument": "SYN_SHORT",
+    "start_index": 77,
+    "end_index": 79,
+    "start_date": "2024-04-18",
+    "end_date": "2024-04-22",
+    "description": "Three sessions, starting at calendar index 77; no earlier history."
+  },
+  {
+    "instrument": "SYN_TIES",
+    "start_index": 0,
+    "end_index": 79,
+    "start_date": "2024-01-02",
+    "end_date": "2024-04-22",
+    "description": "Repeated prices/volume to expose rank and extremum tie conventions."
+  },
+  {
+    "instrument": "SYN_ZERO_PRICE",
+    "start_index": 0,
+    "end_index": 79,
+    "start_date": "2024-01-02",
+    "end_date": "2024-04-22",
+    "description": "Deliberately invalid market prices: close/open/all prices zero."
+  },
+  {
+    "instrument": "SYN_ZERO_VOLUME",
+    "start_index": 0,
+    "end_index": 79,
+    "start_date": "2024-01-02",
+    "end_date": "2024-04-22",
+    "description": "Zero-volume runs and recovery; vwap missing on zero-volume rows."
+  }
+]
