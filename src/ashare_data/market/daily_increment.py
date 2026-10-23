@@ -10,7 +10,7 @@ from pathlib import Path
 import re
 import signal
 import time
-from urllib.parse import urlencode
+from urllib.parse import urlencode, parse_qs, urlsplit
 from zoneinfo import ZoneInfo
 
 from ashare_data.market.increment import exact_number, normalize_values, sohu_capture
@@ -206,6 +206,8 @@ def apply_bao(store, day, batches):
                                                        source_row=number, tradestatus=row["tradestatus"],
                                                        evidence_status="source_declared")
                 store.cover(day, security, "daily", value)
+                if row["tradestatus"] == "0" and not value.get("observed_count"):
+                    store.finish(day, security, "daily")
     path = store.root / "runs" / day / "baostock-accounting.json"
     if accounting and not path.exists():
         atomic_write(path, canonical(accounting))
@@ -282,13 +284,34 @@ def collect_minutes(store, day, http, stopped, *, maximum=None):
     for security, body in store.db.execute("SELECT security,body FROM coverage WHERE day=? AND kind='daily'", (day,)):
         value = json.loads(body)
         statuses[security] = value.get("tradestatus") or value.get("trading_status_evidence", {}).get("tradestatus")
+    retained = {}
+    for job in tasks:
+        if job.get("error") != "source_status_recheck":
+            continue
+        previous = store.db.execute("SELECT body FROM coverage WHERE day=? AND security=? AND kind='minute'",
+                                    (day, job["security"])).fetchone()
+        asset = json.loads(previous[0]).get("source_asset_id") if previous else None
+        symbol = native_security(job["security"]).replace(".", "").lower()
+        for (body,) in store.db.execute("SELECT body FROM capture_requests WHERE asset_id=?", (asset,)):
+            receipt = json.loads(body)
+            if parse_qs(urlsplit(receipt.get("url", "")).query).get("symbol") == [symbol] and receipt.get("path"):
+                retained[job["security"]] = receipt
+                break
 
     def fetch(job):
-        http.history.refresh = job.get("error") == "refresh_not_ready" and statuses.get(job["security"]) != "0"
-        try:
-            body, receipt = fetch_minute(http, job["security"], window)
-        finally:
-            http.history.refresh = False
+        if job.get("error") == "source_status_recheck":
+            receipt = retained.get(job["security"])
+            if receipt is None:
+                raise ValueError("retained minute request missing for status-only recheck")
+            body = gzip.decompress(Path(receipt["path"]).read_bytes())
+            if hashlib.sha256(body).hexdigest() != receipt["sha256"]:
+                raise ValueError("retained minute capture changed")
+        else:
+            http.history.refresh = job.get("error") == "refresh_not_ready"
+            try:
+                body, receipt = fetch_minute(http, job["security"], window)
+            finally:
+                http.history.refresh = False
         return body, receipt, assess_minutes(body, day, window, trade_status=statuses.get(job["security"]))
 
     with ThreadPoolExecutor(max_workers=2) as pool:
@@ -309,7 +332,7 @@ def collect_minutes(store, day, http, stopped, *, maximum=None):
                 try:
                     body, receipt, (rows, coverage) = future.result()
                     with store.db:
-                        asset = store.capture(dict(receipt, path=str(http.root / "raw" / (receipt["sha256"] + ".gz"))))
+                        asset = store.capture(dict(receipt, path=receipt.get("path") or str(http.root / "raw" / (receipt["sha256"] + ".gz"))))
                         changes = Counter()
                         for row in rows:
                             if row["disposition"] == "adopted":
@@ -362,11 +385,11 @@ def run(root, day, *, phase="all", max_minute_jobs=None, retry_sources=False, ca
             http = IncrementHTTP(store.root / "runs" / (capture_day or day) / "http", store.root,
                                  interval=store.config["interval"], timeout=20)
             from ashare_data.market.increment_schedule import retry_not_ready
-            retry_not_ready(store, day)
             if phase in {"all", "prepare"}:
                 prepare(store, day, http, retry_sources=retry_sources)
                 if not stopped() and "sohu" in store.config["daily_sources"]:
                     collect_sohu(store, day, http, stopped)
+            retry_not_ready(store, day)
             if phase in {"all", "minute"} and not stopped():
                 if not store.db.execute("SELECT 1 FROM scopes WHERE day=?", (day,)).fetchone():
                     raise ValueError("prepare the all-market scope first")

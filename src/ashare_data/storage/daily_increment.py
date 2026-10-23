@@ -201,6 +201,16 @@ class IncrementStore:
                         ("failed" if error else "done", utc_now(), error, day, security, kind))
 
     def cover(self, day, security, kind, value):
+        value = dict(value)
+        if kind == "daily":
+            old = self.db.execute("SELECT body FROM coverage WHERE day=? AND security=? AND kind=?",
+                                  (day, security, kind)).fetchone()
+            evidence = json.loads(old[0]).get("trading_status_evidence") if old else None
+            if evidence and "trading_status_evidence" not in value:
+                value["trading_status_evidence"] = evidence
+            status = value.get("trading_status_evidence", {}).get("tradestatus")
+            if status == "0" and not value.get("observed_count") and value["state"] in {"empty_unknown", "quality_gap"}:
+                value.update(state="suspended", price_rows_expected=0)
         self.db.execute("INSERT OR REPLACE INTO coverage VALUES(?,?,?,?,?,?)",
                         (day, security, kind, value["state"], value.get("observed_count", 0), canonical(value).decode()))
 

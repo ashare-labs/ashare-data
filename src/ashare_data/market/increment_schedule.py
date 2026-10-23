@@ -1,6 +1,7 @@
 """Bounded outage catch-up: oldest known open days first, no historical rebuild."""
 
 from datetime import date, datetime, timedelta
+import json
 from zoneinfo import ZoneInfo
 
 from ashare_data.storage.daily_increment import COMPLETE_COVERAGE
@@ -104,10 +105,16 @@ def historical_members(store, day, current, batches):
 
 def retry_not_ready(store, day):
     with store.db:
-        rows = store.db.execute("SELECT c.security,c.kind,j.completed_at FROM coverage c JOIN jobs j USING(day,security,kind) "
-                                "WHERE c.day=? AND c.state='not_yet_available' AND j.state='done'", (day,)).fetchall()
-        for security, kind, completed in rows:
-            if completed and (datetime.now(ZoneInfo("UTC")) - datetime.fromisoformat(completed)).total_seconds() >= 3600:
+        rows = store.db.execute("SELECT c.security,c.kind,j.completed_at,j.state FROM coverage c JOIN jobs j USING(day,security,kind) "
+                                "WHERE c.day=? AND c.state='not_yet_available' AND j.state IN ('done','pending')", (day,)).fetchall()
+        for security, kind, completed, job_state in rows:
+            daily = store.db.execute("SELECT body FROM coverage WHERE day=? AND security=? AND kind='daily'", (day, security)).fetchone()
+            evidence = json.loads(daily[0]) if daily else {}
+            status = evidence.get("tradestatus") or evidence.get("trading_status_evidence", {}).get("tradestatus")
+            if kind == "minute" and status == "0":
+                store.db.execute("UPDATE jobs SET state='pending',error='source_status_recheck' WHERE day=? AND security=? AND kind=?",
+                                 (day, security, kind))
+            elif job_state == "done" and completed and (datetime.now(ZoneInfo("UTC")) - datetime.fromisoformat(completed)).total_seconds() >= 3600:
                 store.db.execute("UPDATE jobs SET state='pending',error='refresh_not_ready' WHERE day=? AND security=? AND kind=?",
                                  (day, security, kind))
 

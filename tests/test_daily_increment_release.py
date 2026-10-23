@@ -1,10 +1,15 @@
 """Free-source continuation preserves baseline release values and isolates conflicts."""
 
 import csv
+from contextlib import closing
 from datetime import datetime
 from decimal import Decimal
+import importlib.util
 import json
+from pathlib import Path
 from zoneinfo import ZoneInfo
+
+import pytest
 
 from ashare_data.market.increment import normalize_values
 from ashare_data.market.increment_schedule import due_plan, historical_members
@@ -57,6 +62,16 @@ def test_candidate_standard_reads_old_release_dedup_and_conflicts(tmp_path):
     assert MarketRelease(output, 1).read("bars_1d", "600000.XSHG", "2024-01-02", "2024-01-03")[0]["volume_shares"] == 125
     again = build_candidate(root, "2024-01-03", output)
     assert again["unchanged"] and again["manifest_sha256"] == first["manifest_sha256"]
+    recipe = Path(__file__).resolve().parents[1] / "scripts" / "accept_daily_update.py"
+    spec = importlib.util.spec_from_file_location("increment_candidate_acceptance", recipe)
+    verifier = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(verifier)
+    with closing(IncrementStore(root)) as check:
+        assert verifier.verify_candidate(check, "2024-01-03", release) == 4
+        check.db.execute("UPDATE observations SET close_price='10.0000000000001' WHERE frequency='1m'")
+        with pytest.raises(AssertionError, match="candidate key/value differs"):
+            verifier.verify_candidate(check, "2024-01-03", release)
+        check.db.rollback()
     assert before == {p.name: sha_file(p) for p in (tmp_path / "base" / "objects").iterdir()}
     store = IncrementStore(root)
     with store.db:

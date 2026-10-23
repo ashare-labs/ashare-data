@@ -253,6 +253,44 @@ def test_not_ready_retry_is_hourly_and_requests_a_fresh_window(store):
     assert store.pending(day, "minute")[0]["error"] == "refresh_not_ready"
 
 
+def test_suspension_evidence_survives_fallback_and_replays_old_capture_offline(store):
+    import gzip
+    import hashlib
+    from types import SimpleNamespace
+    from ashare_data.market.daily_increment import collect_minutes
+    from ashare_data.market.increment_schedule import retry_not_ready
+    day, security = "2026-10-22", "600000.XSHG"
+    store.plan(day, [member(security)])
+    raw = json.dumps([native("2026-10-21 15:00:00")]).encode()
+    asset = hashlib.sha256(raw).hexdigest()
+    path = store.root / (asset + ".gz")
+    path.write_bytes(gzip.compress(raw))
+    _, coverage = assess_minutes(raw, day, 1970)
+    with store.db:
+        store.capture(dict(sha256=asset, path=str(path), received_at="2026-10-22T13:00:00Z",
+                           url="https://quotes.sina.cn/?symbol=sh600000&scale=1"))
+        store.cover(day, security, "minute", dict(coverage, source_asset_id=asset))
+        store.finish(day, security, "minute")
+        evidence = dict(source="baostock", source_asset_id="daily", source_row=2,
+                        tradestatus="0", evidence_status="source_declared")
+        store.cover(day, security, "daily", dict(state="quality_gap", observed_count=0,
+                                                  trading_status_evidence=evidence))
+        store.cover(day, security, "daily", dict(state="empty_unknown", observed_count=0, source="sohu"))
+    daily = json.loads(store.db.execute("SELECT body FROM coverage WHERE kind='daily'").fetchone()[0])
+    assert daily["state"] == "suspended" and daily["trading_status_evidence"] == evidence
+    retry_not_ready(store, day)
+    assert store.pending(day, "minute")[0]["error"] == "source_status_recheck"
+    # No HTTP methods: status re-evaluation must use the retained response, even on a later day.
+    collect_minutes(store, day, SimpleNamespace(root=store.root), lambda: False)
+    result = json.loads(store.db.execute("SELECT body FROM coverage WHERE kind='minute'").fetchone()[0])
+    assert result["state"] == "suspended" and result["source_asset_id"] == asset
+    assert result["observed_count"] == 0 and result["expected_regular_labels"] == 0
+    assert not store.pending(day, "minute")
+    assert store.db.execute("SELECT count(*) FROM observations").fetchone()[0] == 0
+    retry_not_ready(store, day)
+    assert not store.pending(day, "minute")
+
+
 def test_offline_acceptance_checks_values_and_request_identity(store):
     import gzip
     import hashlib
