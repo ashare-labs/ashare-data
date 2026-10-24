@@ -6,6 +6,7 @@ The admitted evidence is frozen into the ordinary product publication as before.
 
 from collections import defaultdict
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 
 from ashare_data.core.model import digest, require
 from ashare_data.financials.tables import TABLES
@@ -15,7 +16,7 @@ ASSUMPTIONS = {"accept_daily_replay": True, "accept_source_observed_limits": Tru
 
 
 class ReleasedReferences:
-    def __init__(self, pin, price_release):
+    def __init__(self, pin, price_release, *, release=None):
         require(
             price_release is not None and all(
                 pin[k] == price_release.get(k) for k in ("root", "release_id", "manifest_sha256")
@@ -23,8 +24,18 @@ class ReleasedReferences:
             "PRODUCT_REFERENCE_RELEASE_CONFLICT",
             "Prices and references must use the same immutable release",
         )
-        self.release = MarketRelease(pin["root"], pin["release_id"],
-                                     expected_manifest_sha256=pin["manifest_sha256"])
+        if release is not None:
+            require(
+                isinstance(release, MarketRelease)
+                and release.root == Path(pin["root"]).expanduser().resolve()
+                and release.release_id == pin["release_id"]
+                and release.sha256 == pin["manifest_sha256"],
+                "PRODUCT_REFERENCE_RELEASE_CONFLICT",
+                "Shared reader must use the same immutable release",
+            )
+        self.release = release or MarketRelease(
+            pin["root"], pin["release_id"], expected_manifest_sha256=pin["manifest_sha256"]
+        )
         self.connection = connection(memory="512MB")
         self.connection.execute("SET temp_directory='' ")
         self.views = set()

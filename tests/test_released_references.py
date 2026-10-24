@@ -189,6 +189,34 @@ def test_old_release_keeps_values_after_new_release_and_rejects_mixed_pin(releas
         ReleasedReferences(old, revised.receipt())
 
 
+def test_shared_reference_reader_keeps_pin_and_object_checks(released):
+    from ashare_data.product.market_release import open_release
+
+    pin = released.receipt()
+    assert open_release({"market_release": pin}, release=released) is released
+    r = ReleasedReferences(pin, pin, release=released)
+    try:
+        assert r.release is released
+        assert r.selected("reference.price_limits", [SID], DAY, DAY)
+    finally:
+        r.close()
+    other = {**pin, "manifest_sha256": "0" * 64}
+    with pytest.raises(DataError, match="same immutable release"):
+        open_release({"market_release": other}, release=released)
+    with pytest.raises(DataError, match="same immutable release"):
+        ReleasedReferences(other, other, release=released)
+    item = next(x for x in released.manifest["evidence"]
+                if x.get("table") == "reference.price_limits")
+    path = released.root / item["path"]
+    path.write_bytes(path.read_bytes() + b"changed")
+    r = ReleasedReferences(pin, pin, release=released)
+    try:
+        with pytest.raises(DataError, match="Immutable object changed"):
+            r.selected("reference.price_limits", [SID], DAY, DAY)
+    finally:
+        r.close()
+
+
 def test_known_tradability_bounds_unknown_old_credit_without_filling_date():
     from ashare_data.corporate_actions.history import event_window_state
     fields = dict(record_date="2014-06-11", ex_date="2014-06-12", payment_date="2014-06-12",

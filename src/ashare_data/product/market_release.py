@@ -3,6 +3,7 @@
 from contextlib import contextmanager
 from datetime import date, timedelta
 from decimal import Decimal
+from pathlib import Path
 import sqlite3
 import json
 
@@ -23,8 +24,17 @@ LIMITATIONS = [
 ]
 
 
-def open_release(config):
+def open_release(config, *, release=None):
     selected = config["market_release"]
+    if release is not None:
+        require(
+            isinstance(release, MarketRelease)
+            and release.root == Path(selected["root"]).expanduser().resolve()
+            and release.release_id == selected["release_id"]
+            and release.sha256 == selected["manifest_sha256"],
+            "PRODUCT_MARKET_RELEASE_CONFLICT", "Shared reader must use the same immutable release",
+        )
+        return release
     return MarketRelease(
         selected["root"],
         selected["release_id"],
@@ -435,8 +445,8 @@ def released_minute_sources(release):
     return sources, canonical_series
 
 
-def minute_prices(config, security, start, end, source="canonical"):
-    release = open_release(config)
+def minute_prices(config, security, start, end, source="canonical", *, release=None):
+    release = open_release(config, release=release)
     sources, canonical_series = released_minute_sources(release)
     chosen = canonical_series if source == "canonical" else [sources.get(source)]
     require(
