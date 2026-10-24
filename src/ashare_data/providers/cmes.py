@@ -17,6 +17,10 @@ MAPPING_VERSION = "cmes-files.v2"
 # Different CMES exports of the same frequency can have different units.
 BAR_PROFILES = {
     "daily-lots-kcny": {"table": "bars_1d", "series_id": 1, "volume": 100, "amount": 1000},
+    # Index levels are not CNY/share. This price-only projection makes no claim
+    # about vendor volume/amount units; original fields remain in the source ZIP.
+    "daily-index-points": {"table": "bars_1d", "series_id": 1, "volume": None, "amount": None,
+                           "asset_class": "index", "price_unit": "index_point"},
     "minute-shares-cny": {"table": "bars_1m", "series_id": 7, "volume": 1, "amount": 1},
     "minute-lots-cny": {"table": "bars_1m", "series_id": 7, "volume": 100, "amount": 1},
 }
@@ -161,7 +165,7 @@ def bar_rows(path, *, profile, securities=None, encoding="utf-8-sig"):
                                     label_at=stamp.replace(tzinfo=TZ).isoformat())
                     values = {key: native[column].strip() for key, column in BAR_COLUMNS.items()}
                     for key in ("volume", "amount"):
-                        values[key] = scale(values[key], contract[key])
+                        values[key] = scale(values[key], contract[key]) if contract[key] is not None else None
                     item.update(normalize_values(values))
                     preclose = native.get("昨收价", "").strip()
                     item["preclose"] = exact_number(preclose) if preclose else None

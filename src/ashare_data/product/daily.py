@@ -35,13 +35,13 @@ def _native_security(security):
     return _security(security)
 
 
-def _selection(securities, start, end, source):
+def _selection(securities, start, end, source, *, native_security=_native_security):
     require(
         isinstance(securities, (list, tuple)) and 1 <= len(securities) <= MAX_SECURITIES,
         "PRODUCT_RESOURCE_LIMIT",
         "Provide 1..100 securities per bounded request",
     )
-    symbols = [_native_security(s) for s in securities]
+    symbols = [native_security(s) for s in securities]
     require(
         len(set(symbols)) == len(symbols), "PRODUCT_DUPLICATE_SECURITY", "Use unique securities"
     )
@@ -57,6 +57,8 @@ class LocalDailyProduct:
     A root is mandatory. No default evaluation store, collection or directory creation
     is performed. This object can be shared by API threads; connections cannot.
     """
+
+    _native_security = staticmethod(_native_security)
 
     def __init__(self, root, *, references=None):
         self.root = Path(root).expanduser().resolve()
@@ -245,7 +247,7 @@ class LocalDailyProduct:
                 }
             )
         for sid in securities:
-            native = _native_security(sid)
+            native = self._native_security(sid)
             facts = [
                 dict(r)
                 for r in store.db.execute(
@@ -330,7 +332,7 @@ class LocalDailyProduct:
     ):
         from ashare_data.providers.cmes_factors import adjust_prices
 
-        securities, start, end = _selection(securities, start, end, source)
+        securities, start, end = _selection(securities, start, end, source, native_security=self._native_security)
         with self._read() as store:
             raw = self._prices(store, securities, start, end, source)
         return adjust_prices(raw, factors=factors, adjustment=adjustment, basis_date=basis_date)

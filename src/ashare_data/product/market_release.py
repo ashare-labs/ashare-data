@@ -7,6 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 import sqlite3
 import json
+import re
 
 import pandas as pd
 
@@ -197,6 +198,11 @@ class FrozenDailyStore(LocalDailyStore):
             frame.attrs.update(source="cmes", source_selection=source,
                                mapping_version=cmes["mapping_version"],
                                mapping_sha256=cmes["mapping_sha256"], fallback="none")
+        instrument = self.release.instruments.get(security, {})
+        if instrument.get("asset_class") == "index":
+            frame.attrs.update(asset_class="index", price_unit="index_point",
+                               volume_unit=cmes.get("volume_unit") if cmes else None,
+                               amount_unit=cmes.get("amount_unit") if cmes else None)
         return frame
 
     def close(self):
@@ -216,6 +222,13 @@ class ReleasedDailyProduct(LocalDailyProduct):
         # One date/search result per pinned reader: paging and same-date calls
         # reuse membership work without retaining a cache for every trading day.
         self._catalogue_rows = lru_cache(maxsize=1)(self._historical_catalogue)
+
+    def _native_security(self, security):
+        # Read access follows a verified publication identity, not a stock-code
+        # prefix whitelist inherited from the live stock-only fetcher.
+        if security in self.release.identifiers and re.fullmatch(r"[0-9]{6}\.(XSHG|XSHE)", security):
+            return ("sh" if security.endswith(".XSHG") else "sz") + security[:6]
+        return super()._native_security(security)
 
     @contextmanager
     def _read(self):
@@ -271,6 +284,11 @@ class ReleasedDailyProduct(LocalDailyProduct):
 
     def _prices(self, *args, **kwargs):
         value = super()._prices(*args, **kwargs)
+        units = {r["security"]: r["source_metadata"]["price_unit"] for r in value["coverage"]}
+        if "index_point" in units.values():
+            value.update(price_units=units, price_unit="index_point" if set(units.values()) == {"index_point"} else "mixed")
+            if set(units.values()) == {"index_point"}:
+                value.update(volume_unit=None, amount_unit=None)
         value["limitations"] = list(LIMITATIONS)
         value["market_release"] = self.release.receipt()
         if value["source"] in ("auto", "canonical", "free_stockdb", "cmes") or value["rows"]:
@@ -341,6 +359,7 @@ class ReleasedDailyProduct(LocalDailyProduct):
             ):
                 item = dict(row)
                 sid = item["security"]
+                item["asset_class"] = self.release.instruments.get(sid, {}).get("asset_class", "equity")
                 if needle not in sid and needle not in (item.get("name") or ""):
                     continue
                 if not sid.endswith((".XSHG", ".XSHE")):

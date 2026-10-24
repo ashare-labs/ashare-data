@@ -19,6 +19,8 @@ def main(argv=None):
     for name in ("daily", "minute", "calendar", "st"):
         build.add_argument("--" + name, nargs="+", default=[])
     build.add_argument("--minute-profile", choices=[p for p in BAR_PROFILES if p.startswith("minute-")])
+    build.add_argument("--daily-profile", choices=[p for p in BAR_PROFILES if p.startswith("daily-")],
+                       default="daily-lots-kcny")
     build.add_argument("--security", nargs="+")
     build.add_argument("--encoding", choices=["utf-8-sig", "gb18030"], default="utf-8-sig")
     build.add_argument("--free-reserve-gib", type=float, default=1)
@@ -34,7 +36,8 @@ def main(argv=None):
     try:
         if args.command == "import":
             result = import_cmes(
-                args.root, daily=args.daily, minute=args.minute, minute_profile=args.minute_profile,
+                args.root, daily=args.daily, daily_profile=args.daily_profile,
+                minute=args.minute, minute_profile=args.minute_profile,
                 calendars=args.calendar, st=args.st, securities=args.security, encoding=args.encoding,
                 free_reserve_bytes=int(args.free_reserve_gib * 1024**3),
             )

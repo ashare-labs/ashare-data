@@ -109,7 +109,7 @@ def _reference(db, asset, *, encoding, securities):
     return dict(count)
 
 
-def import_cmes(root, *, daily=(), minute=(), minute_profile=None, calendars=(), st=(),
+def import_cmes(root, *, daily=(), daily_profile="daily-lots-kcny", minute=(), minute_profile=None, calendars=(), st=(),
                 securities=None, encoding="utf-8-sig", free_reserve_bytes=1024**3,
                 budget_bytes=200 * 1024**3):
     """Build a candidate; identical replays are no-ops, changed inputs need a new root.
@@ -119,11 +119,16 @@ def import_cmes(root, *, daily=(), minute=(), minute_profile=None, calendars=(),
     """
     selected = sorted({cmes.normalize_security(s) for s in securities}) if securities is not None else None
     require(selected is None or selected, "CMES_SCOPE", "An explicit security scope cannot be empty")
+    require(daily_profile in cmes.BAR_PROFILES and cmes.BAR_PROFILES[daily_profile]["table"] == "bars_1d",
+            "CMES_PROFILE", "Daily imports require an explicit daily unit profile")
+    index = cmes.BAR_PROFILES[daily_profile].get("asset_class") == "index"
+    require(not index or (daily and not minute and not st), "CMES_PROFILE",
+            "Index price-only imports cannot mix stock execution inputs")
     require(not minute or minute_profile in cmes.BAR_PROFILES
             and cmes.BAR_PROFILES[minute_profile]["table"] == "bars_1m",
             "CMES_PROFILE", "Minute imports require an explicit minute unit profile")
     inputs = []
-    for kind, paths, profile in (("bars", daily, "daily-lots-kcny"),
+    for kind, paths, profile in (("bars", daily, daily_profile),
                                  ("bars", minute, minute_profile),
                                  ("calendar", calendars, None), ("st", st, None)):
         for path in input_paths(paths, securities=selected if kind == "bars" else None):
@@ -141,6 +146,9 @@ def import_cmes(root, *, daily=(), minute=(), minute_profile=None, calendars=(),
     spec = dict(schema=SCHEMA, source="cmes", mapping_version=cmes.MAPPING_VERSION,
                 mapping_sha256=mapping, inputs=inputs, securities=selected, encoding=encoding,
                 price_basis="raw", volume_unit="share", amount_unit="CNY")
+    if index:
+        spec.update(asset_class="index", price_unit="index_point", volume_unit=None, amount_unit=None,
+                    omitted_fields=["volume", "amount"], omitted_reason="source units not asserted; price-only reference")
     root = Path(root).expanduser().resolve()
     require(all(not Path(x["path"]).is_relative_to(root) for x in inputs),
             "CMES_OUTPUT", "Candidate output must not contain an original input")
@@ -235,9 +243,11 @@ def import_cmes(root, *, daily=(), minute=(), minute_profile=None, calendars=(),
             for security, instrument_id in ids.items():
                 venue = "BJ" if security.startswith("BJ.") else security[-4:]
                 meta.execute("INSERT INTO release_instruments VALUES(?,?,?,?,?,?)",
-                             (instrument_id, security, None, "source code; issuer history unverified", venue, "equity"))
+                             (instrument_id, security, None, "source code; issuer history unverified", venue,
+                              "index" if index else "equity"))
                 meta.execute("INSERT INTO release_identifiers VALUES(?,?,?,?,?,?,?)",
-                             (security, instrument_id, "venue_equity_code", None, None, "unknown", import_id))
+                             (security, instrument_id, "venue_index_code" if index else "venue_equity_code",
+                              None, None, "unknown", import_id))
             for security, source_symbol, asset_id in db.execute(
                 "SELECT DISTINCT security,source_symbol,source_asset_id FROM accepted"
             ).fetchall():
@@ -258,6 +268,8 @@ def import_cmes(root, *, daily=(), minute=(), minute_profile=None, calendars=(),
                                 mapping_version=cmes.MAPPING_VERSION, mapping_sha256=mapping,
                                 profiles={p: cmes.BAR_PROFILES[p] for p in profiles
                                           if cmes.BAR_PROFILES[p]["series_id"] == series_id})
+                if index:
+                    contract.update(asset_class="index", price_unit="index_point", volume_unit=None, amount_unit=None)
                 meta.execute("INSERT INTO series_contracts VALUES(?,?)", (series_id, canonical(contract).decode()))
             if minute:
                 meta.execute("INSERT INTO release_contracts VALUES('minute_selection',?)", (

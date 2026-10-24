@@ -350,6 +350,7 @@ CSV 默认 UTF-8（支持 BOM），其他编码需显式 `--encoding gb18030`。
 | 配置 | 原始量/额 | 标准量/额 | 用途 |
 |---|---|---|---|
 | `daily-lots-kcny` | 手 / 千元 | 股 / 元，分别乘 100 / 1000 | `--daily` 的日线配置 |
+| `daily-index-points` | 不声明量额单位 | 量额为 null，原字段仍可按源定位读取 | 指数点位、只读价格比较 |
 | `minute-shares-cny` | 股 / 元 | 不缩放 | 全市场日包分钟配置 |
 | `minute-lots-cny` | 手 / 元 | 量乘 100 | 另一种单股分钟导出配置 |
 
@@ -357,6 +358,12 @@ CSV 默认 UTF-8（支持 BOM），其他编码需显式 `--encoding gb18030`。
 不能仅由频率判断单位。分钟标签按 `Asia/Shanghai` 解析，保留源分钟，不重采样或补齐网格。
 日线为 `bars_1d` / series 1，分钟为 `bars_1m` / series 7。价格及金额采用精确 Decimal，
 成交量必须是整数股；缺失量额仍为 null。源昨收保留为 `preclose`，不计算复权。
+
+已下载的指数日线可以用 `--daily-profile daily-index-points` 进入同一发布器。
+该配置显式登记 `asset_class=index` 和 `price_unit=index_point`，不能混合股票分钟或 ST 输入。
+它保留原始 OHLC 点位和源定位，不把指数当股票，也不猜测量额单位、历史成分或上市区间。
+`ReleasedDailyProduct.prices` 依据冻结证券身份读取这些代码；实时股票采集器的范围不因此扩大。
+缺少某日行情仍返回缺口，指数发布不授予股票撮合权限，也不自动替换任何部署中的交易发布。
 
 ```python
 from ashare_data.storage.market_release import MarketRelease
