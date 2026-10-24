@@ -10,7 +10,6 @@ from ashare_data.market.client import _security
 from ashare_data.storage.local_daily import LocalDailyStore
 
 SOURCES = ("auto", "canonical", "baostock", "eastmoney", "sina", "sohu", "tencent", "free_stockdb", "cmes")
-MAX_SECURITIES = 100
 MAX_SECURITY_SESSIONS = 100_000
 LIMITATIONS = [
     "Original prices and share volumes; no adjustment or cross-source field filling.",
@@ -37,9 +36,9 @@ def _native_security(security):
 
 def _selection(securities, start, end, source, *, native_security=_native_security):
     require(
-        isinstance(securities, (list, tuple)) and 1 <= len(securities) <= MAX_SECURITIES,
-        "PRODUCT_RESOURCE_LIMIT",
-        "Provide 1..100 securities per bounded request",
+        isinstance(securities, (list, tuple)) and bool(securities),
+        "PRODUCT_SECURITY_SELECTION",
+        "Provide a nonempty selection of securities",
     )
     symbols = [native_security(s) for s in securities]
     require(

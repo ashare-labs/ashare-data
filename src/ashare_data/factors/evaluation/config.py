@@ -31,11 +31,13 @@ class EvaluationConfig:
             raise ValueError("universe_mode must be fixed_sample or point_in_time")
         for name, lower, upper in (
             ("quantiles", 2, 20), ("lag", 1, 252),
-            ("min_assets", 2, 100000), ("rolling_window", 2, 2520),
+            ("rolling_window", 2, 2520),
         ):
             value = getattr(self, name)
             if type(value) is not int or not lower <= value <= upper:
                 raise ValueError(f"{name}: integer in [{lower}, {upper}] required")
+        if type(self.min_assets) is not int or self.min_assets < 2:
+            raise ValueError("min_assets: integer >= 2 required")
         if type(self.direction) is not int or self.direction not in (-1, 1):
             raise ValueError("direction must be +1 or -1, chosen before observing results")
         if not isinstance(self.horizons, (tuple, list)) or not self.horizons:
