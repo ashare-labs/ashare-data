@@ -3,6 +3,7 @@
 from contextlib import contextmanager
 from datetime import date, timedelta
 from decimal import Decimal
+from functools import lru_cache
 from pathlib import Path
 import sqlite3
 import json
@@ -212,6 +213,9 @@ class ReleasedDailyProduct(LocalDailyProduct):
         self.release = open_release(config)
         self.root = self.release.root
         self.references = config.get("references")
+        # One date/search result per pinned reader: paging and same-date calls
+        # reuse membership work without retaining a cache for every trading day.
+        self._catalogue_rows = lru_cache(maxsize=1)(self._historical_catalogue)
 
     @contextmanager
     def _read(self):
@@ -328,6 +332,36 @@ class ReleasedDailyProduct(LocalDailyProduct):
             ]
         return value
 
+    def _historical_catalogue(self, as_of, needle):
+        items, unknown = [], []
+        with self._read() as store:
+            for row in store.db.execute(
+                "SELECT r.instrument_id,r.security,i.name FROM release_identifiers r "
+                "LEFT JOIN release_instruments i USING(instrument_id) ORDER BY r.security"
+            ):
+                item = dict(row)
+                sid = item["security"]
+                if needle not in sid and needle not in (item.get("name") or ""):
+                    continue
+                if not sid.endswith((".XSHG", ".XSHE")):
+                    unknown.append(sid)
+                    continue
+                symbol = ("sh" if sid.endswith(".XSHG") else "sz") + sid[:6]
+                facts = list(store.db.execute(
+                    "SELECT ipo FROM listing_facts WHERE symbol=?", (symbol,)
+                ))
+                if not facts or any(not f[0] for f in facts):
+                    unknown.append(sid)
+                elif LocalDailyStore.expected(store, symbol, as_of, as_of, [as_of]):
+                    # Membership uses this code's own interval, not the union
+                    # of aliases that may be valid for price continuity.
+                    items.append({
+                        **item, "start_date": min(f[0] for f in facts),
+                        "name_is_historical": False,
+                        "coverage_semantics": "retrospective recorded listing/code intervals",
+                    })
+        return items, unknown
+
     def catalogue(self, query="", limit=100, offset=0, *, as_of=None):
         require(
             isinstance(query, str)
@@ -344,39 +378,14 @@ class ReleasedDailyProduct(LocalDailyProduct):
             require(str(date.fromisoformat(as_of)) == as_of, "PRODUCT_DATE", "Use an ISO date")
             # Reuse the recorded listing/code intervals underlying prices(). This
             # is a retrospective directory, not a point-in-time index membership.
-            items, unknown = [], []
-            with self._read() as store:
-                for row in store.db.execute(
-                    "SELECT r.instrument_id,r.security,i.name FROM release_identifiers r "
-                    "LEFT JOIN release_instruments i USING(instrument_id) ORDER BY r.security"
-                ):
-                    item = dict(row)
-                    sid = item["security"]
-                    if needle not in sid and needle not in (item.get("name") or ""):
-                        continue
-                    if not sid.endswith((".XSHG", ".XSHE")):
-                        unknown.append(sid)
-                        continue
-                    symbol = ("sh" if sid.endswith(".XSHG") else "sz") + sid[:6]
-                    facts = list(store.db.execute(
-                        "SELECT ipo FROM listing_facts WHERE symbol=?", (symbol,)
-                    ))
-                    if not facts or any(not f[0] for f in facts):
-                        unknown.append(sid)
-                    elif LocalDailyStore.expected(store, symbol, as_of, as_of, [as_of]):
-                        # A historical directory must respect this code's own
-                        # interval. Price continuity may union identity aliases;
-                        # doing that here would make a renamed code appear early.
-                        items.append({
-                            **item, "start_date": min(f[0] for f in facts),
-                            "name_is_historical": False,
-                            "coverage_semantics": "retrospective recorded listing/code intervals",
-                        })
+            self.release.verify(self.release.manifest["metadata"])
+            items, unknown = self._catalogue_rows(as_of, needle)
+            self.release.verify(self.release.manifest["metadata"])
             return {
                 "schema": "ad-local-daily-catalogue.v1", "query": query,
                 "limit": limit, "offset": offset, "total": len(items), "as_of": as_of,
-                "securities": items[offset:offset + limit],
-                "unknown_listing_securities": unknown,
+                "securities": [dict(item) for item in items[offset:offset + limit]],
+                "unknown_listing_securities": list(unknown),
                 "historical_pit_verified": False, "receipt": self.release.receipt(),
                 "limitations": list(LIMITATIONS) + [
                     "Directory membership uses recorded listing/code intervals; historical names, publication times and complete historical coverage are not certified.",
