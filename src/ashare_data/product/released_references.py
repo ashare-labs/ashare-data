@@ -62,12 +62,13 @@ class ReleasedReferences:
 
     def query(self, table, condition, parameters):
         cursor = self.connection.execute(
-            "SELECT * FROM " + self.view(table) + " WHERE " + condition + " LIMIT 100001",
+            "SELECT * FROM " + self.view(table) + " WHERE " + condition,
             parameters,
         )
         columns = [x[0] for x in cursor.description]
-        rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
-        require(len(rows) <= 100000, "PRODUCT_RESOURCE_LIMIT", "Narrow the reference query")
+        rows = []
+        while batch := cursor.fetchmany(4096):
+            rows.extend(dict(zip(columns, row)) for row in batch)
         return sorted(rows, key=digest)
 
     def selected(self, table, securities, start=None, end=None):
@@ -93,8 +94,6 @@ class ReleasedReferences:
                 target[row["security"], row["trade_date"]].append(row)
         daily = {(r["security"], r["date"]): r for r in prices}
         states, admissions, gaps = [], [], []
-        require(len(securities) * len(days) <= 50000, "PRODUCT_RESOURCE_LIMIT",
-                "Ordinary coverage supports at most 50000 security sessions")
         for sid in securities:
             for day in days:
                 first_gap = len(gaps)

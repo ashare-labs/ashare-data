@@ -9,7 +9,6 @@ import hashlib
 import io
 import json
 import math
-from datetime import timedelta
 from pathlib import Path
 import re
 
@@ -158,14 +157,14 @@ class NeigezhuMinuteView:
         )
         a, b = timestamp(start, minute=True), timestamp(end, minute=True)
         require(
-            a <= b and b - a <= timedelta(days=60), "NEIGEZHU_QUERY_BOUND", "Choose at most 60 days"
+            a <= b, "NEIGEZHU_QUERY_BOUND", "Start must not follow end"
         )
         wanted = None
         if labels is not None:
             require(
-                isinstance(labels, (list, tuple)) and 0 < len(labels) <= 15000,
+                isinstance(labels, (list, tuple)) and bool(labels),
                 "NEIGEZHU_QUERY_BOUND",
-                "Choose 1..15000 explicit labels",
+                "Choose a nonempty explicit label sequence",
             )
             wanted = {timestamp(t, minute=True) for t in labels}
             require(
@@ -223,7 +222,7 @@ class NeigezhuMinuteView:
                     for f in ("open", "high", "low", "close", "volume", "turnover")
                 )
                 + " "
-                "FROM read_parquet(?,file_row_number=true) WHERE timestamp BETWEEN ? AND ? ORDER BY timestamp LIMIT 15001",
+                "FROM read_parquet(?,file_row_number=true) WHERE timestamp BETWEEN ? AND ? ORDER BY timestamp",
                 [str(path), a.replace(tzinfo=None), b.replace(tzinfo=None)],
             ).fetchdf()
         require(
@@ -231,7 +230,6 @@ class NeigezhuMinuteView:
             "NEIGEZHU_SOURCE_INTEGRITY",
             "Source changed while reading",
         )
-        require(len(frame) <= 15000, "NEIGEZHU_QUERY_BOUND", "Too many rows; narrow the interval")
         frame["source_label"] = (
             pd.to_datetime(frame.pop("timestamp"))
             .dt.tz_localize("Asia/Shanghai")

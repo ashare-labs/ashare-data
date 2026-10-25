@@ -10,7 +10,6 @@ from ashare_data.market.client import _security
 from ashare_data.storage.local_daily import LocalDailyStore
 
 SOURCES = ("auto", "canonical", "baostock", "eastmoney", "sina", "sohu", "tencent", "free_stockdb", "cmes")
-MAX_SECURITY_SESSIONS = 100_000
 LIMITATIONS = [
     "Original prices and share volumes; no adjustment or cross-source field filling.",
     "Auto selects one source per security for the entire requested interval by observed days, "
@@ -231,11 +230,6 @@ class LocalDailyProduct:
             )
         ]
         days = [r["date"] for r in calendar]
-        require(
-            len(days) * len(securities) <= MAX_SECURITY_SESSIONS,
-            "PRODUCT_RESOURCE_LIMIT",
-            "Request exceeds 100000 security sessions; narrow the scope",
-        )
         rows, gaps, coverage, listing = [], [], [], []
         if not days:
             gaps.append(
@@ -263,11 +257,6 @@ class LocalDailyProduct:
             for row in converted:
                 row.pop("symbol", None)
             rows.extend(converted)
-            require(
-                len(rows) <= MAX_SECURITY_SESSIONS,
-                "PRODUCT_RESOURCE_LIMIT",
-                "Request exceeds 100000 observed security days; narrow the scope",
-            )
             returned = {r["date"] for r in records}
             expected = set(store.expected(native, start, end, days))
             if not facts:

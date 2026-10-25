@@ -427,7 +427,7 @@ class MarketRelease:
             and r["last_date"] >= str(start)[:10]
         ]
 
-    def read(self, table, security, start, end, *, series_id=None, max_rows=100000):
+    def read(self, table, security, start, end, *, series_id=None):
         require(
             table in {"bars_1d", "bars_1m"}, "MARKET_TABLE", "Choose a logical market fact table"
         )
@@ -446,17 +446,16 @@ class MarketRelease:
             # A SQL union of DOUBLE and DECIMAL silently rounds decimal source values.
             for item in items:
                 path = str(self.verify(item))
-                rows = c.execute(
+                cursor = c.execute(
                     "SELECT * FROM read_parquet(?) WHERE "
                     + column
                     + " BETWEEN ? AND ? ORDER BY "
-                    + column
-                    + " LIMIT ?",
-                    [path, start, end, max_rows + 1],
-                ).fetchall()
+                    + column,
+                    [path, start, end],
+                )
                 names = [r[0] for r in c.description]
-                result.extend(dict(zip(names, row)) for row in rows)
-                require(len(result) <= max_rows, "MARKET_QUERY_BOUND", "Narrow the requested range")
+                while batch := cursor.fetchmany(4096):
+                    result.extend(dict(zip(names, row)) for row in batch)
                 require(
                     self._verified[(self.sha256, item["sha256"], path)] == fingerprint(path),
                     "MARKET_OBJECT_INTEGRITY",

@@ -125,11 +125,6 @@ def _daily(pins, securities, start, end, days, calendar):
         for day in days
         for side in ("BUY", "SELL")
     ]
-    require(
-        len(requests) <= 100000,
-        "PRODUCT_RESOURCE_LIMIT",
-        "Ordinary coverage supports at most 50000 security sessions",
-    )
     options = dict(
         purpose="retrospective_simulation",
         accepted_assumptions=sorted(ASSUMPTIONS),

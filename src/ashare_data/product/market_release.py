@@ -486,7 +486,7 @@ def minute_prices(config, security, start, end, source="canonical", *, release=N
     a, b = timestamp(start, minute=True), timestamp(end, minute=True)
     raw, observed_days = [], {}
     for chosen_series in chosen:
-        part = release.read("bars_1m", security, a, b, series_id=chosen_series, max_rows=15000)
+        part = release.read("bars_1m", security, a, b, series_id=chosen_series)
         days = {r["trade_date"] for r in part}
         require(
             not (days & observed_days.keys()),
@@ -496,7 +496,6 @@ def minute_prices(config, security, start, end, source="canonical", *, release=N
         observed_days.update(dict.fromkeys(days, chosen_series))
         raw.extend(part)
     raw.sort(key=lambda row: row["label_at"])
-    require(len(raw) <= 15000, "MARKET_QUERY_BOUND", "Narrow the requested range")
     names = {value: key for key, value in sources.items()}
     restrictions = {}
     with release.metadata() as db:
@@ -547,7 +546,7 @@ def minute_prices(config, security, start, end, source="canonical", *, release=N
             for other in chosen:
                 if other != row["series_id"] and release.read(
                     "bars_1m", security, day_start, day_start + timedelta(days=1, minutes=-1),
-                    series_id=other, max_rows=15000,
+                    series_id=other,
                 ):
                     observed_days[label.date()] = other
                     break
@@ -558,7 +557,6 @@ def minute_prices(config, security, start, end, source="canonical", *, release=N
         ):
             rows.append(row)
     rows.sort(key=lambda row: timestamp(row["source_label"], minute=True))
-    require(len(rows) <= 15000, "MARKET_QUERY_BOUND", "Narrow the requested range")
     return {
         "schema": "ad-local-minute-prices.v1",
         "source": source,

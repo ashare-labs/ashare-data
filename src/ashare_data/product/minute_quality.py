@@ -93,12 +93,12 @@ def released_invalid_slots(release, security, series_ids, start, end):
         c = connection(memory="128MB", threads=1)
         try:
             for item in issues:
-                records = c.execute(
+                cursor = c.execute(
                     "select asset_id,file_row_number,timestamp from read_parquet(?) "
-                    "where disposition='quarantined' and timestamp between ? and ? limit 15001",
+                    "where disposition='quarantined' and timestamp between ? and ?",
                     [str(release.verify(item)), *bounds],
-                ).fetchall()
-                require(len(records) <= 15000, "MARKET_QUERY_BOUND", "Narrow the requested range")
+                )
+                records = (row for batch in iter(lambda: cursor.fetchmany(4096), []) for row in batch)
                 for asset_id, source_row, label in records:
                     asset_record = db.execute(
                         "select body from source_assets where asset_id=?", (asset_id,)

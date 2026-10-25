@@ -3,7 +3,6 @@
 import hashlib
 import json
 import re
-from datetime import timedelta
 from pathlib import Path
 
 from ashare_data.core.model import DataError, digest, require, timestamp
@@ -184,16 +183,16 @@ class LocalMinuteProduct:
             ),
             "sources": rows,
             "coverage_basis": "Registered audit scope; not a promise of every security/day",
-            "query_bounds": {"securities": 1, "max_days": 60, "max_rows": 15000},
+            "query_shape": {"securities": "one requested security", "range": "inclusive, no fixed span or row ceiling"},
             "verification": "Selected content is checked on query; discovery does not scan raw files",
         }
 
     def prices(self, security, start, end, *, source="auto"):
         a, b = timestamp(start, minute=True), timestamp(end, minute=True)
         require(
-            a <= b and b - a <= timedelta(days=60),
+            a <= b,
             "PRODUCT_MINUTE_QUERY_BOUND",
-            "Choose one security and at most 60 days",
+            "Start must not follow end",
         )
         standard = source == "auto"
         source = self.default_source if standard else source
@@ -222,11 +221,6 @@ class LocalMinuteProduct:
                 result = view.get_price(security, mode="retrospective", start=a, end=b).to_dict()
             else:
                 path = Path(binding["path"])
-                require(
-                    path.stat().st_size <= 64 * 1024 * 1024,
-                    "PRODUCT_MINUTE_QUERY_BOUND",
-                    "Registered TDX session exceeds 64 MiB",
-                )
                 raw = path.read_bytes()
                 require(
                     hashlib.sha256(raw).hexdigest() == binding["content"]["sha256"],
@@ -245,7 +239,6 @@ class LocalMinuteProduct:
                     if row["security"] == security
                     and a <= timestamp(row["source_label"], minute=True) <= b
                 ]
-                require(len(rows) <= 15000, "PRODUCT_MINUTE_QUERY_BOUND", "Narrow the interval")
                 result = {
                     "rows": rows,
                     "report": {

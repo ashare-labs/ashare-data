@@ -150,7 +150,7 @@ audit scope, not a fresh scan or a promise of every security/day. A malformed
 source registration is reported separately and does not disable other sources.
 The selected query checks its pinned content. HF requires both the sealed
 manifest and the sealed quality overlay; neither is optional at this product
-entry. Single-security calls retain the reader's 60-day / 15,000-row bounds.
+entry. Single-security calls return the complete requested interval without fixed span or row ceilings.
 
 The response contains `source`, `binding`, `rows`, and `report`. HF rows/reports
 are the native reader's unchanged output, including exceptional numeric values,

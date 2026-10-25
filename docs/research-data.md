@@ -205,8 +205,8 @@ fetch data, change the deployment, copy a full library, or modify Parquet files.
 
 The caller supplies an externally pinned `file_manifest.csv` from a completed
 byte/integrity audit. Each queried source file is hashed on first use and after
-any size/mtime/inode change. Calls select one security and at most 60 days / 15,000
-observed labels. Hashes certify source identity, not market correctness.
+any size/mtime/inode change. Calls select one security and the complete requested interval, without a fixed
+day or row ceiling. Hashes certify source identity, not market correctness.
 
 ```python
 from ashare_data import NeigezhuMinuteView

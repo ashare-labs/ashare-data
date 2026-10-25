@@ -13,7 +13,6 @@ from ashare_data.product import references as reference_api
 from ashare_data.product.validation import validate_covered_input
 from ashare_data.storage.immutable import Store, identifier, immutable_write, now
 
-MAX_INPUT_BYTES = 64 * 1024 * 1024
 SCHEMA = "ad-local-daily-product.v1"
 PUBLICATION_SCHEMA = """
 CREATE TABLE IF NOT EXISTS local_daily_products (
@@ -427,11 +426,6 @@ def publish(product, store_root, securities, start, end, source, *, mode, refere
         )
         _ordinary(document, evidence, schedule, report)
     raw = canonical(document)
-    require(
-        len(raw) <= MAX_INPUT_BYTES,
-        "PRODUCT_RESOURCE_LIMIT",
-        "Publication exceeds 64 MiB; reduce securities or window",
-    )
     input_hash = hashlib.sha256(raw).hexdigest()
     manifest = {
         "schema": SCHEMA,
@@ -463,11 +457,6 @@ def publish(product, store_root, securities, start, end, source, *, mode, refere
     }
     if ordinary:
         schedule_raw, coverage_raw = canonical(schedule), canonical(report)
-        require(
-            max(len(schedule_raw), len(coverage_raw)) <= MAX_INPUT_BYTES,
-            "PRODUCT_RESOURCE_LIMIT",
-            "Reference response exceeds 64 MiB",
-        )
         manifest.update(
             corporate_schedule_path="corporate-schedule.json",
             corporate_schedule_sha256=hashlib.sha256(schedule_raw).hexdigest(),
@@ -649,10 +638,9 @@ class LocalDailyProductView:
         path = root / name
         require(
             not path.is_symlink()
-            and path.resolve().is_relative_to(root)
-            and path.stat().st_size <= MAX_INPUT_BYTES,
+            and path.resolve().is_relative_to(root),
             "PRODUCT_INTEGRITY",
-            "Published file escapes its release or exceeds its budget",
+            "Published file escapes its release",
         )
         return path.read_bytes()
 
