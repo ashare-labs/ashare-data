@@ -32,7 +32,7 @@ wheels = [
 
 [[package]]
 name = "ashare-data"
-version = "0.10.0.dev23"
+version = "0.10.0.dev24"
 source = { editable = "." }
 dependencies = [
     { name = "duckdb" },
