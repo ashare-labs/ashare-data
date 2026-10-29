@@ -44,6 +44,8 @@ def parser():
     sub = p.add_subparsers(dest="command", required=True)
     sub.add_parser("product", help="Configured local product queries, including registered minute sources")
     sub.add_parser("cmes", help="Offline CMES file import and isolated candidate queries")
+    sub.add_parser("free-updates", help="Frozen CMES menu public-source sample updates and acceptance")
+    sub.add_parser("native-macro", help="Prepare native macro candidates and query pinned releases")
     from ashare_data.cli.zzshare import add_parsers as add_zzshare_parsers
 
     add_zzshare_parsers(sub)
@@ -340,6 +342,13 @@ def parser():
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
+    if argv[:1] == ["native-macro"]:
+        from ashare_data.cli.native_macro import main as native_macro_main
+        return native_macro_main(argv[1:])
+    if argv[:1] == ["free-updates"]:
+        from ashare_data.cli.free_updates import main as free_updates_main
+
+        return free_updates_main(argv[1:])
     if argv[:1] == ["cmes"]:
         from ashare_data.cli.cmes import main as cmes_main
 

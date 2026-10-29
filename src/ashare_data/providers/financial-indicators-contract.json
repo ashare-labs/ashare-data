@@ -1,0 +1,258 @@
+{
+  "schema": "ad.financial-indicators-contract.v1",
+  "source": "https://emweb.securities.eastmoney.com/pc_hsf10/pages/js/chunk-0389df4c.32e41dca.js",
+  "source_sha256": "4e1f95f4af85fca36631496a633db3bfd9d165fa388e9929780a569f5be89a00",
+  "report": "RPT_F10_FINANCE_MAINFINADATA",
+  "scope": "native fields displayed in the source main-indicator panel by reporting period; not the separate single-quarter panel; two securities exposure ratio scales remain unverified, absence of a percent sign in UI is not unit proof",
+  "fields": {
+    "EPSJB": {
+      "label": "基本每股收益(元)",
+      "unit": "CNY/share"
+    },
+    "EPSKCJB": {
+      "label": "扣非每股收益(元)",
+      "unit": "CNY/share"
+    },
+    "EPSXS": {
+      "label": "稀释每股收益(元)",
+      "unit": "CNY/share"
+    },
+    "BPS": {
+      "label": "每股净资产(元)",
+      "unit": "CNY/share"
+    },
+    "MGZBGJ": {
+      "label": "每股公积金(元)",
+      "unit": "CNY/share"
+    },
+    "MGWFPLR": {
+      "label": "每股未分配利润(元)",
+      "unit": "CNY/share"
+    },
+    "MGJYXJJE": {
+      "label": "每股经营现金流(元)",
+      "unit": "CNY/share"
+    },
+    "TOTALOPERATEREVE": {
+      "label": "营业总收入(元)",
+      "unit": "CNY"
+    },
+    "MLR": {
+      "label": "毛利润(元)",
+      "unit": "CNY"
+    },
+    "PARENTNETPROFIT": {
+      "label": "归属净利润(元)",
+      "unit": "CNY"
+    },
+    "KCFJCXSYJLR": {
+      "label": "扣非净利润(元)",
+      "unit": "CNY"
+    },
+    "TOTALOPERATEREVETZ": {
+      "label": "营业总收入同比增长(%)",
+      "unit": "percent"
+    },
+    "PARENTNETPROFITTZ": {
+      "label": "归属净利润同比增长(%)",
+      "unit": "percent"
+    },
+    "KCFJCXSYJLRTZ": {
+      "label": "扣非净利润同比增长(%)",
+      "unit": "percent"
+    },
+    "YYZSRGDHBZC": {
+      "label": "营业总收入滚动环比增长(%)",
+      "unit": "percent"
+    },
+    "NETPROFITRPHBZC": {
+      "label": "归属净利润滚动环比增长(%)",
+      "unit": "percent"
+    },
+    "KFJLRGDHBZC": {
+      "label": "扣非净利润滚动环比增长(%)",
+      "unit": "percent"
+    },
+    "ROEJQ": {
+      "label": "净资产收益率(加权)(%)",
+      "unit": "percent"
+    },
+    "ROEKCJQ": {
+      "label": "净资产收益率(扣非/加权)(%)",
+      "unit": "percent"
+    },
+    "ZZCJLL": {
+      "label": "总资产收益率(加权)(%)",
+      "unit": "percent"
+    },
+    "XSMLL": {
+      "label": "毛利率(%)",
+      "unit": "percent"
+    },
+    "XSJLL": {
+      "label": "净利率(%)",
+      "unit": "percent"
+    },
+    "YSZKYYSR": {
+      "label": "预收账款/营业收入",
+      "unit": "dimensionless_ratio"
+    },
+    "XSJXLYYSR": {
+      "label": "销售净现金流/营业收入",
+      "unit": "dimensionless_ratio"
+    },
+    "JYXJLYYSR": {
+      "label": "经营净现金流/营业收入",
+      "unit": "dimensionless_ratio"
+    },
+    "TAXRATE": {
+      "label": "实际税率(%)",
+      "unit": "percent"
+    },
+    "LD": {
+      "label": "流动比率",
+      "unit": "dimensionless_ratio"
+    },
+    "SD": {
+      "label": "速动比率",
+      "unit": "dimensionless_ratio"
+    },
+    "XJLLB": {
+      "label": "现金流量比率",
+      "unit": "dimensionless_ratio"
+    },
+    "ZCFZL": {
+      "label": "资产负债率(%)",
+      "unit": "percent"
+    },
+    "QYCS": {
+      "label": "权益系数",
+      "unit": "dimensionless_ratio"
+    },
+    "CQBL": {
+      "label": "产权比率",
+      "unit": "dimensionless_ratio"
+    },
+    "ZZCZZTS": {
+      "label": "总资产周转天数(天)",
+      "unit": "days"
+    },
+    "CHZZTS": {
+      "label": "存货周转天数(天)",
+      "unit": "days"
+    },
+    "YSZKZZTS": {
+      "label": "应收账款周转天数(天)",
+      "unit": "days"
+    },
+    "TOAZZL": {
+      "label": "总资产周转率(次)",
+      "unit": "turns"
+    },
+    "CHZZL": {
+      "label": "存货周转率(次)",
+      "unit": "turns"
+    },
+    "YSZKZZL": {
+      "label": "应收账款周转率(次)",
+      "unit": "turns"
+    },
+    "TOTALDEPOSITS": {
+      "label": "存款总额(元)",
+      "unit": "CNY"
+    },
+    "GROSSLOANS": {
+      "label": "贷款总额(元)",
+      "unit": "CNY"
+    },
+    "LTDRR": {
+      "label": "存贷款比例",
+      "unit": "dimensionless_ratio"
+    },
+    "NEWCAPITALADER": {
+      "label": "资本充足率(%)",
+      "unit": "percent"
+    },
+    "HXYJBCZL": {
+      "label": "核心资本充足率(%)",
+      "unit": "percent"
+    },
+    "NONPERLOAN": {
+      "label": "不良贷款率(%)",
+      "unit": "percent"
+    },
+    "BLDKBBL": {
+      "label": "不良贷款拨备覆盖率(%)",
+      "unit": "percent"
+    },
+    "NZBJE": {
+      "label": "资本净额(元)",
+      "unit": "CNY"
+    },
+    "TOTAL_ROI": {
+      "label": "总投资收益率(%)",
+      "unit": "percent"
+    },
+    "NET_ROI": {
+      "label": "净投资收益率(%)",
+      "unit": "percent"
+    },
+    "EARNED_PREMIUM": {
+      "label": "已赚保费(元)",
+      "unit": "CNY"
+    },
+    "COMPENSATE_EXPENSE": {
+      "label": "赔付支出(元)",
+      "unit": "CNY"
+    },
+    "SURRENDER_RATE_LIFE": {
+      "label": "退保率(%)",
+      "unit": "percent"
+    },
+    "SOLVENCY_AR": {
+      "label": "偿付能力充足率(%)",
+      "unit": "percent"
+    },
+    "JZB": {
+      "label": "净资本(元)",
+      "unit": "CNY"
+    },
+    "JZC": {
+      "label": "净资产(元)",
+      "unit": "CNY"
+    },
+    "JZBJZC": {
+      "label": "净资本/净资产",
+      "unit": "percent",
+      "scale_basis": "native JZB/JZC*100 consistency review; source discrepancies retained, never overwritten"
+    },
+    "ZYGPGMJZC": {
+      "label": "自营股票规模/净资产",
+      "unit": "unverified native scale; retained without interpretation"
+    },
+    "ZYGDSYLZQJZB": {
+      "label": "自营固定收益类证券规模/净资产",
+      "unit": "unverified native scale; retained without interpretation"
+    },
+    "YYFXZB": {
+      "label": "营运风险准备(元)",
+      "unit": "CNY"
+    },
+    "JJYWFXZB": {
+      "label": "经纪业务风险准备(元)",
+      "unit": "CNY"
+    },
+    "ZQZYYWFXZB": {
+      "label": "证券自营业务风险准备(元)",
+      "unit": "CNY"
+    },
+    "ZQCXYWFXZB": {
+      "label": "证券承销业务风险准备(元)",
+      "unit": "CNY"
+    },
+    "RZRQYWFXZB": {
+      "label": "融资融券业务风险准备(元)",
+      "unit": "CNY"
+    }
+  }
+}

@@ -25,8 +25,11 @@ def test_real_sdk_worker_entrypoint_imports_renamed_sibling_without_ad_or_networ
     (package / "__init__.py").write_text("""
 import sys
 import socket
+import urllib.request
+import http.client
 from types import SimpleNamespace
 assert 'ashare_data' not in sys.modules, 'worker must not import AD in SDK environment'
+assert hasattr(http.client, 'HTTPConnection'), 'SDK must use the standard-library http package'
 def blocked(*args, **kwargs):
     raise AssertionError('NETWORK_DISABLED_SYNTHETIC_WORKER_TEST')
 socket.socket = socket.create_connection = blocked

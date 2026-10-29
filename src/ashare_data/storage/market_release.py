@@ -96,24 +96,35 @@ class ReleaseWriter:
         budget_bytes=200 * 1024**3,
         free_reserve_bytes=150 * 1024**3,
         retain_work_files=False,
+        categorized=False,
     ):
         self.root = Path(root).resolve()
         self.root.mkdir(parents=True, exist_ok=True)
         self.budget_bytes = budget_bytes
         self.free_reserve_bytes = free_reserve_bytes
         self.retain_work_files = retain_work_files
-        for name in ("objects", "releases", "work"):
+        # Match the categorized layout already used by the CMES controller.
+        self.categorized = categorized or (self.root / "CATALOG.json").exists()
+        self.work = self.root / (".work" if self.categorized else "work")
+        for name in (("data", "metadata", "releases", ".work") if self.categorized
+                     else ("objects", "releases", "work")):
             (self.root / name).mkdir(exist_ok=True)
         self.lock = None
 
     def __enter__(self):
         self.lock = (self.root / "writer.lock").open("a+b")
-        fcntl.flock(self.lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        try:
+            fcntl.flock(self.lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BaseException:
+            self.lock.close()
+            self.lock = None
+            raise
         return self
 
     def __exit__(self, *unused):
         if self.lock is not None:
             self.lock.close()
+            self.lock = None
 
     def budget(self):
         require(
@@ -125,10 +136,19 @@ class ReleaseWriter:
         require(used < self.budget_bytes, "MARKET_CAPACITY", "Market asset budget reached")
         return used
 
-    def object(self, path, kind="parquet"):
+    def object(self, path, kind="parquet", *, table=None):
         path = Path(path)
         digest = sha_file(path)
-        target = self.root / "objects" / (digest + "." + kind)
+        directory = self.root / "objects"
+        if self.categorized:
+            directory = self.root / ("metadata" if kind == "sqlite3" else "data")
+            if table:
+                parts = table.split(".")
+                require(len(parts) == 2 and all(p.replace("_", "").isalnum() for p in parts),
+                        "MARKET_TABLE", "Use a schema-qualified table for categorized objects")
+                directory = directory.joinpath(*parts)
+            directory.mkdir(parents=True, exist_ok=True)
+        target = directory / (digest + "." + kind)
         if target.exists():
             require(sha_file(target) == digest, "MARKET_INTEGRITY", "Existing object changed")
             if target != path and not self.retain_work_files:
@@ -137,15 +157,17 @@ class ReleaseWriter:
             os.replace(path, target)
             with target.open("rb") as stream:
                 os.fsync(stream.fileno())
+            from ashare_data.storage.immutable import fsync_dir
+            fsync_dir(target.parent)
         return {
             "path": str(target.relative_to(self.root)),
             "sha256": digest,
             "bytes": target.stat().st_size,
         }
 
-    def parquet(self, c, sql, params, name):
+    def parquet(self, c, sql, params, name, *, table=None):
         suffix = "-" + uuid4().hex if self.retain_work_files else ""
-        path = self.root / "work" / (name + suffix + ".partial.parquet")
+        path = self.work / (name + suffix + ".partial.parquet")
         if path.exists():
             path.unlink()  # This writer's incomplete output only; never a source or published object.
         try:
@@ -175,7 +197,7 @@ class ReleaseWriter:
                 list(params) + list(params),
             ).fetchone()[0]
             require(difference == 0, "MARKET_RECONCILIATION", "Key/value roundtrip differs")
-            result = self.object(path)
+            result = self.object(path, table=table)
             result["key_value_mismatches"] = difference
             return result
         except BaseException:
@@ -183,7 +205,8 @@ class ReleaseWriter:
                 path.unlink(missing_ok=True)
             raise
 
-    def publish(self, manifest, *, expected_parent, verify_unchanged=True):
+    def publish(self, manifest, *, expected_parent, verify_unchanged=True,
+                expected_parent_sha256=None, native_macro_boundary=None):
         require(self.lock is not None, "MARKET_WRITER", "Acquire the writer lock")
         pointer = self.root / "CURRENT.json"
         old = json.loads(pointer.read_bytes()) if pointer.exists() else None
@@ -193,6 +216,8 @@ class ReleaseWriter:
             parent == expected_parent, "MARKET_PARENT_CHANGED", "Publish against the current parent"
         )
         if old:
+            require(expected_parent_sha256 is None or expected_parent_sha256 == old["sha256"],
+                    "MARKET_PARENT_CHANGED", "Current parent SHA differs; prepare again")
             prior_body = (self.root / "releases" / f"{parent:08d}.json").read_bytes()
             require(hashlib.sha256(prior_body).hexdigest() == old["sha256"],
                     "MARKET_RELEASE_INTEGRITY", "Current parent manifest changed")
@@ -286,6 +311,8 @@ class ReleaseWriter:
                     'Preserve prior coverage evidence on unrelated releases')
         if manifest.get(coverage_contract):
             validate_coverage(self.root, manifest)
+        from ashare_data.storage.native_macro_release import publication_guard
+        publication_guard(self, manifest, prior if old else None, old, native_macro_boundary)
         value = {
             **manifest,
             "schema": SCHEMA,
@@ -604,3 +631,8 @@ class MarketRelease:
         """Financial/reference reader bound to this exact common release."""
         from ashare_data.product.financial_release import FinancialTables
         return FinancialTables(self)
+
+    def native_macro(self):
+        """Explicit native macro source reader pinned to this exact release."""
+        from ashare_data.product.native_macro import NativeMacro
+        return NativeMacro(self)

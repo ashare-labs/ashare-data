@@ -1,0 +1,777 @@
+{
+  "source": "https://github.com/akfamily/akshare",
+  "commit": "68f2977203a07d5b3e82d747904f2afb0dc525fc",
+  "version": "1.20.2",
+  "functions": {
+    "news_cctv": {
+      "path": "alternative/alternative_news_cctv.py",
+      "sha256": "d66c85eca02ad3fe832e2bf4ba4ce3fedb4c53f1e31932479c8517e51da7aeea",
+      "line": 17
+    },
+    "tool_trade_date_hist_sina": {
+      "path": "calendar/calendar_trade_date_hist.py",
+      "sha256": "a3dd36d501dd38456e723ca7165d232c48b53c4325371bc32a732c152c117ea8",
+      "line": 19
+    },
+    "futures_main_sina": {
+      "path": "futures/futures_index_sina.py",
+      "sha256": "b98926e18bd71a892980252119c7082b71afe62323668b949f27c20f1f03d2b3",
+      "line": 103
+    },
+    "futures_zh_minute_sina": {
+      "path": "futures/futures_zh_sina.py",
+      "sha256": "9aee5f73cc9367a4574a6ebfde0eab9e6ca1cf65d62ad79042281e0271228211",
+      "line": 615
+    },
+    "energy_carbon_bj": {
+      "path": "energy/energy_carbon.py",
+      "sha256": "f675bebbcce2264f9b2d20328d89ffca72537b33bcf318dbcb28c5a13ea1e191",
+      "line": 76
+    },
+    "energy_carbon_hb": {
+      "path": "energy/energy_carbon.py",
+      "sha256": "f675bebbcce2264f9b2d20328d89ffca72537b33bcf318dbcb28c5a13ea1e191",
+      "line": 198
+    },
+    "energy_oil_hist": {
+      "path": "energy/energy_oil_em.py",
+      "sha256": "ee659ec603edb953744be760a6e60edf21e1192fe76d9cc5fb15601302a2c6b2",
+      "line": 13
+    },
+    "energy_oil_detail": {
+      "path": "energy/energy_oil_em.py",
+      "sha256": "ee659ec603edb953744be760a6e60edf21e1192fe76d9cc5fb15601302a2c6b2",
+      "line": 48
+    },
+    "currency_boc_safe": {
+      "path": "fx/fx_safe.py",
+      "sha256": "d495d8489f8b9769b93cf205cb220efbecce16d9d78bdb08db6a99e13832c058",
+      "line": 18
+    },
+    "bond_china_yield": {
+      "path": "bond/bond_china.py",
+      "sha256": "e9cc2c0d450f93a1c3b66b5cca4fe30b49feb4fe02ffe4980fc8edf3e45c6810",
+      "line": 142
+    },
+    "bond_zh_hs_cov_daily": {
+      "path": "bond/bond_zh_cov.py",
+      "sha256": "1422df8938f4c97ef7d4188a52ba64aa3f8f0a7134f0a386ff583a665708f65d",
+      "line": 65
+    },
+    "bond_zh_hs_cov_min": {
+      "path": "bond/bond_zh_cov.py",
+      "sha256": "1422df8938f4c97ef7d4188a52ba64aa3f8f0a7134f0a386ff583a665708f65d",
+      "line": 131
+    },
+    "bond_zh_cov": {
+      "path": "bond/bond_zh_cov.py",
+      "sha256": "1422df8938f4c97ef7d4188a52ba64aa3f8f0a7134f0a386ff583a665708f65d",
+      "line": 309
+    },
+    "bond_zh_cov_info": {
+      "path": "bond/bond_zh_cov.py",
+      "sha256": "1422df8938f4c97ef7d4188a52ba64aa3f8f0a7134f0a386ff583a665708f65d",
+      "line": 542
+    },
+    "rate_interbank": {
+      "path": "interest_rate/interest_rate_interbank_em.py",
+      "sha256": "0b31e76083eb21014be6972ffa74b54649455224856fd6b9fafd953d031124f0",
+      "line": 14
+    },
+    "macro_cnbs": {
+      "path": "macro/macro_cnbs.py",
+      "sha256": "8162f2e3cf5e110af1aaaa68ced96ce459cceb224a4b0f87ee8e34b0aeacb0c5",
+      "line": 12
+    },
+    "macro_stock_finance": {
+      "path": "macro/macro_finance_ths.py",
+      "sha256": "bb4a9549955ae45b6ed5081e8405fe6ce7a79667a3272cb741696c7fc0b95b5e",
+      "line": 15
+    },
+    "macro_rmb_loan": {
+      "path": "macro/macro_finance_ths.py",
+      "sha256": "bb4a9549955ae45b6ed5081e8405fe6ce7a79667a3272cb741696c7fc0b95b5e",
+      "line": 50
+    },
+    "macro_rmb_deposit": {
+      "path": "macro/macro_finance_ths.py",
+      "sha256": "bb4a9549955ae45b6ed5081e8405fe6ce7a79667a3272cb741696c7fc0b95b5e",
+      "line": 82
+    },
+    "macro_china_qyspjg": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 108
+    },
+    "macro_china_shrzgm": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 258
+    },
+    "macro_china_gdp_yearly": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 383
+    },
+    "macro_china_cpi_yearly": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 402
+    },
+    "macro_china_cpi_monthly": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 421
+    },
+    "macro_china_ppi_yearly": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 440
+    },
+    "macro_china_exports_yoy": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 459
+    },
+    "macro_china_imports_yoy": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 480
+    },
+    "macro_china_trade_balance": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 502
+    },
+    "macro_china_industrial_production_yoy": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 522
+    },
+    "macro_china_pmi_yearly": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 544
+    },
+    "macro_china_cx_pmi_yearly": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 563
+    },
+    "macro_china_cx_services_pmi_yearly": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 582
+    },
+    "macro_china_non_man_pmi": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 601
+    },
+    "macro_china_fx_reserves_yearly": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 620
+    },
+    "macro_china_m2_yearly": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 639
+    },
+    "macro_china_shibor_all": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 658
+    },
+    "macro_china_market_margin_sz": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 888
+    },
+    "macro_china_market_margin_sh": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 919
+    },
+    "macro_china_au_report": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 953
+    },
+    "macro_china_lpr": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 1012
+    },
+    "macro_china_new_house_price": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 1059
+    },
+    "macro_china_enterprise_boom_index": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 1138
+    },
+    "macro_china_national_tax_receipts": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 1206
+    },
+    "macro_china_bank_financing": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 1241
+    },
+    "macro_china_insurance_income": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 1287
+    },
+    "macro_china_mobile_number": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 1333
+    },
+    "macro_china_vegetable_basket": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 1380
+    },
+    "macro_china_agricultural_product": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 1435
+    },
+    "macro_china_agricultural_index": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 1490
+    },
+    "macro_china_energy_index": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 1545
+    },
+    "macro_china_commodity_price_index": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 1600
+    },
+    "macro_china_yw_electronic_index": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 1710
+    },
+    "macro_china_construction_index": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 1765
+    },
+    "macro_china_construction_price_index": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 1823
+    },
+    "macro_china_lpi_index": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 1878
+    },
+    "macro_china_bdti_index": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 1933
+    },
+    "macro_china_bsi_index": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 1988
+    },
+    "macro_china_new_financial_credit": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 2142
+    },
+    "macro_china_fx_gold": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 2190
+    },
+    "macro_china_stock_market_cap": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 2256
+    },
+    "macro_china_money_supply": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 2342
+    },
+    "macro_china_cpi": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 2425
+    },
+    "macro_china_gdp": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 2500
+    },
+    "macro_china_ppi": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 2577
+    },
+    "macro_china_pmi": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 2622
+    },
+    "macro_china_gdzctz": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 2674
+    },
+    "macro_china_hgjck": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 2723
+    },
+    "macro_china_czsr": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 2814
+    },
+    "macro_china_whxd": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 2867
+    },
+    "macro_china_wbck": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 2917
+    },
+    "macro_china_xfzxx": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 2966
+    },
+    "macro_china_gyzjz": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 3051
+    },
+    "macro_china_reserve_requirement_ratio": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 3096
+    },
+    "macro_china_consumer_goods_retail": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 3180
+    },
+    "macro_china_society_electricity": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 3236
+    },
+    "macro_china_society_traffic_volume": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 3289
+    },
+    "macro_china_postal_telecommunicational": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 3347
+    },
+    "macro_china_international_tourism_fx": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 3381
+    },
+    "macro_china_passenger_load_factor": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 3415
+    },
+    "macro_china_freight_index": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 3481
+    },
+    "macro_china_central_bank_balance": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 3526
+    },
+    "macro_china_insurance": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 3560
+    },
+    "macro_china_supply_of_money": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 3594
+    },
+    "macro_china_foreign_exchange_gold": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 3628
+    },
+    "macro_china_retail_price_index": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 3663
+    },
+    "macro_china_real_estate": {
+      "path": "macro/macro_china.py",
+      "sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+      "line": 3699
+    },
+    "sw_index_first_info": {
+      "path": "index/index_sw.py",
+      "sha256": "ee6c5c51177da78deaad81bccfef950a0cf2458fc21d277e2c4ea80ad3e37eed",
+      "line": 38
+    },
+    "sw_index_second_info": {
+      "path": "index/index_sw.py",
+      "sha256": "ee6c5c51177da78deaad81bccfef950a0cf2458fc21d277e2c4ea80ad3e37eed",
+      "line": 96
+    },
+    "sw_index_third_info": {
+      "path": "index/index_sw.py",
+      "sha256": "ee6c5c51177da78deaad81bccfef950a0cf2458fc21d277e2c4ea80ad3e37eed",
+      "line": 158
+    },
+    "sw_index_third_cons": {
+      "path": "index/index_sw.py",
+      "sha256": "ee6c5c51177da78deaad81bccfef950a0cf2458fc21d277e2c4ea80ad3e37eed",
+      "line": 220
+    },
+    "index_stock_cons_csindex": {
+      "path": "index/index_cons.py",
+      "sha256": "f884ef86797108d86da89786e3091474b3c064033084a7e8b6996c52c9fd246d",
+      "line": 126
+    },
+    "index_zh_a_hist": {
+      "path": "index/index_zh_em.py",
+      "sha256": "62588a57bf74ca92ddc3da04676df155597ab1b1a21b107682b9955e948749e0",
+      "line": 42
+    },
+    "index_zh_a_hist_min_em": {
+      "path": "index/index_zh_em.py",
+      "sha256": "62588a57bf74ca92ddc3da04676df155597ab1b1a21b107682b9955e948749e0",
+      "line": 178
+    },
+    "spot_goods": {
+      "path": "index/index_spot.py",
+      "sha256": "99e4c14c2a760cf5535ff377aa908bb6423ed2add786b27782774dba044118a8",
+      "line": 13
+    },
+    "index_component_sw": {
+      "path": "index/index_research_sw.py",
+      "sha256": "e0679138b47a72353b36e4326e2c4017017066c8e3e46be5706162a4d4981545",
+      "line": 139
+    },
+    "index_analysis_daily_sw": {
+      "path": "index/index_research_sw.py",
+      "sha256": "e0679138b47a72353b36e4326e2c4017017066c8e3e46be5706162a4d4981545",
+      "line": 319
+    },
+    "stock_profit_forecast_em": {
+      "path": "stock/research/stock_profit_forecast_em.py",
+      "sha256": "7b0cd0af3bdcae142803f3e216db05b4ac58668eb2e50f048933922b7cf57b07",
+      "line": 15
+    },
+    "stock_new_ipo_cninfo": {
+      "path": "stock/research/stock_new_cninfo.py",
+      "sha256": "10eb99a300cb412487c8f0305dcb8f5db424aa16f3da744166c33ba3665620b1",
+      "line": 76
+    },
+    "stock_info_global_em": {
+      "path": "stock/research/stock_info.py",
+      "sha256": "af5222de4c1396b2b1ecc14ff40c13e5cdc32ae8be738523b1c2f7a395bedb90",
+      "line": 61
+    },
+    "stock_info_global_sina": {
+      "path": "stock/research/stock_info.py",
+      "sha256": "af5222de4c1396b2b1ecc14ff40c13e5cdc32ae8be738523b1c2f7a395bedb90",
+      "line": 96
+    },
+    "stock_info_global_ths": {
+      "path": "stock/research/stock_info.py",
+      "sha256": "af5222de4c1396b2b1ecc14ff40c13e5cdc32ae8be738523b1c2f7a395bedb90",
+      "line": 162
+    },
+    "stock_info_global_cls": {
+      "path": "stock/research/stock_info.py",
+      "sha256": "af5222de4c1396b2b1ecc14ff40c13e5cdc32ae8be738523b1c2f7a395bedb90",
+      "line": 195
+    },
+    "stock_board_industry_name_ths": {
+      "path": "stock/board/stock_board_industry_ths.py",
+      "sha256": "736d893fd3091a770b6aabc19a40311d4cf71ca34c08a7f9f11ba0f67daf9405",
+      "line": 68
+    },
+    "stock_board_industry_index_ths": {
+      "path": "stock/board/stock_board_industry_ths.py",
+      "sha256": "736d893fd3091a770b6aabc19a40311d4cf71ca34c08a7f9f11ba0f67daf9405",
+      "line": 121
+    },
+    "stock_board_concept_name_ths": {
+      "path": "stock/board/stock_board_concept_ths.py",
+      "sha256": "4ac27f90f6ece2ff5381edb918b7b72c0fa678df9cfc4fe70061c5dc77e2d086",
+      "line": 71
+    },
+    "stock_board_concept_index_ths": {
+      "path": "stock/board/stock_board_concept_ths.py",
+      "sha256": "4ac27f90f6ece2ff5381edb918b7b72c0fa678df9cfc4fe70061c5dc77e2d086",
+      "line": 124
+    },
+    "stock_board_industry_hist_em": {
+      "path": "stock/board/stock_board_industry_em.py",
+      "sha256": "86b05cc3cfb13cf0880c2703a4fdb3c346a7dd7396981b79bb0579b775222e35",
+      "line": 211
+    },
+    "stock_board_industry_cons_em": {
+      "path": "stock/board/stock_board_industry_em.py",
+      "sha256": "86b05cc3cfb13cf0880c2703a4fdb3c346a7dd7396981b79bb0579b775222e35",
+      "line": 411
+    },
+    "stock_board_concept_hist_em": {
+      "path": "stock/board/stock_board_concept_em.py",
+      "sha256": "ab100cddd806a81bc64d260861b8652e296e85792dfdc4bbf42d6524d4cb82c6",
+      "line": 172
+    },
+    "stock_board_concept_cons_em": {
+      "path": "stock/board/stock_board_concept_em.py",
+      "sha256": "ab100cddd806a81bc64d260861b8652e296e85792dfdc4bbf42d6524d4cb82c6",
+      "line": 400
+    },
+    "stock_zh_a_hist": {
+      "path": "stock/quote/stock_hist_em.py",
+      "sha256": "d2a4c09d55d9362c8c7e58ec82f78d198cf6d2c2daf004033eef42ded915050d",
+      "line": 952
+    },
+    "stock_zh_a_hist_min_em": {
+      "path": "stock/quote/stock_hist_em.py",
+      "sha256": "d2a4c09d55d9362c8c7e58ec82f78d198cf6d2c2daf004033eef42ded915050d",
+      "line": 1042
+    },
+    "stock_zh_a_daily": {
+      "path": "stock/quote/stock_zh_a_sina.py",
+      "sha256": "aa60721af3f7bdec29e1e5f59ff6770b54fc919fc6867706d16d36b3a7ee07a2",
+      "line": 133
+    },
+    "stock_bid_ask_em": {
+      "path": "stock/quote/stock_ask_bid_em.py",
+      "sha256": "6e8ed5364a753e62b867e18f66e567fc8f8801dcde5bc72cdd6ffbe4aa1dc428",
+      "line": 13
+    },
+    "stock_zt_pool_em": {
+      "path": "stock/quote/stock_ztb_em.py",
+      "sha256": "6d0fbd5aa084e1ffc698f794c3b2d97271530f5d4f1f2674dad58b2e92bc35c2",
+      "line": 24
+    },
+    "stock_zt_pool_zbgc_em": {
+      "path": "stock/quote/stock_ztb_em.py",
+      "sha256": "6d0fbd5aa084e1ffc698f794c3b2d97271530f5d4f1f2674dad58b2e92bc35c2",
+      "line": 357
+    },
+    "stock_zt_pool_dtgc_em": {
+      "path": "stock/quote/stock_ztb_em.py",
+      "sha256": "6d0fbd5aa084e1ffc698f794c3b2d97271530f5d4f1f2674dad58b2e92bc35c2",
+      "line": 439
+    },
+    "stock_zh_a_st_em": {
+      "path": "stock/quote/stock_zh_a_special.py",
+      "sha256": "136054ef714bc8e0bedcb71788b115428b19e95beeeac220a3e11eeba933cd33",
+      "line": 20
+    },
+    "stock_gdfx_free_top_10_em": {
+      "path": "stock/holder/stock_gdfx_em.py",
+      "sha256": "baea59a9d36b44084f25ef8f8f3377af73917d4e755e7b6dd7efb3c69d972dc7",
+      "line": 393
+    },
+    "stock_gdfx_top_10_em": {
+      "path": "stock/holder/stock_gdfx_em.py",
+      "sha256": "baea59a9d36b44084f25ef8f8f3377af73917d4e755e7b6dd7efb3c69d972dc7",
+      "line": 452
+    },
+    "stock_fhps_detail_em": {
+      "path": "stock/issue/stock_fhps_em.py",
+      "sha256": "131df9e6a8f58ff11fb8cec898e6ee149a1452aa573bbddafb35da0c930a56e5",
+      "line": 141
+    },
+    "stock_financial_analysis_indicator_em": {
+      "path": "stock/issue/stock_finance_sina.py",
+      "sha256": "e84c993cf6e74a521047c79072abf1bd1ae0a984b4713f3b30982edce663a7b7",
+      "line": 181
+    },
+    "stock_zh_a_disclosure_report_cninfo": {
+      "path": "stock/finance/stock_disclosure_cninfo.py",
+      "sha256": "a43d2f4e4ba90144bfc02099e9c807560e34535d433ebddb4de7d4988c03fa49",
+      "line": 129
+    },
+    "stock_zygc_em": {
+      "path": "stock/finance/stock_zygc.py",
+      "sha256": "84b82d66641ae210627ff029f20981d987fff8401edea07f5083e19088b6faa9",
+      "line": 13
+    },
+    "stock_balance_sheet_by_report_em": {
+      "path": "stock/finance/stock_three_report_em.py",
+      "sha256": "e9cb438a5e033e9ba2d14c0341528b1aeec3f162fb2c0e5cbff41a6bc293348e",
+      "line": 35
+    },
+    "stock_profit_sheet_by_report_em": {
+      "path": "stock/finance/stock_three_report_em.py",
+      "sha256": "e9cb438a5e033e9ba2d14c0341528b1aeec3f162fb2c0e5cbff41a6bc293348e",
+      "line": 142
+    },
+    "stock_cash_flow_sheet_by_report_em": {
+      "path": "stock/finance/stock_three_report_em.py",
+      "sha256": "e9cb438a5e033e9ba2d14c0341528b1aeec3f162fb2c0e5cbff41a6bc293348e",
+      "line": 291
+    },
+    "stock_profile_cninfo": {
+      "path": "stock/finance/stock_profile_cninfo.py",
+      "sha256": "520507dc62b9d97976e6cdd62179459954e52b30dde901a24d38e3d25f862ac9",
+      "line": 30
+    },
+    "stock_value_em": {
+      "path": "stock/valuation/stock_value_em.py",
+      "sha256": "440f38d9d91e0a1484a12df237d7e21b14b7783cd88de51dae95db9ed7b2cd96",
+      "line": 14
+    },
+    "stock_fund_flow_individual": {
+      "path": "stock/flow/stock_fund_flow.py",
+      "sha256": "0d82c435c59e4a839c36d9a33faa2f04374f7f769ffcaa86122e17d033054618",
+      "line": 59
+    },
+    "stock_fund_flow_industry": {
+      "path": "stock/flow/stock_fund_flow.py",
+      "sha256": "0d82c435c59e4a839c36d9a33faa2f04374f7f769ffcaa86122e17d033054618",
+      "line": 265
+    },
+    "stock_individual_fund_flow": {
+      "path": "stock/flow/stock_fund_em.py",
+      "sha256": "94a9d9f548cb637d7c029201877bd4953c8adccbdaec5376e95b7e3f7ec4e980",
+      "line": 20
+    },
+    "stock_market_fund_flow": {
+      "path": "stock/flow/stock_fund_em.py",
+      "sha256": "94a9d9f548cb637d7c029201877bd4953c8adccbdaec5376e95b7e3f7ec4e980",
+      "line": 347
+    },
+    "stock_sector_fund_flow_rank": {
+      "path": "stock/flow/stock_fund_em.py",
+      "sha256": "94a9d9f548cb637d7c029201877bd4953c8adccbdaec5376e95b7e3f7ec4e980",
+      "line": 447
+    },
+    "stock_lhb_detail_em": {
+      "path": "stock/flow/stock_lhb_em.py",
+      "sha256": "a64995b62fa3ef796360d5830a61583735d0ddfe4fbc1dcc6af04eca113de450",
+      "line": 14
+    },
+    "stock_lhb_jgmmtj_em": {
+      "path": "stock/flow/stock_lhb_em.py",
+      "sha256": "a64995b62fa3ef796360d5830a61583735d0ddfe4fbc1dcc6af04eca113de450",
+      "line": 226
+    },
+    "stock_lhb_stock_detail_em": {
+      "path": "stock/flow/stock_lhb_em.py",
+      "sha256": "a64995b62fa3ef796360d5830a61583735d0ddfe4fbc1dcc6af04eca113de450",
+      "line": 766
+    },
+    "stock_dzjy_mrmx": {
+      "path": "stock/flow/stock_dzjy_em.py",
+      "sha256": "0cacf03a0d81b504631c424ce3e6aa450a9368df0c58b0c769b66f73317d1ff7",
+      "line": 72
+    },
+    "fund_etf_hist_em": {
+      "path": "fund/fund_etf_em.py",
+      "sha256": "e27bca79042081fd7e6e3251e431aae5b2e2dcf0930d3a38818a6009d94ea2fd",
+      "line": 237
+    },
+    "fund_etf_hist_min_em": {
+      "path": "fund/fund_etf_em.py",
+      "sha256": "e27bca79042081fd7e6e3251e431aae5b2e2dcf0930d3a38818a6009d94ea2fd",
+      "line": 320
+    },
+    "fund_etf_scale_szse": {
+      "path": "fund/fund_etf_szse.py",
+      "sha256": "05d9087044e3284b8565e86d28a23bd7ff821c7c6bc2b966d1971d2d320ab034",
+      "line": 15
+    },
+    "fund_etf_scale_sse": {
+      "path": "fund/fund_etf_sse.py",
+      "sha256": "8a49f4573676ec3debb744c643d30cb261f120c66a9cd59213437568d661b5cf",
+      "line": 13
+    },
+    "spot_hog_soozhu": {
+      "path": "spot/spot_hog_soozhu.py",
+      "sha256": "204b7bceb0ecd29b402a0300ed0448938e6370c2dc03f2c6aba63794a2c54e2d",
+      "line": 14
+    },
+    "spot_hog_year_trend_soozhu": {
+      "path": "spot/spot_hog_soozhu.py",
+      "sha256": "204b7bceb0ecd29b402a0300ed0448938e6370c2dc03f2c6aba63794a2c54e2d",
+      "line": 41
+    },
+    "spot_hog_lean_price_soozhu": {
+      "path": "spot/spot_hog_soozhu.py",
+      "sha256": "204b7bceb0ecd29b402a0300ed0448938e6370c2dc03f2c6aba63794a2c54e2d",
+      "line": 65
+    },
+    "spot_hog_three_way_soozhu": {
+      "path": "spot/spot_hog_soozhu.py",
+      "sha256": "204b7bceb0ecd29b402a0300ed0448938e6370c2dc03f2c6aba63794a2c54e2d",
+      "line": 89
+    },
+    "spot_hog_crossbred_soozhu": {
+      "path": "spot/spot_hog_soozhu.py",
+      "sha256": "204b7bceb0ecd29b402a0300ed0448938e6370c2dc03f2c6aba63794a2c54e2d",
+      "line": 113
+    },
+    "spot_corn_price_soozhu": {
+      "path": "spot/spot_hog_soozhu.py",
+      "sha256": "204b7bceb0ecd29b402a0300ed0448938e6370c2dc03f2c6aba63794a2c54e2d",
+      "line": 137
+    },
+    "spot_soybean_price_soozhu": {
+      "path": "spot/spot_hog_soozhu.py",
+      "sha256": "204b7bceb0ecd29b402a0300ed0448938e6370c2dc03f2c6aba63794a2c54e2d",
+      "line": 161
+    },
+    "spot_mixed_feed_soozhu": {
+      "path": "spot/spot_hog_soozhu.py",
+      "sha256": "204b7bceb0ecd29b402a0300ed0448938e6370c2dc03f2c6aba63794a2c54e2d",
+      "line": 185
+    },
+    "spot_hist_sge": {
+      "path": "spot/spot_sge.py",
+      "sha256": "abe5a6987047ea68959580738d358da5534ef68840fa25a6fb72a9a735d8f76d",
+      "line": 109
+    },
+    "spot_golden_benchmark_sge": {
+      "path": "spot/spot_sge.py",
+      "sha256": "abe5a6987047ea68959580738d358da5534ef68840fa25a6fb72a9a735d8f76d",
+      "line": 163
+    },
+    "spot_silver_benchmark_sge": {
+      "path": "spot/spot_sge.py",
+      "sha256": "abe5a6987047ea68959580738d358da5534ef68840fa25a6fb72a9a735d8f76d",
+      "line": 194
+    },
+    "spot_price_qh": {
+      "path": "spot/spot_price_qh.py",
+      "sha256": "ad1bf4f6f47c2b453fc7ac7c0222e01a5bb1cad21790b6ad14d56415b221f1e4",
+      "line": 79
+    }
+  }
+}

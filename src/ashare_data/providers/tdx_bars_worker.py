@@ -9,6 +9,12 @@ import sys
 # module is stdlib-only, so the SDK environment does not need AD installed.
 from tdx_collection import SCHEMA, collect_pages, error_kind, now, save_journal, sha
 
+# Direct script execution adds this directory ahead of the standard library.
+# Keep the loaded stdlib-only sibling, but remove that search entry before the
+# SDK imports urllib: providers/http.py must not shadow the stdlib http package.
+_worker_directory = Path(__file__).resolve().parent
+sys.path[:] = [p for p in sys.path if Path(p).resolve() != _worker_directory]
+
 
 def main():
     root = Path(sys.argv[1])

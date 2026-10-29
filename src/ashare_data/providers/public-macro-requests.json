@@ -1,0 +1,960 @@
+{
+  "reference": "https://github.com/akfamily/akshare/blob/68f2977203a07d5b3e82d747904f2afb0dc525fc/akshare/macro/macro_china.py",
+  "source_sha256": "4e0c48c06dc42f2c1ab3a18ef6fc6232fd1ece0bee38e68d04a48f73d474bc29",
+  "specs": {
+    "macro_china_agricultural_index": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "pageSize": "500",
+        "pageNumber": "1",
+        "reportName": "RPT_INDUSTRY_INDEX",
+        "columns": "REPORT_DATE,INDICATOR_VALUE,CHANGE_RATE,CHANGERATE_3M,CHANGERATE_6M,CHANGERATE_1Y,CHANGERATE_2Y,CHANGERATE_3Y,INDICATOR_ID,INDICATOR_NAME",
+        "filter": "(INDICATOR_ID=\"EMI00662543\")",
+        "source": "WEB",
+        "client": "WEB"
+      },
+      "reference_function": "macro_china_agricultural_index",
+      "source_lines": [
+        1490,
+        1542
+      ]
+    },
+    "macro_china_agricultural_product": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "pageSize": "500",
+        "pageNumber": "1",
+        "reportName": "RPT_INDUSTRY_INDEX",
+        "columns": "REPORT_DATE,INDICATOR_VALUE,CHANGE_RATE,CHANGERATE_3M,CHANGERATE_6M,CHANGERATE_1Y,CHANGERATE_2Y,CHANGERATE_3Y,INDICATOR_ID,INDICATOR_NAME",
+        "filter": "(INDICATOR_ID=\"EMI00009274\")",
+        "source": "WEB",
+        "client": "WEB"
+      },
+      "reference_function": "macro_china_agricultural_product",
+      "source_lines": [
+        1435,
+        1487
+      ]
+    },
+    "macro_china_bank_financing": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "pageSize": "1000",
+        "pageNumber": "1",
+        "reportName": "RPT_INDUSTRY_INDEX",
+        "columns": "REPORT_DATE,INDICATOR_VALUE,CHANGE_RATE,CHANGERATE_3M,CHANGERATE_6M,CHANGERATE_1Y,CHANGERATE_2Y,CHANGERATE_3Y,INDICATOR_ID,INDICATOR_NAME",
+        "filter": "(INDICATOR_ID=\"EMI01516267\")",
+        "source": "WEB",
+        "client": "WEB"
+      },
+      "reference_function": "macro_china_bank_financing",
+      "source_lines": [
+        1241,
+        1284
+      ]
+    },
+    "macro_china_bdti_index": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "pageSize": "500",
+        "pageNumber": "1",
+        "reportName": "RPT_INDUSTRY_INDEX",
+        "columns": "REPORT_DATE,INDICATOR_VALUE,CHANGE_RATE,CHANGERATE_3M,CHANGERATE_6M,CHANGERATE_1Y,CHANGERATE_2Y,CHANGERATE_3Y,INDICATOR_ID,INDICATOR_NAME",
+        "filter": "(INDICATOR_ID=\"EMI00107668\")",
+        "source": "WEB",
+        "client": "WEB"
+      },
+      "reference_function": "macro_china_bdti_index",
+      "source_lines": [
+        1933,
+        1985
+      ]
+    },
+    "macro_china_bsi_index": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "pageSize": "500",
+        "pageNumber": "1",
+        "reportName": "RPT_INDUSTRY_INDEX",
+        "columns": "REPORT_DATE,INDICATOR_VALUE,CHANGE_RATE,CHANGERATE_3M,CHANGERATE_6M,CHANGERATE_1Y,CHANGERATE_2Y,CHANGERATE_3Y,INDICATOR_ID,INDICATOR_NAME",
+        "filter": "(INDICATOR_ID=\"EMI00107667\")",
+        "source": "WEB",
+        "client": "WEB"
+      },
+      "reference_function": "macro_china_bsi_index",
+      "source_lines": [
+        1988,
+        2040
+      ]
+    },
+    "macro_china_commodity_price_index": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "pageSize": "500",
+        "pageNumber": "1",
+        "reportName": "RPT_INDUSTRY_INDEX",
+        "columns": "REPORT_DATE,INDICATOR_VALUE,CHANGE_RATE,CHANGERATE_3M,CHANGERATE_6M,CHANGERATE_1Y,CHANGERATE_2Y,CHANGERATE_3Y,INDICATOR_ID,INDICATOR_NAME",
+        "filter": "(INDICATOR_ID=\"EMI00662535\")",
+        "source": "WEB",
+        "client": "WEB"
+      },
+      "reference_function": "macro_china_commodity_price_index",
+      "source_lines": [
+        1600,
+        1652
+      ]
+    },
+    "macro_china_construction_index": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "pageSize": "500",
+        "pageNumber": "1",
+        "reportName": "RPT_INDUSTRY_INDEX",
+        "columns": "REPORT_DATE,INDICATOR_VALUE,CHANGE_RATE,CHANGERATE_3M,CHANGERATE_6M,CHANGERATE_1Y,CHANGERATE_2Y,CHANGERATE_3Y,INDICATOR_ID,INDICATOR_NAME",
+        "filter": "(INDICATOR_ID=\"EMI00662541\")",
+        "source": "WEB",
+        "client": "WEB"
+      },
+      "reference_function": "macro_china_construction_index",
+      "source_lines": [
+        1765,
+        1820
+      ]
+    },
+    "macro_china_construction_price_index": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "pageSize": "500",
+        "pageNumber": "1",
+        "reportName": "RPT_INDUSTRY_INDEX",
+        "columns": "REPORT_DATE,INDICATOR_VALUE,CHANGE_RATE,CHANGERATE_3M,CHANGERATE_6M,CHANGERATE_1Y,CHANGERATE_2Y,CHANGERATE_3Y",
+        "filter": "(INDICATOR_ID=\"EMI00237146\")",
+        "source": "WEB",
+        "client": "WEB"
+      },
+      "reference_function": "macro_china_construction_price_index",
+      "source_lines": [
+        1823,
+        1875
+      ]
+    },
+    "macro_china_consumer_goods_retail": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "columns": "REPORT_DATE,TIME,RETAIL_TOTAL,RETAIL_TOTAL_SAME,RETAIL_TOTAL_SEQUENTIAL,RETAIL_TOTAL_ACCUMULATE,RETAIL_ACCUMULATE_SAME",
+        "pageNumber": "1",
+        "pageSize": "1000",
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "source": "WEB",
+        "client": "WEB",
+        "reportName": "RPT_ECONOMY_TOTAL_RETAIL",
+        "p": "1",
+        "pageNo": "1",
+        "pageNum": "1"
+      },
+      "reference_function": "macro_china_consumer_goods_retail",
+      "source_lines": [
+        3180,
+        3233
+      ]
+    },
+    "macro_china_cpi": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "columns": "REPORT_DATE,TIME,NATIONAL_SAME,NATIONAL_BASE,NATIONAL_SEQUENTIAL,NATIONAL_ACCUMULATE,CITY_SAME,CITY_BASE,CITY_SEQUENTIAL,CITY_ACCUMULATE,RURAL_SAME,RURAL_BASE,RURAL_SEQUENTIAL,RURAL_ACCUMULATE",
+        "pageNumber": "1",
+        "pageSize": "2000",
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "source": "WEB",
+        "client": "WEB",
+        "reportName": "RPT_ECONOMY_CPI",
+        "p": "1",
+        "pageNo": "1",
+        "pageNum": "1"
+      },
+      "reference_function": "macro_china_cpi",
+      "source_lines": [
+        2425,
+        2497
+      ]
+    },
+    "macro_china_cpi_monthly": {
+      "kind": "jin10_latest",
+      "url": "https://datacenter-api.jin10.com/reports/list_v2",
+      "parameters": {
+        "max_date": "",
+        "category": "ec",
+        "attr_id": "72"
+      },
+      "reference_function": "macro_china_cpi_monthly",
+      "source_lines": [
+        421,
+        436
+      ]
+    },
+    "macro_china_cpi_yearly": {
+      "kind": "jin10_latest",
+      "url": "https://datacenter-api.jin10.com/reports/list_v2",
+      "parameters": {
+        "max_date": "",
+        "category": "ec",
+        "attr_id": "56"
+      },
+      "reference_function": "macro_china_cpi_yearly",
+      "source_lines": [
+        402,
+        417
+      ]
+    },
+    "macro_china_cx_pmi_yearly": {
+      "kind": "jin10_latest",
+      "url": "https://datacenter-api.jin10.com/reports/list_v2",
+      "parameters": {
+        "max_date": "",
+        "category": "ec",
+        "attr_id": "73"
+      },
+      "reference_function": "macro_china_cx_pmi_yearly",
+      "source_lines": [
+        563,
+        578
+      ]
+    },
+    "macro_china_cx_services_pmi_yearly": {
+      "kind": "jin10_latest",
+      "url": "https://datacenter-api.jin10.com/reports/list_v2",
+      "parameters": {
+        "max_date": "",
+        "category": "ec",
+        "attr_id": "67"
+      },
+      "reference_function": "macro_china_cx_services_pmi_yearly",
+      "source_lines": [
+        582,
+        597
+      ]
+    },
+    "macro_china_czsr": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "columns": "REPORT_DATE,TIME,BASE,BASE_SAME,BASE_SEQUENTIAL,BASE_ACCUMULATE,ACCUMULATE_SAME",
+        "pageNumber": "1",
+        "pageSize": "2000",
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "source": "WEB",
+        "client": "WEB",
+        "reportName": "RPT_ECONOMY_INCOME",
+        "p": "1",
+        "pageNo": "1",
+        "pageNum": "1"
+      },
+      "reference_function": "macro_china_czsr",
+      "source_lines": [
+        2814,
+        2864
+      ]
+    },
+    "macro_china_energy_index": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "pageSize": "500",
+        "pageNumber": "1",
+        "reportName": "RPT_INDUSTRY_INDEX",
+        "columns": "REPORT_DATE,INDICATOR_VALUE,CHANGE_RATE,CHANGERATE_3M,CHANGERATE_6M,CHANGERATE_1Y,CHANGERATE_2Y,CHANGERATE_3Y,INDICATOR_ID,INDICATOR_NAME",
+        "filter": "(INDICATOR_ID=\"EMI00662539\")",
+        "source": "WEB",
+        "client": "WEB"
+      },
+      "reference_function": "macro_china_energy_index",
+      "source_lines": [
+        1545,
+        1597
+      ]
+    },
+    "macro_china_enterprise_boom_index": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "columns": "REPORT_DATE,TIME,BOOM_INDEX,FAITH_INDEX,BOOM_INDEX_SAME,BOOM_INDEX_SEQUENTIAL,FAITH_INDEX_SAME,FAITH_INDEX_SEQUENTIAL",
+        "pageNumber": "1",
+        "pageSize": "500",
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "source": "WEB",
+        "client": "WEB",
+        "reportName": "RPT_ECONOMY_BOOM_INDEX",
+        "p": "1",
+        "pageNo": "1",
+        "pageNum": "1"
+      },
+      "reference_function": "macro_china_enterprise_boom_index",
+      "source_lines": [
+        1138,
+        1202
+      ]
+    },
+    "macro_china_exports_yoy": {
+      "kind": "jin10_latest",
+      "url": "https://datacenter-api.jin10.com/reports/list_v2",
+      "parameters": {
+        "max_date": "",
+        "category": "ec",
+        "attr_id": "66"
+      },
+      "reference_function": "macro_china_exports_yoy",
+      "source_lines": [
+        459,
+        476
+      ]
+    },
+    "macro_china_fx_gold": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "columns": "REPORT_DATE,TIME,GOLD_RESERVES,GOLD_RESERVES_SAME,GOLD_RESERVES_SEQUENTIAL,FOREX,FOREX_SAME,FOREX_SEQUENTIAL",
+        "pageNumber": "1",
+        "pageSize": "1000",
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "source": "WEB",
+        "client": "WEB",
+        "reportName": "RPT_ECONOMY_GOLD_CURRENCY",
+        "p": "1",
+        "pageNo": "1",
+        "pageNum": "1"
+      },
+      "reference_function": "macro_china_fx_gold",
+      "source_lines": [
+        2190,
+        2253
+      ]
+    },
+    "macro_china_fx_reserves_yearly": {
+      "kind": "jin10_latest",
+      "url": "https://datacenter-api.jin10.com/reports/list_v2",
+      "parameters": {
+        "max_date": "",
+        "category": "ec",
+        "attr_id": "76"
+      },
+      "reference_function": "macro_china_fx_reserves_yearly",
+      "source_lines": [
+        620,
+        635
+      ]
+    },
+    "macro_china_gdp": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "columns": "REPORT_DATE,TIME,DOMESTICL_PRODUCT_BASE,FIRST_PRODUCT_BASE,SECOND_PRODUCT_BASE,THIRD_PRODUCT_BASE,SUM_SAME,FIRST_SAME,SECOND_SAME,THIRD_SAME",
+        "pageNumber": "1",
+        "pageSize": "2000",
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "source": "WEB",
+        "client": "WEB",
+        "reportName": "RPT_ECONOMY_GDP",
+        "p": "1",
+        "pageNo": "1",
+        "pageNum": "1"
+      },
+      "reference_function": "macro_china_gdp",
+      "source_lines": [
+        2500,
+        2574
+      ]
+    },
+    "macro_china_gdp_yearly": {
+      "kind": "jin10_latest",
+      "url": "https://datacenter-api.jin10.com/reports/list_v2",
+      "parameters": {
+        "max_date": "",
+        "category": "ec",
+        "attr_id": "57"
+      },
+      "reference_function": "macro_china_gdp_yearly",
+      "source_lines": [
+        383,
+        398
+      ]
+    },
+    "macro_china_gdzctz": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "columns": "REPORT_DATE,TIME,BASE,BASE_SAME,BASE_SEQUENTIAL,BASE_ACCUMULATE",
+        "pageNumber": "1",
+        "pageSize": "2000",
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "source": "WEB",
+        "client": "WEB",
+        "reportName": "RPT_ECONOMY_ASSET_INVEST",
+        "p": "1",
+        "pageNo": "1",
+        "pageNum": "1"
+      },
+      "reference_function": "macro_china_gdzctz",
+      "source_lines": [
+        2674,
+        2720
+      ]
+    },
+    "macro_china_gyzjz": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "columns": "REPORT_DATE,TIME,BASE_SAME,BASE_ACCUMULATE",
+        "pageNumber": "1",
+        "pageSize": "2000",
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "source": "WEB",
+        "client": "WEB",
+        "reportName": "RPT_ECONOMY_INDUS_GROW",
+        "p": "1",
+        "pageNo": "1",
+        "pageNum": "1"
+      },
+      "reference_function": "macro_china_gyzjz",
+      "source_lines": [
+        3051,
+        3093
+      ]
+    },
+    "macro_china_hgjck": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "columns": "REPORT_DATE,TIME,EXIT_BASE,IMPORT_BASE,EXIT_BASE_SAME,IMPORT_BASE_SAME,EXIT_BASE_SEQUENTIAL,IMPORT_BASE_SEQUENTIAL,EXIT_ACCUMULATE,IMPORT_ACCUMULATE,EXIT_ACCUMULATE_SAME,IMPORT_ACCUMULATE_SAME",
+        "pageNumber": "1",
+        "pageSize": "2000",
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "source": "WEB",
+        "client": "WEB",
+        "reportName": "RPT_ECONOMY_CUSTOMS",
+        "p": "1",
+        "pageNo": "1",
+        "pageNum": "1"
+      },
+      "reference_function": "macro_china_hgjck",
+      "source_lines": [
+        2723,
+        2811
+      ]
+    },
+    "macro_china_imports_yoy": {
+      "kind": "jin10_latest",
+      "url": "https://datacenter-api.jin10.com/reports/list_v2",
+      "parameters": {
+        "max_date": "",
+        "category": "ec",
+        "attr_id": "77"
+      },
+      "reference_function": "macro_china_imports_yoy",
+      "source_lines": [
+        480,
+        498
+      ]
+    },
+    "macro_china_industrial_production_yoy": {
+      "kind": "jin10_latest",
+      "url": "https://datacenter-api.jin10.com/reports/list_v2",
+      "parameters": {
+        "max_date": "",
+        "category": "ec",
+        "attr_id": "58"
+      },
+      "reference_function": "macro_china_industrial_production_yoy",
+      "source_lines": [
+        522,
+        540
+      ]
+    },
+    "macro_china_insurance_income": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "pageSize": "1000",
+        "pageNumber": "1",
+        "reportName": "RPT_INDUSTRY_INDEX",
+        "columns": "REPORT_DATE,INDICATOR_VALUE,CHANGE_RATE,CHANGERATE_3M,CHANGERATE_6M,CHANGERATE_1Y,CHANGERATE_2Y,CHANGERATE_3Y",
+        "filter": "(INDICATOR_ID=\"EMM00088870\")",
+        "source": "WEB",
+        "client": "WEB"
+      },
+      "reference_function": "macro_china_insurance_income",
+      "source_lines": [
+        1287,
+        1330
+      ]
+    },
+    "macro_china_lpi_index": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "pageSize": "500",
+        "pageNumber": "1",
+        "reportName": "RPT_INDUSTRY_INDEX",
+        "columns": "REPORT_DATE,INDICATOR_VALUE,CHANGE_RATE,CHANGERATE_3M,CHANGERATE_6M,CHANGERATE_1Y,CHANGERATE_2Y,CHANGERATE_3Y,INDICATOR_ID,INDICATOR_NAME",
+        "filter": "(INDICATOR_ID=\"EMI00352262\")",
+        "source": "WEB",
+        "client": "WEB"
+      },
+      "reference_function": "macro_china_lpi_index",
+      "source_lines": [
+        1878,
+        1930
+      ]
+    },
+    "macro_china_lpr": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "reportName": "RPTA_WEB_RATE",
+        "columns": "ALL",
+        "sortColumns": "TRADE_DATE",
+        "sortTypes": "-1",
+        "token": "894050c76af8597a853f5b408b759f5d",
+        "pageNumber": "1",
+        "pageSize": "500",
+        "p": "1",
+        "pageNo": "1",
+        "pageNum": "1"
+      },
+      "reference_function": "macro_china_lpr",
+      "source_lines": [
+        1012,
+        1055
+      ]
+    },
+    "macro_china_m2_yearly": {
+      "kind": "jin10_latest",
+      "url": "https://datacenter-api.jin10.com/reports/list_v2",
+      "parameters": {
+        "max_date": "",
+        "category": "ec",
+        "attr_id": "59"
+      },
+      "reference_function": "macro_china_m2_yearly",
+      "source_lines": [
+        639,
+        654
+      ]
+    },
+    "macro_china_mobile_number": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "pageSize": "1000",
+        "pageNumber": "1",
+        "reportName": "RPT_INDUSTRY_INDEX",
+        "columns": "REPORT_DATE,INDICATOR_VALUE,CHANGE_RATE,CHANGERATE_3M,CHANGERATE_6M,CHANGERATE_1Y,CHANGERATE_2Y,CHANGERATE_3Y,INDICATOR_ID,INDICATOR_NAME",
+        "filter": "(INDICATOR_ID=\"EMI00225823\")",
+        "source": "WEB",
+        "client": "WEB"
+      },
+      "reference_function": "macro_china_mobile_number",
+      "source_lines": [
+        1333,
+        1377
+      ]
+    },
+    "macro_china_money_supply": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "columns": "REPORT_DATE,TIME,BASIC_CURRENCY,BASIC_CURRENCY_SAME,BASIC_CURRENCY_SEQUENTIAL,CURRENCY,CURRENCY_SAME,CURRENCY_SEQUENTIAL,FREE_CASH,FREE_CASH_SAME,FREE_CASH_SEQUENTIAL",
+        "pageNumber": "1",
+        "pageSize": "2000",
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "source": "WEB",
+        "client": "WEB",
+        "reportName": "RPT_ECONOMY_CURRENCY_SUPPLY",
+        "p": "1",
+        "pageNo": "1",
+        "pageNum": "1"
+      },
+      "reference_function": "macro_china_money_supply",
+      "source_lines": [
+        2342,
+        2422
+      ]
+    },
+    "macro_china_national_tax_receipts": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "columns": "REPORT_DATE,TIME,TAX_INCOME,TAX_INCOME_SAME,TAX_INCOME_SEQUENTIAL",
+        "pageNumber": "1",
+        "pageSize": "500",
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "source": "WEB",
+        "client": "WEB",
+        "reportName": "RPT_ECONOMY_TAX",
+        "p": "1",
+        "pageNo": "1",
+        "pageNum": "1"
+      },
+      "reference_function": "macro_china_national_tax_receipts",
+      "source_lines": [
+        1206,
+        1237
+      ]
+    },
+    "macro_china_new_financial_credit": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "columns": "REPORT_DATE,TIME,RMB_LOAN,RMB_LOAN_SAME,RMB_LOAN_SEQUENTIAL,RMB_LOAN_ACCUMULATE,LOAN_ACCUMULATE_SAME",
+        "pageNumber": "1",
+        "pageSize": "2000",
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "source": "WEB",
+        "client": "WEB",
+        "reportName": "RPT_ECONOMY_RMB_LOAN",
+        "p": "1",
+        "pageNo": "1",
+        "pageNum": "1"
+      },
+      "reference_function": "macro_china_new_financial_credit",
+      "source_lines": [
+        2142,
+        2187
+      ]
+    },
+    "macro_china_non_man_pmi": {
+      "kind": "jin10_latest",
+      "url": "https://datacenter-api.jin10.com/reports/list_v2",
+      "parameters": {
+        "max_date": "",
+        "category": "ec",
+        "attr_id": "75"
+      },
+      "reference_function": "macro_china_non_man_pmi",
+      "source_lines": [
+        601,
+        616
+      ]
+    },
+    "macro_china_pmi": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "columns": "REPORT_DATE,TIME,MAKE_INDEX,MAKE_SAME,NMAKE_INDEX,NMAKE_SAME",
+        "pageNumber": "1",
+        "pageSize": "2000",
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "source": "WEB",
+        "client": "WEB",
+        "reportName": "RPT_ECONOMY_PMI",
+        "p": "1",
+        "pageNo": "1",
+        "pageNum": "1"
+      },
+      "reference_function": "macro_china_pmi",
+      "source_lines": [
+        2622,
+        2671
+      ]
+    },
+    "macro_china_pmi_yearly": {
+      "kind": "jin10_latest",
+      "url": "https://datacenter-api.jin10.com/reports/list_v2",
+      "parameters": {
+        "category": "ec",
+        "attr_id": "65",
+        "max_date": ""
+      },
+      "reference_function": "macro_china_pmi_yearly",
+      "source_lines": [
+        544,
+        559
+      ]
+    },
+    "macro_china_ppi": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "columns": "REPORT_DATE,TIME,BASE,BASE_SAME,BASE_ACCUMULATE",
+        "pageNumber": "1",
+        "pageSize": "2000",
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "source": "WEB",
+        "client": "WEB",
+        "reportName": "RPT_ECONOMY_PPI",
+        "p": "1",
+        "pageNo": "1",
+        "pageNum": "1"
+      },
+      "reference_function": "macro_china_ppi",
+      "source_lines": [
+        2577,
+        2619
+      ]
+    },
+    "macro_china_ppi_yearly": {
+      "kind": "jin10_latest",
+      "url": "https://datacenter-api.jin10.com/reports/list_v2",
+      "parameters": {
+        "max_date": "",
+        "category": "ec",
+        "attr_id": "60"
+      },
+      "reference_function": "macro_china_ppi_yearly",
+      "source_lines": [
+        440,
+        455
+      ]
+    },
+    "macro_china_qyspjg": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "columns": "REPORT_DATE,TIME,BASE,BASE_SAME,BASE_SEQUENTIAL,FARM_BASE,FARM_BASE_SAME,FARM_BASE_SEQUENTIAL,MINERAL_BASE,MINERAL_BASE_SAME,MINERAL_BASE_SEQUENTIAL,ENERGY_BASE,ENERGY_BASE_SAME,ENERGY_BASE_SEQUENTIAL",
+        "pageNumber": "1",
+        "pageSize": "2000",
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "source": "WEB",
+        "client": "WEB",
+        "reportName": "RPT_ECONOMY_GOODS_INDEX",
+        "p": "1",
+        "pageNo": "1",
+        "pageNum": "1"
+      },
+      "reference_function": "macro_china_qyspjg",
+      "source_lines": [
+        108,
+        199
+      ]
+    },
+    "macro_china_real_estate": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "pageSize": "1000",
+        "pageNumber": "1",
+        "reportName": "RPT_INDUSTRY_INDEX",
+        "columns": "REPORT_DATE,INDICATOR_VALUE,CHANGE_RATE,CHANGERATE_3M,CHANGERATE_6M,CHANGERATE_1Y,CHANGERATE_2Y,CHANGERATE_3Y",
+        "filter": "(INDICATOR_ID=\"EMM00121987\")",
+        "source": "WEB",
+        "client": "WEB"
+      },
+      "reference_function": "macro_china_real_estate",
+      "source_lines": [
+        3699,
+        3755
+      ]
+    },
+    "macro_china_reserve_requirement_ratio": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "columns": "REPORT_DATE,PUBLISH_DATE,TRADE_DATE,INTEREST_RATE_BB,INTEREST_RATE_BA,CHANGE_RATE_B,INTEREST_RATE_SB,INTEREST_RATE_SA,CHANGE_RATE_S,NEXT_SH_RATE,NEXT_SZ_RATE,REMARK",
+        "pageNumber": "1",
+        "pageSize": "2000",
+        "sortColumns": "PUBLISH_DATE,TRADE_DATE",
+        "sortTypes": "-1,-1",
+        "source": "WEB",
+        "client": "WEB",
+        "reportName": "RPT_ECONOMY_DEPOSIT_RESERVE",
+        "p": "1",
+        "pageNo": "1",
+        "pageNum": "1"
+      },
+      "reference_function": "macro_china_reserve_requirement_ratio",
+      "source_lines": [
+        3096,
+        3177
+      ]
+    },
+    "macro_china_stock_market_cap": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "reportName": "RPT_ECONOMY_STOCK_STATISTICS",
+        "columns": "REPORT_DATE,TIME,TOTAL_SHARES_SH,TOTAL_MARKE_SH,DEAL_AMOUNT_SH,VOLUME_SH,HIGH_INDEX_SH,LOW_INDEX_SH,TOTAL_SZARES_SZ,TOTAL_MARKE_SZ,DEAL_AMOUNT_SZ,VOLUME_SZ,HIGH_INDEX_SZ,LOW_INDEX_SZ",
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "pageNumber": "1",
+        "pageSize": "1000",
+        "source": "WEB",
+        "client": "WEB"
+      },
+      "reference_function": "macro_china_stock_market_cap",
+      "source_lines": [
+        2256,
+        2339
+      ]
+    },
+    "macro_china_trade_balance": {
+      "kind": "jin10_latest",
+      "url": "https://datacenter-api.jin10.com/reports/list_v2",
+      "parameters": {
+        "max_date": "",
+        "category": "ec",
+        "attr_id": "61"
+      },
+      "reference_function": "macro_china_trade_balance",
+      "source_lines": [
+        502,
+        518
+      ]
+    },
+    "macro_china_vegetable_basket": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "pageSize": "500",
+        "pageNumber": "1",
+        "reportName": "RPT_INDUSTRY_INDEX",
+        "columns": "REPORT_DATE,INDICATOR_VALUE,CHANGE_RATE,CHANGERATE_3M,CHANGERATE_6M,CHANGERATE_1Y,CHANGERATE_2Y,CHANGERATE_3Y,INDICATOR_ID,INDICATOR_NAME",
+        "filter": "(INDICATOR_ID=\"EMI00009275\")",
+        "source": "WEB",
+        "client": "WEB"
+      },
+      "reference_function": "macro_china_vegetable_basket",
+      "source_lines": [
+        1380,
+        1432
+      ]
+    },
+    "macro_china_wbck": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "columns": "REPORT_DATE,TIME,BASE,BASE_SAME,BASE_SEQUENTIAL,BASE_ACCUMULATE",
+        "pageNumber": "1",
+        "pageSize": "2000",
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "source": "WEB",
+        "client": "WEB",
+        "reportName": "RPT_ECONOMY_FOREX_DEPOSIT",
+        "p": "1",
+        "pageNo": "1",
+        "pageNum": "1"
+      },
+      "reference_function": "macro_china_wbck",
+      "source_lines": [
+        2917,
+        2963
+      ]
+    },
+    "macro_china_whxd": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "columns": "REPORT_DATE,TIME,BASE,BASE_SAME,BASE_SEQUENTIAL,BASE_ACCUMULATE",
+        "pageNumber": "1",
+        "pageSize": "2000",
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "source": "WEB",
+        "client": "WEB",
+        "reportName": "RPT_ECONOMY_FOREX_LOAN",
+        "p": "1",
+        "pageNo": "1",
+        "pageNum": "1"
+      },
+      "reference_function": "macro_china_whxd",
+      "source_lines": [
+        2867,
+        2914
+      ]
+    },
+    "macro_china_xfzxx": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "columns": "REPORT_DATE,TIME,CONSUMERS_FAITH_INDEX,FAITH_INDEX_SAME,FAITH_INDEX_SEQUENTIAL,CONSUMERS_ASTIS_INDEX,ASTIS_INDEX_SAME,ASTIS_INDEX_SEQUENTIAL,CONSUMERS_EXPECT_INDEX,EXPECT_INDEX_SAME,EXPECT_INDEX_SEQUENTIAL",
+        "pageNumber": "1",
+        "pageSize": "2000",
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "source": "WEB",
+        "client": "WEB",
+        "reportName": "RPT_ECONOMY_FAITH_INDEX",
+        "p": "1",
+        "pageNo": "1",
+        "pageNum": "1"
+      },
+      "reference_function": "macro_china_xfzxx",
+      "source_lines": [
+        2966,
+        3048
+      ]
+    },
+    "macro_china_yw_electronic_index": {
+      "kind": "eastmoney_datacenter",
+      "url": "https://datacenter-web.eastmoney.com/api/data/v1/get",
+      "parameters": {
+        "sortColumns": "REPORT_DATE",
+        "sortTypes": "-1",
+        "pageSize": "500",
+        "pageNumber": "1",
+        "reportName": "RPT_INDUSTRY_INDEX",
+        "columns": "REPORT_DATE,INDICATOR_VALUE,CHANGE_RATE,CHANGERATE_3M,CHANGERATE_6M,CHANGERATE_1Y,CHANGERATE_2Y,CHANGERATE_3Y",
+        "filter": "(INDICATOR_ID=\"EMI00055551\")",
+        "source": "WEB",
+        "client": "WEB"
+      },
+      "reference_function": "macro_china_yw_electronic_index",
+      "source_lines": [
+        1710,
+        1762
+      ]
+    }
+  }
+}

@@ -1,0 +1,631 @@
+{
+  "schema": "ad.free-source-routing.v1",
+  "source_commit": "68f2977203a07d5b3e82d747904f2afb0dc525fc",
+  "functions": {
+    "news_cctv": [
+      "cctv.com",
+      "cntv.cn"
+    ],
+    "tool_trade_date_hist_sina": [
+      "sina"
+    ],
+    "futures_main_sina": [
+      "sina"
+    ],
+    "futures_zh_minute_sina": [
+      "sina"
+    ],
+    "energy_carbon_bj": [
+      "bjets.com.cn"
+    ],
+    "energy_carbon_hb": [
+      "hbets.cn"
+    ],
+    "energy_oil_hist": [
+      "eastmoney.com"
+    ],
+    "energy_oil_detail": [
+      "eastmoney.com"
+    ],
+    "currency_boc_safe": [
+      "safe.gov.cn"
+    ],
+    "bond_china_yield": [
+      "chinabond.com.cn"
+    ],
+    "bond_zh_hs_cov_daily": [
+      "sina"
+    ],
+    "bond_zh_hs_cov_min": [
+      "eastmoney.com"
+    ],
+    "bond_zh_cov": [
+      "eastmoney.com"
+    ],
+    "bond_zh_cov_info": [
+      "eastmoney.com"
+    ],
+    "rate_interbank": [
+      "eastmoney.com"
+    ],
+    "macro_cnbs": [
+      "cnbs.public-database"
+    ],
+    "macro_stock_finance": [
+      "10jqka.com.cn"
+    ],
+    "macro_rmb_loan": [
+      "10jqka.com.cn"
+    ],
+    "macro_rmb_deposit": [
+      "10jqka.com.cn"
+    ],
+    "macro_china_qyspjg": [
+      "eastmoney.com"
+    ],
+    "macro_china_shrzgm": [
+      "mofcom.gov.cn"
+    ],
+    "macro_china_gdp_yearly": [
+      "eastmoney.com",
+      "jin10.com",
+      "mofcom.gov.cn",
+      "sina",
+      "stats.gov.cn"
+    ],
+    "macro_china_cpi_yearly": [
+      "eastmoney.com",
+      "jin10.com",
+      "mofcom.gov.cn",
+      "sina",
+      "stats.gov.cn"
+    ],
+    "macro_china_cpi_monthly": [
+      "eastmoney.com",
+      "jin10.com",
+      "mofcom.gov.cn",
+      "sina",
+      "stats.gov.cn"
+    ],
+    "macro_china_ppi_yearly": [
+      "eastmoney.com",
+      "jin10.com",
+      "mofcom.gov.cn",
+      "sina",
+      "stats.gov.cn"
+    ],
+    "macro_china_exports_yoy": [
+      "eastmoney.com",
+      "jin10.com",
+      "mofcom.gov.cn",
+      "sina",
+      "stats.gov.cn"
+    ],
+    "macro_china_imports_yoy": [
+      "eastmoney.com",
+      "jin10.com",
+      "mofcom.gov.cn",
+      "sina",
+      "stats.gov.cn"
+    ],
+    "macro_china_trade_balance": [
+      "eastmoney.com",
+      "jin10.com",
+      "mofcom.gov.cn",
+      "sina",
+      "stats.gov.cn"
+    ],
+    "macro_china_industrial_production_yoy": [
+      "eastmoney.com",
+      "jin10.com",
+      "mofcom.gov.cn",
+      "sina",
+      "stats.gov.cn"
+    ],
+    "macro_china_pmi_yearly": [
+      "eastmoney.com",
+      "jin10.com",
+      "mofcom.gov.cn",
+      "sina",
+      "stats.gov.cn"
+    ],
+    "macro_china_cx_pmi_yearly": [
+      "eastmoney.com",
+      "jin10.com",
+      "mofcom.gov.cn",
+      "sina",
+      "stats.gov.cn"
+    ],
+    "macro_china_cx_services_pmi_yearly": [
+      "eastmoney.com",
+      "jin10.com",
+      "mofcom.gov.cn",
+      "sina",
+      "stats.gov.cn"
+    ],
+    "macro_china_non_man_pmi": [
+      "eastmoney.com",
+      "jin10.com",
+      "mofcom.gov.cn",
+      "sina",
+      "stats.gov.cn"
+    ],
+    "macro_china_fx_reserves_yearly": [
+      "eastmoney.com",
+      "jin10.com",
+      "mofcom.gov.cn",
+      "sina",
+      "stats.gov.cn"
+    ],
+    "macro_china_m2_yearly": [
+      "eastmoney.com",
+      "jin10.com",
+      "mofcom.gov.cn",
+      "sina",
+      "stats.gov.cn"
+    ],
+    "macro_china_shibor_all": [
+      "jin10.com"
+    ],
+    "macro_china_market_margin_sz": [
+      "jin10.com"
+    ],
+    "macro_china_market_margin_sh": [
+      "jin10.com"
+    ],
+    "macro_china_au_report": [
+      "jin10.com"
+    ],
+    "macro_china_lpr": [
+      "eastmoney.com"
+    ],
+    "macro_china_new_house_price": [
+      "eastmoney.com"
+    ],
+    "macro_china_enterprise_boom_index": [
+      "eastmoney.com"
+    ],
+    "macro_china_national_tax_receipts": [
+      "eastmoney.com"
+    ],
+    "macro_china_bank_financing": [
+      "eastmoney.com"
+    ],
+    "macro_china_insurance_income": [
+      "eastmoney.com"
+    ],
+    "macro_china_mobile_number": [
+      "eastmoney.com"
+    ],
+    "macro_china_vegetable_basket": [
+      "eastmoney.com"
+    ],
+    "macro_china_agricultural_product": [
+      "eastmoney.com"
+    ],
+    "macro_china_agricultural_index": [
+      "eastmoney.com"
+    ],
+    "macro_china_energy_index": [
+      "eastmoney.com"
+    ],
+    "macro_china_commodity_price_index": [
+      "eastmoney.com"
+    ],
+    "macro_china_yw_electronic_index": [
+      "eastmoney.com"
+    ],
+    "macro_china_construction_index": [
+      "eastmoney.com"
+    ],
+    "macro_china_construction_price_index": [
+      "eastmoney.com"
+    ],
+    "macro_china_lpi_index": [
+      "eastmoney.com"
+    ],
+    "macro_china_bdti_index": [
+      "eastmoney.com"
+    ],
+    "macro_china_bsi_index": [
+      "eastmoney.com"
+    ],
+    "macro_china_new_financial_credit": [
+      "eastmoney.com"
+    ],
+    "macro_china_fx_gold": [
+      "eastmoney.com"
+    ],
+    "macro_china_stock_market_cap": [
+      "eastmoney.com"
+    ],
+    "macro_china_money_supply": [
+      "eastmoney.com"
+    ],
+    "macro_china_cpi": [
+      "eastmoney.com"
+    ],
+    "macro_china_gdp": [
+      "eastmoney.com"
+    ],
+    "macro_china_ppi": [
+      "eastmoney.com"
+    ],
+    "macro_china_pmi": [
+      "eastmoney.com"
+    ],
+    "macro_china_gdzctz": [
+      "eastmoney.com"
+    ],
+    "macro_china_hgjck": [
+      "eastmoney.com"
+    ],
+    "macro_china_czsr": [
+      "eastmoney.com"
+    ],
+    "macro_china_whxd": [
+      "eastmoney.com"
+    ],
+    "macro_china_wbck": [
+      "eastmoney.com"
+    ],
+    "macro_china_xfzxx": [
+      "eastmoney.com"
+    ],
+    "macro_china_gyzjz": [
+      "eastmoney.com"
+    ],
+    "macro_china_reserve_requirement_ratio": [
+      "eastmoney.com"
+    ],
+    "macro_china_consumer_goods_retail": [
+      "eastmoney.com"
+    ],
+    "macro_china_society_electricity": [
+      "sina"
+    ],
+    "macro_china_society_traffic_volume": [
+      "sina"
+    ],
+    "macro_china_postal_telecommunicational": [
+      "sina"
+    ],
+    "macro_china_international_tourism_fx": [
+      "sina"
+    ],
+    "macro_china_passenger_load_factor": [
+      "sina"
+    ],
+    "macro_china_freight_index": [
+      "sina"
+    ],
+    "macro_china_central_bank_balance": [
+      "sina"
+    ],
+    "macro_china_insurance": [
+      "sina"
+    ],
+    "macro_china_supply_of_money": [
+      "sina"
+    ],
+    "macro_china_foreign_exchange_gold": [
+      "sina"
+    ],
+    "macro_china_retail_price_index": [
+      "sina"
+    ],
+    "macro_china_real_estate": [
+      "eastmoney.com"
+    ],
+    "sw_index_first_info": [
+      "legulegu.com"
+    ],
+    "sw_index_second_info": [
+      "legulegu.com"
+    ],
+    "sw_index_third_info": [
+      "legulegu.com"
+    ],
+    "sw_index_third_cons": [
+      "legulegu.com"
+    ],
+    "index_stock_cons_csindex": [
+      "csindex.com.cn"
+    ],
+    "index_zh_a_hist": [
+      "eastmoney.com"
+    ],
+    "index_zh_a_hist_min_em": [
+      "eastmoney.com"
+    ],
+    "spot_goods": [
+      "sina"
+    ],
+    "index_component_sw": [
+      "swsresearch.com"
+    ],
+    "index_analysis_daily_sw": [
+      "swsresearch.com"
+    ],
+    "stock_profit_forecast_em": [
+      "eastmoney.com"
+    ],
+    "stock_new_ipo_cninfo": [
+      "cninfo.com.cn"
+    ],
+    "stock_info_global_em": [
+      "eastmoney.com"
+    ],
+    "stock_info_global_sina": [
+      "sina"
+    ],
+    "stock_info_global_ths": [
+      "10jqka.com.cn"
+    ],
+    "stock_info_global_cls": [
+      "cls.cn"
+    ],
+    "stock_board_industry_name_ths": [
+      "10jqka.com.cn"
+    ],
+    "stock_board_industry_index_ths": [
+      "10jqka.com.cn"
+    ],
+    "stock_board_concept_name_ths": [
+      "10jqka.com.cn"
+    ],
+    "stock_board_concept_index_ths": [
+      "10jqka.com.cn"
+    ],
+    "stock_board_industry_hist_em": [
+      "eastmoney.com"
+    ],
+    "stock_board_industry_cons_em": [
+      "eastmoney.com"
+    ],
+    "stock_board_concept_hist_em": [
+      "eastmoney.com"
+    ],
+    "stock_board_concept_cons_em": [
+      "eastmoney.com"
+    ],
+    "stock_zh_a_hist": [
+      "eastmoney.com"
+    ],
+    "stock_zh_a_hist_min_em": [
+      "eastmoney.com"
+    ],
+    "stock_zh_a_daily": [
+      "sina"
+    ],
+    "stock_bid_ask_em": [
+      "eastmoney.com"
+    ],
+    "stock_zt_pool_em": [
+      "eastmoney.com"
+    ],
+    "stock_zt_pool_zbgc_em": [
+      "eastmoney.com"
+    ],
+    "stock_zt_pool_dtgc_em": [
+      "eastmoney.com"
+    ],
+    "stock_zh_a_st_em": [
+      "eastmoney.com"
+    ],
+    "stock_gdfx_free_top_10_em": [
+      "eastmoney.com"
+    ],
+    "stock_gdfx_top_10_em": [
+      "eastmoney.com"
+    ],
+    "stock_fhps_detail_em": [
+      "eastmoney.com"
+    ],
+    "stock_financial_analysis_indicator_em": [
+      "eastmoney.com"
+    ],
+    "stock_zh_a_disclosure_report_cninfo": [
+      "cninfo.com.cn"
+    ],
+    "stock_zygc_em": [
+      "eastmoney.com"
+    ],
+    "stock_balance_sheet_by_report_em": [
+      "eastmoney.com"
+    ],
+    "stock_profit_sheet_by_report_em": [
+      "eastmoney.com"
+    ],
+    "stock_cash_flow_sheet_by_report_em": [
+      "eastmoney.com"
+    ],
+    "stock_profile_cninfo": [
+      "cninfo.com.cn"
+    ],
+    "stock_value_em": [
+      "eastmoney.com"
+    ],
+    "stock_fund_flow_individual": [
+      "10jqka.com.cn"
+    ],
+    "stock_fund_flow_industry": [
+      "10jqka.com.cn"
+    ],
+    "stock_individual_fund_flow": [
+      "eastmoney.com"
+    ],
+    "stock_market_fund_flow": [
+      "eastmoney.com"
+    ],
+    "stock_sector_fund_flow_rank": [
+      "eastmoney.com"
+    ],
+    "stock_lhb_detail_em": [
+      "eastmoney.com"
+    ],
+    "stock_lhb_jgmmtj_em": [
+      "eastmoney.com"
+    ],
+    "stock_lhb_stock_detail_em": [
+      "eastmoney.com"
+    ],
+    "stock_dzjy_mrmx": [
+      "eastmoney.com"
+    ],
+    "fund_etf_hist_em": [
+      "eastmoney.com"
+    ],
+    "fund_etf_hist_min_em": [
+      "eastmoney.com"
+    ],
+    "fund_etf_scale_szse": [
+      "szse.cn"
+    ],
+    "fund_etf_scale_sse": [
+      "sse.com.cn"
+    ],
+    "spot_hog_soozhu": [
+      "soozhu.com"
+    ],
+    "spot_hog_year_trend_soozhu": [
+      "soozhu.com"
+    ],
+    "spot_hog_lean_price_soozhu": [
+      "soozhu.com"
+    ],
+    "spot_hog_three_way_soozhu": [
+      "soozhu.com"
+    ],
+    "spot_hog_crossbred_soozhu": [
+      "soozhu.com"
+    ],
+    "spot_corn_price_soozhu": [
+      "soozhu.com"
+    ],
+    "spot_soybean_price_soozhu": [
+      "soozhu.com"
+    ],
+    "spot_mixed_feed_soozhu": [
+      "soozhu.com"
+    ],
+    "spot_hist_sge": [
+      "sge.com.cn"
+    ],
+    "spot_golden_benchmark_sge": [
+      "sge.com.cn"
+    ],
+    "spot_silver_benchmark_sge": [
+      "sge.com.cn"
+    ],
+    "spot_price_qh": [
+      "99qh.com",
+      "fx168api.com"
+    ],
+    "ths_hot": [
+      "10jqka.com.cn"
+    ],
+    "tdx_blocks": [
+      "tdx"
+    ],
+    "tdx_members": [
+      "tdx"
+    ],
+    "treasury_rates": [
+      "treasury.gov"
+    ],
+    "tencent_raw_daily": [
+      "gtimg.cn"
+    ],
+    "energy_oil_detail_latest": [
+      "eastmoney.com"
+    ],
+    "futures_resample": [
+      "sina"
+    ],
+    "sina_macro_page": [
+      "sina"
+    ],
+    "cpi_rate_em": [
+      "eastmoney.com"
+    ],
+    "macro_indicator_em": [
+      "eastmoney.com"
+    ],
+    "nbs_gdp_yoy": [
+      "stats.gov.cn"
+    ],
+    "sge_benchmark": [
+      "sge.com.cn"
+    ],
+    "china_government_yield": [
+      "chinabond.com.cn"
+    ],
+    "security_events_em": [
+      "eastmoney.com"
+    ],
+    "fund_etf_only_szse": [
+      "szse.cn"
+    ],
+    "szse_margin_summary": [
+      "szse.cn"
+    ],
+    "soozhu_province_rank": [
+      "www.soozhu.com"
+    ],
+    "sina_native_minutes": [
+      "sina"
+    ],
+    "sina_raw_daily": [
+      "sina"
+    ],
+    "sina_trade_calendar": [
+      "sina"
+    ],
+    "tdx_f10_company": [
+      "tdx-f10"
+    ],
+    "sina_corporate_actions": [
+      "sina"
+    ],
+    "tdx_f10_business": [
+      "tdx-f10"
+    ],
+    "tdx_f10_valuation": [
+      "tdx-f10"
+    ],
+    "sina_period_bars": [
+      "sina"
+    ],
+    "tdx_native_bond_bars": [
+      "tdx-native"
+    ],
+    "tdx_native_finance": [
+      "tdx-native"
+    ],
+    "tdx_native_depth": [
+      "116.205.183.150"
+    ],
+    "safe_rmb_window": [
+      "safe.gov.cn"
+    ],
+    "sw_index_first_cons": [
+      "legulegu.com"
+    ],
+    "sw_index_second_cons": [
+      "legulegu.com"
+    ],
+    "pbc_social_financing_flow": [
+      "pbc.gov.cn"
+    ],
+    "ndrc_oil_adjustment": [
+      "ndrc.gov.cn"
+    ],
+    "shanghai_oil_prices": [
+      "fgw.sh.gov.cn"
+    ],
+    "szse_margin_latest": [
+      "szse.cn"
+    ]
+  }
+}

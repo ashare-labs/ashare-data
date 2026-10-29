@@ -1,0 +1,258 @@
+{
+  "schema": "ad.reviewed-futures-product-units.v1",
+  "reviewed_on": "2026-10-29",
+  "scope": "Product identity and price/contract units only. No historical multiplier, tick-size or delivery-rule equivalence claim; no CMES roll equivalence.",
+  "products": {
+    "V0": {
+      "exchange": "DCE",
+      "product": "PVC",
+      "price_unit": "CNY/tonne",
+      "tonnes_per_contract": 5,
+      "sources": [
+        "https://www.dce.com.cn/dce/channel/list/134.html",
+        "https://finance.sina.com.cn/futures/quotes/V0.shtml"
+      ]
+    },
+    "CU0": {
+      "exchange": "SHFE",
+      "product": "阴极铜",
+      "price_unit": "CNY/tonne",
+      "tonnes_per_contract": 5,
+      "sources": [
+        "https://www.shfe.com.cn/regulation/exchangerules/productrules/202512/t20251231_829954.html",
+        "https://finance.sina.com.cn/futures/quotes/CU0.shtml"
+      ]
+    },
+    "AU0": {
+      "exchange": "SHFE",
+      "product": "黄金",
+      "price_unit": "CNY/gram",
+      "grams_per_contract": 1000,
+      "sources": [
+        "https://www.shfe.com.cn/regulation/exchangerules/productrules/202512/t20251231_829960.html",
+        "https://finance.sina.com.cn/futures/quotes/AU0.shtml"
+      ]
+    },
+    "CF0": {
+      "exchange": "CZCE",
+      "product": "棉花",
+      "price_unit": "CNY/tonne",
+      "tonnes_per_contract": 5,
+      "weight_basis": "公定重量",
+      "sources": [
+        "https://www.czce.com.cn/cn/sspz/mh/bzhy/qhhy/H077002003001001index_1.htm",
+        "https://finance.sina.com.cn/futures/quotes/CF0.shtml"
+      ]
+    },
+    "IF0": {
+      "exchange": "CFFEX",
+      "product": "沪深300股指期货",
+      "price_unit": "index points",
+      "cny_per_index_point": 300,
+      "sources": [
+        "https://www.cffex.com.cn/cn/hs300.html",
+        "https://finance.sina.com.cn/futures/quotes/IF0.shtml"
+      ]
+    },
+    "TF0": {
+      "exchange": "CFFEX",
+      "product": "5年期国债期货",
+      "price_unit": "CNY clean price per CNY 100 face value",
+      "face_value_cny_per_contract": 1000000,
+      "sources": [
+        "https://www.cffex.com.cn/cn/5tf.html",
+        "https://finance.sina.com.cn/futures/quotes/TF0.shtml"
+      ]
+    },
+    "SI0": {
+      "exchange": "GFEX",
+      "product": "工业硅",
+      "price_unit": "CNY/tonne",
+      "tonnes_per_contract": 5,
+      "sources": [
+        "https://www.gfex.com.cn/gfex/gyeg/sspz.shtml",
+        "https://finance.sina.com.cn/futures/quotes/SI0.shtml"
+      ]
+    },
+    "SC0": {
+      "exchange": "INE",
+      "product": "中质含硫原油",
+      "price_unit": "CNY/barrel excluding tax",
+      "barrels_per_contract": 1000,
+      "sources": [
+        "https://www.ine.com.cn/products/futures/energyandchemical/sc_f/standard_sc_f/202312/t20231205_802540.html",
+        "https://finance.sina.com.cn/futures/quotes/SC0.shtml"
+      ]
+    },
+    "AL0": {
+      "exchange": "SHFE",
+      "product": "铝",
+      "price_unit": "CNY/tonne",
+      "tonnes_per_contract": 5,
+      "sources": [
+        "https://www.shfe.com.cn/regulation/exchangerules/productrules/202512/t20251231_829955.html",
+        "https://finance.sina.com.cn/futures/quotes/AL0.shtml"
+      ]
+    },
+    "ZN0": {
+      "exchange": "SHFE",
+      "product": "锌",
+      "price_unit": "CNY/tonne",
+      "tonnes_per_contract": 5,
+      "sources": [
+        "https://www.shfe.com.cn/regulation/exchangerules/productrules/202512/t20251231_829956.html",
+        "https://finance.sina.com.cn/futures/quotes/ZN0.shtml"
+      ]
+    },
+    "PB0": {
+      "exchange": "SHFE",
+      "product": "铅",
+      "price_unit": "CNY/tonne",
+      "tonnes_per_contract": 5,
+      "sources": [
+        "https://www.shfe.com.cn/regulation/exchangerules/productrules/202512/t20251231_829957.html",
+        "https://finance.sina.com.cn/futures/quotes/PB0.shtml"
+      ]
+    },
+    "NI0": {
+      "exchange": "SHFE",
+      "product": "镍",
+      "price_unit": "CNY/tonne",
+      "tonnes_per_contract": 1,
+      "sources": [
+        "https://www.shfe.com.cn/regulation/exchangerules/productrules/202603/t20260327_830916.html",
+        "https://finance.sina.com.cn/futures/quotes/NI0.shtml"
+      ]
+    },
+    "SN0": {
+      "exchange": "SHFE",
+      "product": "锡",
+      "price_unit": "CNY/tonne",
+      "tonnes_per_contract": 1,
+      "sources": [
+        "https://www.shfe.com.cn/regulation/exchangerules/productrules/202512/t20251231_829959.html",
+        "https://finance.sina.com.cn/futures/quotes/SN0.shtml"
+      ]
+    },
+    "AG0": {
+      "exchange": "SHFE",
+      "product": "白银",
+      "price_unit": "CNY/kilogram",
+      "kilograms_per_contract": 15,
+      "sources": [
+        "https://www.shfe.com.cn/regulation/exchangerules/productrules/202512/t20251231_829961.html",
+        "https://finance.sina.com.cn/futures/quotes/AG0.shtml"
+      ]
+    },
+    "RB0": {
+      "exchange": "SHFE",
+      "product": "螺纹钢",
+      "price_unit": "CNY/tonne",
+      "tonnes_per_contract": 10,
+      "sources": [
+        "https://www.shfe.com.cn/regulation/exchangerules/productrules/202512/t20251231_829962.html",
+        "https://finance.sina.com.cn/futures/quotes/RB0.shtml"
+      ]
+    },
+    "HC0": {
+      "exchange": "SHFE",
+      "product": "热轧卷板",
+      "price_unit": "CNY/tonne",
+      "tonnes_per_contract": 10,
+      "sources": [
+        "https://www.shfe.com.cn/regulation/exchangerules/productrules/202512/t20251231_829963.html",
+        "https://finance.sina.com.cn/futures/quotes/HC0.shtml"
+      ]
+    },
+    "SS0": {
+      "exchange": "SHFE",
+      "product": "不锈钢",
+      "price_unit": "CNY/tonne",
+      "tonnes_per_contract": 5,
+      "sources": [
+        "https://www.shfe.com.cn/regulation/exchangerules/productrules/202608/t20260831_833156.html"
+      ]
+    },
+    "RU0": {
+      "exchange": "SHFE",
+      "product": "天然橡胶",
+      "price_unit": "CNY/tonne",
+      "tonnes_per_contract": 10,
+      "sources": [
+        "https://www.shfe.com.cn/regulation/exchangerules/productrules/202512/t20251231_829973.html"
+      ]
+    },
+    "SP0": {
+      "exchange": "SHFE",
+      "product": "漂针浆",
+      "price_unit": "CNY/tonne",
+      "tonnes_per_contract": 10,
+      "sources": [
+        "https://www.shfe.com.cn/regulation/exchangerules/productrules/202512/t20251231_829972.html"
+      ]
+    },
+    "AD0": {
+      "exchange": "SHFE",
+      "product": "铸造铝合金",
+      "price_unit": "CNY/tonne",
+      "tonnes_per_contract": 10,
+      "sources": [
+        "https://www.shfe.com.cn/regulation/exchangerules/productrules/202512/t20251231_829971.html"
+      ]
+    },
+    "BU0": {
+      "exchange": "SHFE",
+      "product": "石油沥青",
+      "price_unit": "CNY/tonne",
+      "tonnes_per_contract": 10,
+      "sources": [
+        "https://www.shfe.com.cn/regulation/exchangerules/productrules/202512/t20251231_829970.html"
+      ]
+    },
+    "AO0": {
+      "exchange": "SHFE",
+      "product": "氧化铝",
+      "price_unit": "CNY/tonne",
+      "tonnes_per_contract": 20,
+      "sources": [
+        "https://www.shfe.com.cn/regulation/exchangerules/productrules/202512/t20251231_829969.html"
+      ]
+    },
+    "OP0": {
+      "exchange": "SHFE",
+      "product": "胶版印刷纸",
+      "price_unit": "CNY/tonne",
+      "tonnes_per_contract": 40,
+      "sources": [
+        "https://www.shfe.com.cn/regulation/exchangerules/productrules/202512/t20251231_829968.html"
+      ]
+    },
+    "BR0": {
+      "exchange": "SHFE",
+      "product": "丁二烯橡胶",
+      "price_unit": "CNY/tonne",
+      "tonnes_per_contract": 5,
+      "sources": [
+        "https://www.shfe.com.cn/regulation/exchangerules/productrules/202512/t20251231_829967.html"
+      ]
+    },
+    "FU0": {
+      "exchange": "SHFE",
+      "product": "燃料油",
+      "price_unit": "CNY/tonne excluding tax",
+      "tonnes_per_contract": 10,
+      "sources": [
+        "https://www.shfe.com.cn/regulation/exchangerules/productrules/202512/t20251231_829966.html"
+      ]
+    },
+    "WR0": {
+      "exchange": "SHFE",
+      "product": "线材",
+      "price_unit": "CNY/tonne",
+      "tonnes_per_contract": 10,
+      "sources": [
+        "https://www.shfe.com.cn/regulation/exchangerules/productrules/202512/t20251231_829964.html"
+      ]
+    }
+  }
+}

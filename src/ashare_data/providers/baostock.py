@@ -37,7 +37,7 @@ FIELDS = "date,code,open,high,low,close,volume,amount,adjustflag,tradestatus"
 TABLE = """CREATE TABLE IF NOT EXISTS baostock_captures
 (id TEXT PRIMARY KEY, body TEXT NOT NULL, status TEXT NOT NULL)"""
 VERSION = "baostock-research-1/receipt-4.1"
-METADATA_POLICY = "baostock-basic-validation-1"
+METADATA_POLICY = "baostock-basic-validation-2"
 
 
 def validate_basic(rows, code):
@@ -50,11 +50,12 @@ def validate_basic(rows, code):
             "SOURCE_SCHEMA_ERROR",
             "证券资料字段、字符串类型或代码异常",
         )
-        # Supported reader profile, not a promise to recognize future source enums.
+        # Metadata is a native observation. An unrecognized numeric type stays
+        # readable and explicitly unmapped; it never authorizes a bar/trade query.
         require(
-            row["type"] in {"1", "2", "3"} and row["status"] in {"0", "1"},
+            re.fullmatch(r"[1-9]\d{0,3}", row["type"]) and row["status"] in {"0", "1"},
             "SOURCE_SCHEMA_ERROR",
-            "证券type/status未获支持；未知不能映射为正常",
+            "证券原始type代码格式或status异常；未知不能映射为正常",
         )
         dates = {name: _day(row[name]) if row[name] else None for name in ("ipoDate", "outDate")}
         require(
@@ -85,7 +86,15 @@ def request(kind, security=None, start_date=None, end_date=None, frequency=None)
         )
     params = {}
     if kind != "calendar":
-        code = _security(security)
+        if kind == "basic":
+            # Basic metadata declares its own native type (stock/index/fund).
+            # The stock-only bar contract must not reject a metadata query.
+            require(isinstance(security, str) and re.fullmatch(r"\d{6}\.(?:XSHG|XSHE)", security),
+                    "INVALID_SECURITY", "证券资料需要明确沪深六位代码与交易所")
+            number, exchange = security.split(".")
+            code = ("sh" if exchange == "XSHG" else "sz") + number
+        else:
+            code = _security(security)
         params["code"] = code[:2] + "." + code[2:]
     else:
         require(security is None, "INVALID_ARGUMENT", "日历查询不接受证券参数")
@@ -807,6 +816,8 @@ class BaoStockView:
                 for name in ("ipoDate", "outDate")
                 if name in r and r[name] == ""
             ],
+            "unmapped_basic_type_codes": sorted({r["type"] for r in self._rows
+                if self._attempt["request"]["method"] == "query_stock_basic" and r["type"] not in {"1", "2", "3"}}),
         }
 
     def coverage(self):

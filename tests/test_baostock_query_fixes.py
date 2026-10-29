@@ -235,6 +235,7 @@ INVALID_META = (
         (field, value)
         for field in ("type", "status")
         for value in ("", "999", "-1", "01", "unknown")
+        if not (field == "type" and value == "999")
     ]
 )
 
@@ -258,7 +259,7 @@ def test_invalid_metadata_sealed_but_refused(tmp_path, field, value):
         view.at("2030-01-01T00:00:00+08:00", visibility="received")
 
 
-@pytest.mark.parametrize("type_", ["1", "2", "3"])
+@pytest.mark.parametrize("type_", ["1", "2", "3", "5", "999"])
 @pytest.mark.parametrize("status", ["0", "1"])
 @pytest.mark.parametrize(
     "dates",
@@ -382,3 +383,11 @@ def test_missing_clock_and_exclusive_without_end(minute_view):
     ]:
         with pytest.raises(DataError):
             fn()
+
+
+def test_basic_metadata_allows_explicit_fund_and_index_without_widening_bar_contract():
+    from ashare_data.providers.baostock import request
+    assert request('basic','510300.XSHG')['params']['code']=='sh.510300'
+    assert request('basic','000001.XSHG')['params']['code']=='sh.000001'
+    with pytest.raises(DataError):
+        request('daily','510300.XSHG','2026-10-28','2026-10-28')
