@@ -96,3 +96,21 @@ def test_incremental_goal_covers_future_candidates_without_claiming_implementati
         assert not requirement["historical_api_required"]
         assert "先核tick是否指快照" in requirement["definition_rule"]
         assert "implemented" not in requirement
+
+
+def test_cancellation_survives_recalculation_without_erasing_historical_evidence(tmp_path):
+    from ashare_data.providers.free_update_acceptance import user_progress
+    value = ledger()
+    item = value['items'][0]
+    item['scope_decision'] = {'status': 'cancelled', 'reason': 'User cancelled further development'}
+    item['scoped_availability'] = {'verified': True, 'scope': 'historical sample', 'entry': 'old entry',
+        'evidence': 'old evidence', 'readback_verified': True, 'rerun_verified': True}
+    item.update(user_progress(item))
+    assert item['user_status'] == '用户取消'
+    source = tmp_path/'ledger.json'
+    source.write_text(json.dumps(value))
+    result = export_local_ledger(source, tmp_path/'latest')
+    assert result['user_status_counts']['用户取消'] == 1
+    saved = json.loads((tmp_path/'latest'/'acceptance.json').read_text())
+    assert saved['items'][0]['scoped_availability'] == item['scoped_availability']
+    assert len(saved['items']) == 198

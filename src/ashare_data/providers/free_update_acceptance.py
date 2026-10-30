@@ -104,11 +104,16 @@ def acceptance_work(item):
 
 def user_progress(item):
     """A proven explicit scope is useful without whole-market/deployment gates."""
+    decision = item.get("scope_decision", {})
+    if decision.get("status") == "cancelled":
+        return {"user_status": "用户取消", "user_reason": decision["reason"]}
     scoped = item.get("scoped_availability", {})
     if (scoped.get("verified") and scoped.get("scope") and scoped.get("entry")
             and scoped.get("evidence") and scoped.get("readback_verified")
             and scoped.get("rerun_verified")):
         return {"user_status": "可运行", "user_reason": scoped["scope"]}
+    if decision.get("status") == "continue":
+        return {"user_status": "继续实施", "user_reason": decision["reason"]}
     diagnosis = item.get("failure_diagnosis", {})
     if diagnosis.get("kind") in {"collector_transport", "cooldown_skipped", "implementation", "not_tested"}:
         return {"user_status": "待验证", "user_reason": diagnosis["reason"]}
@@ -228,7 +233,7 @@ def export_local_ledger(ledger_path, output, *, workbook=None):
         temporary.replace(output/name)
     fields = ['excel_row','category','item','candidate_status','candidate_source','note','source_url','user_status','user_reason',
         'status','implementation_verified','coverage_verified','daily_deployment','formal_published',
-        'scope_clarification','acceptance_dimensions','remaining_acceptance','evidence_binding','coverage_evidence']
+        'scope_clarification','acceptance_dimensions','remaining_acceptance','evidence_binding','coverage_evidence','scope_decision']
     stream = io.StringIO(newline='')
     writer = csv.DictWriter(stream, fieldnames=fields, extrasaction='ignore')
     writer.writeheader()
@@ -241,7 +246,9 @@ def export_local_ledger(ledger_path, output, *, workbook=None):
     description = ('CMES 198项验收：唯一最新入口\n\n'
         f"生成时间：{ledger['generated_at']}\n"
         f"可运行（已验证入口/范围）：{user_counts.get('可运行', 0)}；待验证：{user_counts.get('待验证', 0)}；来源问题：{user_counts.get('来源问题', 0)}。\n"
-        f"技术核心样本：{counts['completed']}/198；来源窗口：{counts['coverage_verified_count']}/198。\n"
+        + (f"用户取消后续开发：{user_counts['用户取消']}项，保留原行及历史证据，不再研究、实现或重试。\n" if user_counts.get('用户取消') else '')
+        + (f"继续实施：{user_counts['继续实施']}项。\n" if user_counts.get('继续实施') else '')
+        + f"技术核心样本：{counts['completed']}/198；来源窗口：{counts['coverage_verified_count']}/198。\n"
         f"日常启用：{counts['daily_deployed']}；正式发布：{counts['formal_published']}。\n\n"
         '目标是CMES历史底库加免费源当期增量；当前快照和短窗口可以持续留存，历史衔接空档单列补数。\n'
         '可运行指表内明确范围已有实际入口；日常启用和正式发布另列。\n'

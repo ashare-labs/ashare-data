@@ -137,7 +137,39 @@ def checked(config_path):
                 raise ValueError("financial security identity changed")
     if not ids:
         raise ValueError("no configured profiles")
+    dependencies = {i['id']:i.get('depends_on',[]) for i in config['items']}
+    visiting, visited = set(), set()
+    def visit(identity):
+        if identity in visiting:
+            raise ValueError('collector dependency cycle')
+        if identity in visited:
+            return
+        edges=dependencies[identity]
+        if not isinstance(edges,list) or len(set(edges))!=len(edges) or any(d not in ids for d in edges):
+            raise ValueError('unknown or duplicate collector dependency')
+        visiting.add(identity)
+        for dependency in edges:
+            visit(dependency)
+        visiting.remove(identity)
+        visited.add(identity)
+    for identity in ids:
+        visit(identity)
     return config
+
+
+def due_key(item, now):
+    return (now.date().isoformat() if item['frequency']=='daily' else
+            now.date().replace(day=1).isoformat() if item['frequency']=='monthly' else
+            (now.date()-timedelta(days=now.weekday())).isoformat())
+
+
+def dependencies_ready(item, config, state, now):
+    by_id={i['id']:i for i in config['items']}
+    for dependency in item.get('depends_on',[]):
+        current=state['items'].get(dependency,{})
+        if not current.get('complete') or current.get('due')!=due_key(by_id[dependency],now):
+            return False
+    return True
 
 
 def blocked_sources(config, now, *, active_roots=()):
@@ -483,10 +515,11 @@ def run(profile, *, execute=False, clock=None, runner=invoke, usage_reader=usage
                         current = state["items"].get(item["id"])
                         if current and current["day"] > day:
                             raise ValueError("collection clock moved backwards")
-                        due = (day if item["frequency"] == "daily" else
-                               now.date().replace(day=1).isoformat() if item["frequency"] == "monthly" else
-                               (now.date() - timedelta(days=now.weekday())).isoformat())
+                        due = due_key(item, now)
                         if current and current["settled"] and current["due"] == due:
+                            continue
+                        if not dependencies_ready(item,config,state,now):
+                            pending_reason='source_dependency_pending'
                             continue
                         offline = item["kind"] == "cached_macro"
                         scope = item["observation_root"] if parallel else "registry"

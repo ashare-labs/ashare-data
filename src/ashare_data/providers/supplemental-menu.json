@@ -1,0 +1,198 @@
+{
+  "schema": "ad.supplemental-menu.v1",
+  "library_file_id": "libfile_5b4c096f20a88191a73205c1038e94bf",
+  "version": 0,
+  "workbook_sha256": "9f5df53320550da2e4b3497d62382abe7a0b3adab1bca5e7d5310b3919da6a58",
+  "items": [
+    {
+      "sheet": "数据菜单",
+      "excel_row": 30,
+      "category": "股票数据",
+      "item": "可转债票面利率",
+      "candidate_status": "部分可尝试",
+      "candidate_source": "发行募集说明书 / 付息公告",
+      "note": "逐年利率需提取",
+      "source_url": "https://www.cninfo.com.cn/new/index"
+    },
+    {
+      "sheet": "数据菜单",
+      "excel_row": 50,
+      "category": "股票数据",
+      "item": "日级别财务指标数据-个股打包",
+      "candidate_status": "部分可尝试",
+      "candidate_source": "BaoStock / 东财",
+      "note": "常用估值有源；字段待对齐",
+      "source_url": "https://akshare.akfamily.xyz/data/stock/stock_valuation.html"
+    },
+    {
+      "sheet": "数据菜单",
+      "excel_row": 51,
+      "category": "股票数据",
+      "item": "日级别含技术指标数据",
+      "candidate_status": "部分可尝试",
+      "candidate_source": "腾讯 / 东财行情 + 本地计算",
+      "note": "常用指标可算；非原表等价",
+      "source_url": "https://akshare.akfamily.xyz/data/stock/stock_quote.html"
+    },
+    {
+      "sheet": "数据菜单",
+      "excel_row": 52,
+      "category": "股票数据",
+      "item": "日级别技术指标数据-按日打包",
+      "candidate_status": "部分可尝试",
+      "candidate_source": "腾讯 / 东财行情 + 本地计算",
+      "note": "常用指标可算；非原表等价",
+      "source_url": "https://akshare.akfamily.xyz/data/stock/stock_quote.html"
+    },
+    {
+      "sheet": "数据菜单",
+      "excel_row": 57,
+      "category": "股票数据",
+      "item": "上市公司基本面",
+      "candidate_status": "部分可尝试",
+      "candidate_source": "东财 / 新浪 / 巨潮",
+      "note": "常用字段；原合集待对齐",
+      "source_url": "https://akshare.akfamily.xyz/data/stock/stock_finance.html"
+    },
+    {
+      "sheet": "数据菜单",
+      "excel_row": 64,
+      "category": "股票数据",
+      "item": "日级别财务指标数据，按日打包",
+      "candidate_status": "部分可尝试",
+      "candidate_source": "BaoStock / 东财",
+      "note": "常用估值有源；字段待对齐",
+      "source_url": "https://akshare.akfamily.xyz/data/stock/stock_valuation.html"
+    },
+    {
+      "sheet": "数据菜单",
+      "excel_row": 82,
+      "category": "涨停打板",
+      "item": "题材成分",
+      "candidate_status": "部分可尝试",
+      "candidate_source": "同花顺概念 / 东财板块",
+      "note": "分类体系不同，非直接等价",
+      "source_url": "https://akshare.akfamily.xyz/data/stock/stock_board.html"
+    },
+    {
+      "sheet": "数据菜单",
+      "excel_row": 112,
+      "category": "成分股板块",
+      "item": "指数成分股名单合集日更",
+      "candidate_status": "部分可尝试",
+      "candidate_source": "中证、国证当前成分表；AKShare",
+      "note": "可逐日保存名单；尚未证明覆盖CMES全部指数，不能回填历史成分。",
+      "source_url": "https://github.com/akfamily/akshare/blob/main/docs/data/index/index.md"
+    },
+    {
+      "sheet": "数据菜单",
+      "excel_row": 125,
+      "category": "成分股板块",
+      "item": "沪深300成分股行情",
+      "candidate_status": "部分可尝试",
+      "candidate_source": "中证当前成分表＋个股日行情（东财/腾讯/新浪）",
+      "note": "组合可尝试：用当期成分筛选个股行情；非现成CMES同字段包，历史不能用今天名单回填。",
+      "source_url": "https://github.com/akfamily/akshare/blob/main/docs/data/index/index.md"
+    },
+    {
+      "sheet": "数据菜单",
+      "excel_row": 126,
+      "category": "成分股板块",
+      "item": "上证50成分股行情",
+      "candidate_status": "部分可尝试",
+      "candidate_source": "中证当前成分表＋个股日行情（东财/腾讯/新浪）",
+      "note": "组合可尝试：用当期成分筛选个股行情；非现成CMES同字段包，历史不能用今天名单回填。",
+      "source_url": "https://github.com/akfamily/akshare/blob/main/docs/data/index/index.md"
+    },
+    {
+      "sheet": "数据菜单",
+      "excel_row": 127,
+      "category": "成分股板块",
+      "item": "创业板指成分股行情",
+      "candidate_status": "部分可尝试",
+      "candidate_source": "国证当前成分表＋个股日行情（东财/腾讯/新浪）",
+      "note": "组合可尝试：用当期成分筛选个股行情；非现成CMES同字段包，历史不能用今天名单回填。",
+      "source_url": "https://github.com/akfamily/akshare/blob/main/docs/data/index/index.md"
+    },
+    {
+      "sheet": "数据菜单",
+      "excel_row": 128,
+      "category": "成分股板块",
+      "item": "科创50成分股行情",
+      "candidate_status": "部分可尝试",
+      "candidate_source": "中证当前成分表＋个股日行情（东财/腾讯/新浪）",
+      "note": "组合可尝试：用当期成分筛选个股行情；非现成CMES同字段包，历史不能用今天名单回填。",
+      "source_url": "https://github.com/akfamily/akshare/blob/main/docs/data/index/index.md"
+    },
+    {
+      "sheet": "数据菜单",
+      "excel_row": 129,
+      "category": "成分股板块",
+      "item": "中证500成分股行情",
+      "candidate_status": "部分可尝试",
+      "candidate_source": "中证当前成分表＋个股日行情（东财/腾讯/新浪）",
+      "note": "组合可尝试：用当期成分筛选个股行情；非现成CMES同字段包，历史不能用今天名单回填。",
+      "source_url": "https://github.com/akfamily/akshare/blob/main/docs/data/index/index.md"
+    },
+    {
+      "sheet": "数据菜单",
+      "excel_row": 130,
+      "category": "成分股板块",
+      "item": "中证800成分股行情",
+      "candidate_status": "部分可尝试",
+      "candidate_source": "中证当前成分表＋个股日行情（东财/腾讯/新浪）",
+      "note": "组合可尝试：用当期成分筛选个股行情；非现成CMES同字段包，历史不能用今天名单回填。",
+      "source_url": "https://github.com/akfamily/akshare/blob/main/docs/data/index/index.md"
+    },
+    {
+      "sheet": "数据菜单",
+      "excel_row": 131,
+      "category": "成分股板块",
+      "item": "中证1000成分股行情",
+      "candidate_status": "部分可尝试",
+      "candidate_source": "中证当前成分表＋个股日行情（东财/腾讯/新浪）",
+      "note": "组合可尝试：用当期成分筛选个股行情；非现成CMES同字段包，历史不能用今天名单回填。",
+      "source_url": "https://github.com/akfamily/akshare/blob/main/docs/data/index/index.md"
+    },
+    {
+      "sheet": "数据菜单",
+      "excel_row": 132,
+      "category": "成分股板块",
+      "item": "上证180成分股行情",
+      "candidate_status": "部分可尝试",
+      "candidate_source": "中证当前成分表＋个股日行情（东财/腾讯/新浪）",
+      "note": "组合可尝试：用当期成分筛选个股行情；非现成CMES同字段包，历史不能用今天名单回填。",
+      "source_url": "https://github.com/akfamily/akshare/blob/main/docs/data/index/index.md"
+    },
+    {
+      "sheet": "数据菜单",
+      "excel_row": 201,
+      "category": "宏观数据",
+      "item": "美国国债长期利率平均值",
+      "candidate_status": "部分可尝试",
+      "candidate_source": "美国财政部",
+      "note": "按原发布频率更新；有长期实际利率平均值；需确认CMES该项是否相同口径。",
+      "source_url": "https://home.treasury.gov/treasury-daily-interest-rate-xml-feed"
+    },
+    {
+      "sheet": "数据菜单",
+      "excel_row": 207,
+      "category": "F10 基本面",
+      "item": "分红融资",
+      "candidate_status": "部分可尝试",
+      "candidate_source": "AKShare→新浪／巨潮",
+      "note": "分红、送转、配股已有候选；其他融资子项未逐项确认。",
+      "source_url": "https://akshare.akfamily.xyz/data/stock/stock_issue.html"
+    },
+    {
+      "sheet": "数据菜单",
+      "excel_row": 214,
+      "category": "F10 基本面",
+      "item": "热点题材",
+      "candidate_status": "部分可尝试",
+      "candidate_source": "东财／同花顺板块数据",
+      "note": "可取概念题材及成分；F10热点说明与热度字段未逐项确认。",
+      "source_url": "https://akshare.akfamily.xyz/data/stock/stock_board.html"
+    }
+  ]
+}

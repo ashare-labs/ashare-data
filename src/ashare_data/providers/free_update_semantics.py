@@ -32,6 +32,10 @@ def numeric(value):
 
 
 def validate_semantics(rows, job, as_of):
+    from ashare_data.providers.free_update_board_bars import validate as board_bars
+    checked = board_bars(rows, job, as_of, numeric)
+    if checked is not None:
+        return checked
     from ashare_data.providers.free_update_policy_releases import validate as policy_releases
     checked = policy_releases(rows, job, as_of, numeric)
     if checked is not None:

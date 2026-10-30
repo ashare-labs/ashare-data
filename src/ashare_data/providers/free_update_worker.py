@@ -244,6 +244,9 @@ class Capture:
 
 
 def direct_records(capture, name, params):
+    from ashare_data.providers.free_update_board_bars import FUNCTIONS as BOARD_BARS, collect as board_bars
+    if name in BOARD_BARS:
+        return board_bars(capture, name, params)
     from ashare_data.providers.free_update_policy_releases import FUNCTIONS as POLICY, collect as policy
     if name in POLICY:
         return policy(capture, name, params)
@@ -529,6 +532,8 @@ def run(request):
         direct_specs.update(dict.fromkeys(NATIVE))
         from ashare_data.providers.free_update_industry_directory import LEVELS
         direct_specs.update(dict.fromkeys(LEVELS))
+        from ashare_data.providers.free_update_board_bars import FUNCTIONS as BOARD_BARS
+        direct_specs.update(dict.fromkeys(BOARD_BARS))
         from ashare_data.providers.free_update_legacy_reference import FUNCTIONS
         if job["function"] in {"ths_hot","treasury_rates","tdx_blocks","tdx_members","stock_zh_a_daily","tencent_raw_daily","sina_raw_daily","sina_period_bars","sina_trade_calendar","sina_macro_page","cpi_rate_em","macro_indicator_em","fund_etf_scale_sse","stock_fund_flow_individual","energy_carbon_bj","nbs_gdp_yoy","sge_benchmark","security_events_em"} or job["function"] in direct_specs or job["function"] in FUNCTIONS:
             records=direct_records(capture,job["function"],job["parameters"])

@@ -1,4 +1,5 @@
 """Independent sources overlap; a shared source/store remains single-writer."""
+
 from datetime import timedelta
 import json
 from pathlib import Path
@@ -18,9 +19,15 @@ def setup(tmp_path, monkeypatch):
 
 def parallel(setup):
     module, path, config, now = setup
-    config.update(schema="ad.daily-update-registry.v2", workers=8,
-                  budget_scope="observation_store", chunks_per_run=5000,
-                  seconds_per_run=21600, between_chunks_seconds=0, child_jobs=4)
+    config.update(
+        schema="ad.daily-update-registry.v2",
+        workers=8,
+        budget_scope="observation_store",
+        chunks_per_run=5000,
+        seconds_per_run=21600,
+        between_chunks_seconds=0,
+        child_jobs=4,
+    )
     config["items"][1]["sources"] = ["stats.gov.cn"]
     path.write_text(json.dumps(config))
     return module, path, config, now
@@ -40,8 +47,56 @@ def test_independent_sources_overlap_and_completed_work_does_not_repeat(setup):
     result = m.run(p, execute=True, clock=lambda: now, runner=runner, usage_reader=empty_usage)
     assert set(calls) == {"quotes", "news"} and result["peak_active_children"] == 2
     assert result["budget_scope"] == "observation_store" and result["budget_count"] == 2
-    assert not m.run(p, execute=True, clock=lambda: now, runner=runner, usage_reader=empty_usage)["work"]
+    assert not m.run(p, execute=True, clock=lambda: now, runner=runner, usage_reader=empty_usage)[
+        "work"
+    ]
     assert m.run(p)["workers"] == 8
+
+
+def test_dependent_queue_runs_after_current_directory_even_if_listed_first(setup):
+    m, p, c, now = parallel(setup)
+    c["items"][0]["depends_on"] = ["news"]
+    p.write_text(json.dumps(c))
+    calls = []
+
+    def runner(item, *args):
+        calls.append(item["id"])
+        return dict(complete=True, settled=True)
+
+    result = m.run(p, execute=True, clock=lambda: now, runner=runner, usage_reader=empty_usage)
+    assert calls == ["news", "quotes"] and result["launched_chunks"] == 2
+    calls.clear()
+    m.run(
+        p,
+        execute=True,
+        clock=lambda: now + timedelta(days=1),
+        runner=runner,
+        usage_reader=empty_usage,
+    )
+    assert calls == ["news", "quotes"]
+
+
+def test_failed_directory_does_not_launch_dependent_queue(setup):
+    m, p, c, now = parallel(setup)
+    c["items"][0]["depends_on"] = ["news"]
+    p.write_text(json.dumps(c))
+    calls = []
+
+    def runner(item, *args):
+        calls.append(item["id"])
+        return dict(complete=False, settled=True)
+
+    result = m.run(p, execute=True, clock=lambda: now, runner=runner, usage_reader=empty_usage)
+    assert calls == ["news"] and result["reason"] == "source_dependency_pending"
+
+
+@pytest.mark.parametrize("edges", [["missing"], ["quotes"]])
+def test_dependency_typos_and_cycles_are_rejected(setup, edges):
+    m, p, c, now = parallel(setup)
+    c["items"][0]["depends_on"] = edges
+    p.write_text(json.dumps(c))
+    with pytest.raises(ValueError, match="dependency"):
+        m.run(p)
 
 
 @pytest.mark.parametrize("same", ["upstream", "store"])
@@ -93,7 +148,7 @@ def test_usage_history_scanned_once_not_every_chunk(setup):
         return empty_usage()
 
     def runner(item, *args):
-        n = calls.get(item["id"], 0)+1
+        n = calls.get(item["id"], 0) + 1
         calls[item["id"]] = n
         return dict(complete=n == 4, settled=n == 4)
 
@@ -115,7 +170,10 @@ def test_real_refusal_stops_same_family_without_stopping_other_sources(setup):
             root.mkdir()
             with sqlite3.connect(root / "observations.sqlite") as db:
                 db.execute("CREATE TABLE cooldowns(host TEXT,until_epoch REAL,reason TEXT)")
-                db.execute("INSERT INTO cooldowns VALUES(?,?,?)", ("quotes.sina.cn", now.timestamp()+7200, "HTTP 429 Retry-After"))
+                db.execute(
+                    "INSERT INTO cooldowns VALUES(?,?,?)",
+                    ("quotes.sina.cn", now.timestamp() + 7200, "HTTP 429 Retry-After"),
+                )
         return dict(complete=True, settled=True)
 
     r = m.run(p, execute=True, clock=lambda: now, runner=runner, usage_reader=empty_usage)
@@ -134,7 +192,13 @@ def test_protected_macro_window_only_blocks_shared_source(setup):
         calls.append(item["id"])
         return dict(complete=True, settled=True)
 
-    r = m.run(p, execute=True, clock=lambda: now.replace(hour=21, minute=30), runner=runner, usage_reader=empty_usage)
+    r = m.run(
+        p,
+        execute=True,
+        clock=lambda: now.replace(hour=21, minute=30),
+        runner=runner,
+        usage_reader=empty_usage,
+    )
     assert calls == ["news"] and r["reason"] == "protected_schedule_window"
 
 
@@ -142,15 +206,28 @@ def test_upgrade_preserves_old_checkpoint_and_uses_same_outer_lock(setup):
     m, p, c, now = parallel(setup)
     root = Path(c["root"])
     root.mkdir()
-    old = {name: b"unchanged old controller evidence" for name in ["profile.json", "state.json", "request-budget-config.json"]}
+    old = {
+        name: b"unchanged old controller evidence"
+        for name in ["profile.json", "state.json", "request-budget-config.json"]
+    }
     for name, body in old.items():
         (root / name).write_bytes(body)
-    result = m.run(p, execute=True, clock=lambda: now,
-                   runner=lambda *args: dict(complete=True, settled=True), usage_reader=empty_usage)
+    result = m.run(
+        p,
+        execute=True,
+        clock=lambda: now,
+        runner=lambda *args: dict(complete=True, settled=True),
+        usage_reader=empty_usage,
+    )
     assert Path(result["state_path"]).is_relative_to(root / "dispatches")
     assert all((root / name).read_bytes() == body for name, body in old.items())
-    later = m.run(p, execute=True, clock=lambda: now+timedelta(days=1),
-                  runner=lambda *args: dict(complete=True, settled=True), usage_reader=empty_usage)
+    later = m.run(
+        p,
+        execute=True,
+        clock=lambda: now + timedelta(days=1),
+        runner=lambda *args: dict(complete=True, settled=True),
+        usage_reader=empty_usage,
+    )
     assert all(x["day"] == "2026-10-30" for x in later["items"].values())
 
 
@@ -193,14 +270,19 @@ def test_initializing_owned_database_is_read_only_after_its_lease_finishes(setup
     assert not m.blocked_sources(c, now, active_roots={str(root)})
     with sqlite3.connect(root / "observations.sqlite") as db:
         db.execute("CREATE TABLE cooldowns(host TEXT,until_epoch REAL,reason TEXT)")
-        db.execute("INSERT INTO cooldowns VALUES(?,?,?)", ("quotes.sina.cn", now.timestamp()+3600, "HTTP 429"))
+        db.execute(
+            "INSERT INTO cooldowns VALUES(?,?,?)",
+            ("quotes.sina.cn", now.timestamp() + 3600, "HTTP 429"),
+        )
     assert m.source_block(c["items"][0], m.blocked_sources(c, now))
 
 
 def test_existing_schedule_protects_shared_store_even_for_a_different_source(setup):
     m, p, c, now = parallel(setup)
-    c.update(protected_sources=["eastmoney.com"],
-             protected_observation_roots=[c["items"][0]["observation_root"]])
+    c.update(
+        protected_sources=["eastmoney.com"],
+        protected_observation_roots=[c["items"][0]["observation_root"]],
+    )
     p.write_text(json.dumps(c))
     calls = []
 
@@ -208,7 +290,13 @@ def test_existing_schedule_protects_shared_store_even_for_a_different_source(set
         calls.append(item["id"])
         return dict(complete=True, settled=True)
 
-    r = m.run(p, execute=True, clock=lambda: now.replace(hour=21, minute=30), runner=runner, usage_reader=empty_usage)
+    r = m.run(
+        p,
+        execute=True,
+        clock=lambda: now.replace(hour=21, minute=30),
+        runner=runner,
+        usage_reader=empty_usage,
+    )
     assert calls == ["news"] and r["reason"] == "protected_schedule_window"
 
 
@@ -216,8 +304,11 @@ def test_child_progress_does_not_corrupt_machine_readable_result(setup, monkeypa
     m, p, c, now = parallel(setup)
     item = p.parent / "child-item.json"
     item.write_text(json.dumps(c["items"][0]))
-    monkeypatch.setattr(m.sys, "argv", [m.__file__, "--child-item", str(item),
-                                       "--day", now.date().isoformat(), "--jobs", "4"])
+    monkeypatch.setattr(
+        m.sys,
+        "argv",
+        [m.__file__, "--child-item", str(item), "--day", now.date().isoformat(), "--jobs", "4"],
+    )
 
     def collector(*args):
         print(json.dumps({"task": "financial-report", "state": "complete"}))
