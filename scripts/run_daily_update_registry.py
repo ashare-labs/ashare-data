@@ -6,6 +6,7 @@ timer must explicitly invoke --execute. This recipe cannot publish production.
 """
 
 import argparse
+from contextlib import redirect_stdout
 from datetime import datetime, timedelta, timezone
 import fcntl
 import hashlib
@@ -17,6 +18,7 @@ import re
 import shutil
 import sqlite3
 import subprocess
+import sys
 import time
 from zoneinfo import ZoneInfo
 from uuid import uuid4
@@ -88,9 +90,10 @@ def checked(config_path):
         ):
             raise ValueError("production observation roots forbidden")
         if item["kind"] != "financial" and (
-            profile.get("workers", 1) != 1 or profile.get("attempts_per_day", 2) != 1
+            profile.get("workers", 1) != 1
+            or profile.get("attempts_per_day", 2) not in ({1, 2} if parallel else {1})
         ):
-            raise ValueError("daily registry requires serial one-attempt profiles")
+            raise ValueError("daily registry requires serial bounded-attempt profiles")
         if item["kind"] == "manual" and not 1 <= profile["max_jobs"] <= (18 if parallel else 1):
             raise ValueError("manual child job count exceeds the collector contract")
         if item["kind"] in {"cached_macro", "billboard_queue"}:
@@ -586,11 +589,13 @@ def main():
     parser.add_argument("--jobs", type=int, default=1)
     args = parser.parse_args()
     started = time.monotonic()
-    result = (
-        child(read(args.child_item), args.day, args.jobs)
-        if args.child_item
-        else run(args.profile, execute=args.execute)
-    )
+    if args.child_item:
+        # Existing collectors may print progress JSON or diagnostics. stdout is
+        # one machine-readable result; progress belongs on the separate log.
+        with redirect_stdout(sys.stderr):
+            result = child(read(args.child_item), args.day, args.jobs)
+    else:
+        result = run(args.profile, execute=args.execute)
     if args.child_item:
         import resource
 

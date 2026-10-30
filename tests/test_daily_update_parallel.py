@@ -210,3 +210,40 @@ def test_existing_schedule_protects_shared_store_even_for_a_different_source(set
 
     r = m.run(p, execute=True, clock=lambda: now.replace(hour=21, minute=30), runner=runner, usage_reader=empty_usage)
     assert calls == ["news"] and r["reason"] == "protected_schedule_window"
+
+
+def test_child_progress_does_not_corrupt_machine_readable_result(setup, monkeypatch, capsys):
+    m, p, c, now = parallel(setup)
+    item = p.parent / "child-item.json"
+    item.write_text(json.dumps(c["items"][0]))
+    monkeypatch.setattr(m.sys, "argv", [m.__file__, "--child-item", str(item),
+                                       "--day", now.date().isoformat(), "--jobs", "4"])
+
+    def collector(*args):
+        print(json.dumps({"task": "financial-report", "state": "complete"}))
+        print("collector progress")
+        return dict(complete=True, settled=True, result={"readback_verified": True})
+
+    monkeypatch.setattr(m, "child", collector)
+    assert m.main() == 0
+    captured = capsys.readouterr()
+    assert json.loads(captured.out)["result"]["readback_verified"]
+    assert "financial-report" in captured.err and "collector progress" in captured.err
+
+
+def test_parallel_profile_can_explicitly_allow_one_transport_retry(setup):
+    m, p, c, now = parallel(setup)
+    item = c["items"][0]
+    path = Path(item["profile"])
+    profile = m.read(path)
+    profile["attempts_per_day"] = 2
+    path.write_text(json.dumps(profile))
+    item["profile_sha256"] = m.sha(path)
+    p.write_text(json.dumps(c))
+    assert m.checked(p)["items"][0]["profile_sha256"] == m.sha(path)
+    profile["attempts_per_day"] = 3
+    path.write_text(json.dumps(profile))
+    item["profile_sha256"] = m.sha(path)
+    p.write_text(json.dumps(c))
+    with pytest.raises(ValueError, match="bounded-attempt"):
+        m.checked(p)
