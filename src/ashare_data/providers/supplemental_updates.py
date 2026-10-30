@@ -37,6 +37,9 @@ FUNCTIONS = {
     "index_stock_cons_csindex",
     "treasury_rates",
     "sina_corporate_actions",
+    "sina_current_quotes",
+    "cni_current_members",
+    "tdx_f10_hot_topics",
 }
 
 
@@ -103,8 +106,40 @@ def inputs(index):
 def project(row, sources):
     used = []
 
+    def members():
+        # A later received current list supersedes an older list, even when
+        # both still exist in the immutable input ledger.
+        latest = {}
+        for manifest, records in sources:
+            if manifest["function"] not in {"index_stock_cons_csindex", "cni_current_members"}:
+                continue
+            code = records[0]["指数代码"]
+            if row in INDICES and code != INDICES[row]:
+                continue
+            if code not in latest or manifest["observed_at"] > latest[code][0]["observed_at"]:
+                latest[code] = manifest, records
+        used.extend(m for m, _ in latest.values())
+        return [r for _, records in latest.values() for r in records]
+
     def take(function):
         pairs = [s for s in sources if s[0]["function"] == function]
+        if function == "treasury_rates":
+            # Other reviewed Treasury tables use maturity columns, not the
+            # long-term-average RATE_TYPE schema. Select the actual requested
+            # series before revising overlapping observations by business key.
+            pairs = [(m, [r for r in rs if r.get("RATE_TYPE") in {"Over_10_Years", "Real_Rate"}])
+                     for m, rs in pairs]
+            pairs = [(m, rs) for m, rs in pairs if rs]
+        current_fields = {"bond_zh_cov_info": "SECUCODE", "tdx_f10_company": "security",
+                          "tdx_members": "block_code", "tdx_f10_hot_topics": "security"}
+        if function in current_fields:
+            field = current_fields[function]
+            groups = {}
+            for manifest, records in pairs:
+                for entity in {r[field] for r in records}:
+                    if entity not in groups or manifest["observed_at"] > groups[entity][0]["observed_at"]:
+                        groups[entity] = manifest, [r for r in records if r[field] == entity]
+            pairs = list(groups.values())
         used.extend(m for m, _ in pairs)
         if function == "sina_raw_daily":
             # Multiple packaging rows may contain the same daily bar. Prefer
@@ -127,6 +162,20 @@ def project(row, sources):
                             "same-time daily observations conflict",
                         )
                     latest[key] = (stamp, record)
+            return [record for _, record in latest.values()]
+        keys = {"tdx_f10_valuation": ["security", "date"],
+                "treasury_rates": ["date", "RATE_TYPE"],
+                "sina_corporate_actions": ["security", "native_business_identity"],
+                "sina_current_quotes": ["security", "quote_time"]}.get(function)
+        if keys:
+            latest = {}
+            for manifest, records in sorted(pairs, key=lambda p: p[0]["observed_at"]):
+                for record in records:
+                    key = digest([record[k] for k in keys])
+                    stamp = manifest["observed_at"]
+                    require(key not in latest or latest[key][0] != stamp or latest[key][1] == record,
+                            "same-time source observations conflict")
+                    latest[key] = stamp, record
             return [record for _, record in latest.values()]
         return [r for _, rs in pairs for r in rs]
 
@@ -218,41 +267,48 @@ def project(row, sources):
             "TDX named current theme; not asserted equivalent to a differently named CMES/THS/Eastmoney taxonomy"
         ]
     elif row == 112:
-        records = take("index_stock_cons_csindex")
+        records = members()
         keys = ["指数代码", "日期", "交易所", "成分券代码"]
         units = {"codes": "identifiers"}
         limitations = [
             "only explicit input indices; current file date and actual receipt time retained, no historic membership backfill"
         ]
     elif row in INDICES:
-        members = [r for r in take("index_stock_cons_csindex") if r["指数代码"] == INDICES[row]]
+        current_members = [r for r in members() if r["指数代码"] == INDICES[row]]
         bars = take("sina_raw_daily")
+        quotes = take("sina_current_quotes")
         records = []
         universe = set()
-        for member in members:
+        for member in current_members:
             exchange = {"上海证券交易所": "sh", "深圳证券交易所": "sz"}.get(member["交易所"])
             require(exchange, "unmapped member exchange")
             security = exchange + member["成分券代码"]
             universe.add(security)
             eligible = [
                 b
-                for b in bars
+                for b in bars + quotes
                 if b.get("asset_type") == "stock"
                 and b["security"] == security
                 and b["date"] >= member["日期"][:10]
             ]
             if eligible:
-                b = max(eligible, key=lambda r: r["date"])
+                b = max(eligible, key=lambda r: (r["date"], r.get("quote_time", "")))
                 records.append(
                     dict(b, index_code=INDICES[row], membership_source_date=member["日期"][:10])
                 )
         keys = ["index_code", "security", "date"]
-        units = {"OHLC": "CNY/share", "volume": "native unconverted"}
+        units = {"OHLC": "CNY/share", "volume": "see each record's volume_unit; legacy daily native",
+                 "amount": "CNY for current quote source"}
+        newest = max((r["date"] for r in records), default=None)
         scope.update(
             index_code=INDICES[row],
             member_count=len(universe),
             quoted_members=len(records),
             missing_member_quotes=sorted(universe - {r["security"] for r in records}),
+            complete_current_member_quotes=bool(universe) and len(records) == len(universe),
+            latest_quote_date=newest,
+            older_quote_dates={r["security"]: r["date"] for r in records if r["date"] != newest},
+            zero_trade_field_members=[r["security"] for r in records if r.get("zero_trade_fields")],
         )
         limitations = [
             "only members with available matching-date quotes; missing securities explicitly enumerated",
@@ -283,6 +339,12 @@ def project(row, sources):
         limitations = [
             "source-returned dividend/bonus/rights events only; other financing categories are not provided"
         ]
+    elif row == 214:
+        records = take("tdx_f10_hot_topics")
+        keys = ["security", "topic_id"]
+        units = {"topic_id": "identifier"}
+        limitations = ["TDX F10 current issuer topic names and descriptions; explicit issuer scope",
+                       "native dates/flags/scores retained; not interpreted as disclosure dates or market-wide heat ranking"]
     else:
         return None
     if not records:

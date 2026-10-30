@@ -114,6 +114,34 @@ def test_dependency_pending_does_not_spin_or_mark_finished(setup):
     assert all(not v["settled"] for v in result["items"].values())
 
 
+def test_second_batch_counts_stay_separate_and_new_day_does_not_resume_old_current_request(setup):
+    from ashare_data.providers.supplemental_updates import ROWS
+    m, p, c, now = setup
+    item = c["items"][0]
+    item.update(kind="supplemental", acceptance_batch="second", rows=sorted(ROWS))
+    seed = p.parent / "seed.json"
+    seed.write_text(json.dumps(dict(manual_snapshot_queries=[])))
+    profile = Path(item["profile"])
+    child = m.read(profile)
+    child.update(source_index=str(seed), source_index_sha256=m.sha(seed), source_roots=[])
+    profile.write_text(json.dumps(child))
+    item["profile_sha256"] = m.sha(profile)
+    c.update(chunks_per_run=1)
+    p.write_text(json.dumps(c))
+    preview = m.run(p)
+    assert preview["menu_rows"] == [12] and preview["second_batch_rows"] == sorted(ROWS)
+    calls = []
+    def runner(item, day, jobs, output):
+        calls.append((item["id"], day))
+        return dict(complete=False, settled=False)
+    first = m.run(p, execute=True, clock=lambda: now, runner=runner, usage_reader=empty_usage)
+    state = m.read(first["state_path"])
+    state["cursor"] = 0
+    m.save(first["state_path"], state)
+    m.run(p, execute=True, clock=lambda: now+timedelta(days=1), runner=runner, usage_reader=empty_usage)
+    assert calls == [("quotes", "2026-10-29"), ("quotes", "2026-10-30")]
+
+
 def test_daily_resume_finished_jobs_skip_and_next_date_opens(setup):
     m, p, c, now = setup
     calls = []
@@ -163,6 +191,7 @@ def test_shared_cooldown_blocks_other_profile_same_source(setup):
 @pytest.mark.parametrize("tag,host", [
     ("sina", "quotes.sina.cn"), ("sina.cn", "finance.sina.com.cn"),
     ("sina.com.cn", "sina"), ("tdx-f10", "static.tdx.com.cn"),
+    ("hq.sinajs.cn", "finance.sina.com.cn"), ("sina", "hq.sinajs.cn"),
 ])
 def test_source_alias_and_receipt_host_share_refusal(tag, host):
     m = module()

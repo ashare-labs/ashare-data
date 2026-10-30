@@ -23,7 +23,7 @@ DOMAINS = ("eastmoney.com", "sina.com.cn", "sina.cn", "10jqka.com.cn", "cninfo.c
            "jin10.com", "soozhu.com", "sge.com.cn", "bjets.com.cn", "hbets.cn",
            "safe.gov.cn", "chinabond.com.cn", "treasury.gov", "99qh.com", "cnbs.ac.cn", "gtimg.cn", "qq.com",
            "cls.cn", "cctv.com", "cntv.cn", "mofcom.gov.cn", "fx168api.com", "stats.gov.cn",
-           "pbc.gov.cn", "ndrc.gov.cn", "fgw.sh.gov.cn")
+           "pbc.gov.cn", "ndrc.gov.cn", "fgw.sh.gov.cn", "hq.sinajs.cn", "www.cnindex.com.cn")
 # The CASS Institute of Finance and Banking official database directory links
 # this public CNBS origin: http://ifb.cass.cn/newpc/sjk/ (reviewed 2026-10-28).
 # Restrict the exception to the SDK's reviewed data download, not arbitrary IPs.

@@ -71,7 +71,7 @@ def checked(config_path):
         if not re.fullmatch("[a-z0-9-]+", item["id"]) or item["id"] in ids:
             raise ValueError("invalid or repeated profile id")
         ids.add(item["id"])
-        if item["kind"] not in {"manual", "securities", "financial", "cached_macro", "billboard_queue"}:
+        if item["kind"] not in {"manual", "securities", "financial", "cached_macro", "billboard_queue", "supplemental"}:
             raise ValueError("unsupported collector kind")
         if "not_before_local" in item and not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", item["not_before_local"]):
             raise ValueError("invalid earliest collection time")
@@ -99,6 +99,15 @@ def checked(config_path):
         if item["kind"] in {"cached_macro", "billboard_queue"}:
             if not Path(profile["source_root"]).resolve().is_relative_to(scope):
                 raise ValueError("cached source outside isolated workspace")
+        if item["kind"] == "supplemental":
+            from ashare_data.providers.supplemental_updates import ROWS
+            if item.get("acceptance_batch") != "second" or set(item["rows"]) != ROWS:
+                raise ValueError("second-batch acceptance must remain separate and exact")
+            if (not Path(profile["source_index"]).resolve().is_relative_to(scope)
+                    or sha(profile["source_index"]) != profile["source_index_sha256"]
+                    or any(not Path(p).resolve().is_relative_to(scope)
+                           for p in profile["source_roots"] + profile.get("cooldown_roots", []))):
+                raise ValueError("supplemental source binding outside reviewed workspace or changed")
         if item.get("native_sdk_manifest"):
             binding = Path(item["native_sdk_manifest"]).resolve()
             if not binding.is_relative_to(scope) or sha(binding) != item["native_sdk_manifest_sha256"]:
@@ -218,7 +227,7 @@ def source_block(item, blocked):
     # A Sina refusal cannot be skipped merely because another recipe says
     # "sina" while the receipt says quotes.sina.cn or finance.sina.com.cn.
     aliases = {
-        "sina": ("sina.com.cn", "sina.cn"),
+        "sina": ("sina.com.cn", "sina.cn", "hq.sinajs.cn"),
         "tdx": ("tdx.com.cn",),
         "eltdx": ("tdx.com.cn",),
         "tdx-f10": ("tdx.com.cn",),
@@ -282,7 +291,7 @@ def source_resources(item):
         return set()
     result = set()
     for host in item["sources"]:
-        if host == "sina" or host.endswith(("sina.cn", "sina.com.cn")):
+        if host == "sina" or host.endswith(("sina.cn", "sina.com.cn")) or host == "hq.sinajs.cn":
             host = "sina"
         elif host in {"tdx", "eltdx", "tdx-f10"} or "native_sdk_manifest" in item:
             host = "tdx"
@@ -335,6 +344,9 @@ def child(item, day, jobs):
     if item["kind"] == "cached_macro":
         from ashare_data.providers.free_update_derived import run_cached_macro
         result = run_cached_macro(item["profile"], execute=True, as_of=day)
+    elif item["kind"] == "supplemental":
+        from ashare_data.providers.supplemental_batch import run as supplemental
+        result = supplemental(item["profile"], execute=True, as_of=day, max_jobs=jobs)
     elif item["kind"] == "billboard_queue":
         from ashare_data.providers.free_update_billboard_queue import run_billboard_queue
         attempts = 0
@@ -424,7 +436,8 @@ def run(profile, *, execute=False, clock=None, runner=invoke, usage_reader=usage
                             if i["kind"] != "cached_macro"})
     summary = dict(
         dry_run=not execute, profile=str(Path(profile).resolve()),
-        menu_rows=sorted({r for i in config["items"] for r in i["rows"]}),
+        menu_rows=sorted({r for i in config["items"] if i.get("acceptance_batch", "first") == "first" for r in i["rows"]}),
+        second_batch_rows=sorted({r for i in config["items"] if i.get("acceptance_batch") == "second" for r in i["rows"]}),
         configured_profiles=len(config["items"]), workers=workers,
         serial_workers=1 if workers == 1 else None,
         budget_scope="observation_store" if parallel else "registry",
@@ -544,7 +557,7 @@ def run(profile, *, execute=False, clock=None, runner=invoke, usage_reader=usage
                         store = str(Path(item["observation_root"]).resolve())
                         if resources & held_sources or store in held_stores:
                             continue
-                        if not current or current["settled"] or (item["kind"] == "billboard_queue" and current["due"] != due):
+                        if not current or current["settled"] or (item["kind"] in {"billboard_queue", "supplemental"} and current["due"] != due):
                             current = dict(day=day, due=due, settled=False, complete=False, attempts=0)
                             state["items"][item["id"]] = current
                         selected = index, item, current, resources, store, budget

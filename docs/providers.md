@@ -395,6 +395,12 @@ v2 使用 `budget_scope: observation_store`，`http_requests_per_day` 和 `respo
 
 东财板块日线使用 `free_update_board_bars` 按已核实的原生 `BK` 代码直接请求原行情端点，目录发现与已有代码更新分开。手动行76配置给出 `em_concept`、`em_industry` 及最近日期窗口；两个类别分别留证。OHLC为指数点，成交量/额保留原生f56/f57并明确未转换尺度。响应身份、日期窗口、OHLC和重复键必须一致；目录暂时断连不能推断行情端点不可用。
 
-第二批19项保存在独立 `supplemental-menu.json`，与首批198项身份互斥。`scripts/run_supplemental_updates.py --source-index index.json --root isolated-output` 读取已验证快照列表，生成独立不可变快照及 `latest.json`，不联网、不安装调度、不增加首批完成数。输入索引的 `manual_snapshot_queries` 每项至少包含 `function` 与 `snapshot`；引用快照的内容哈希、来源语义与记录数重新检查。索引为显式输入，需要在上游采集完成后刷新，不能将重复读取同一索引称为新日更新。
+第二批19项保存在独立 `supplemental-menu.json`，与首批198项身份互斥。`scripts/run_supplemental_updates.py --source-index index.json --root isolated-output` 读取已验证快照列表，生成独立不可变快照及 `latest.json`，不联网、不安装调度、不增加首批完成数。输入索引的 `manual_snapshot_queries` 每项至少包含 `function` 与 `snapshot`；引用快照的内容哈希、来源语义与记录数重新检查。
+
+在线增量使用 `scripts/run_supplemental_updates.py --profile second.json --execute`；省略 `--execute` 只预览。`ad.supplemental-19-batch.v1` 配置指定隔离 `root`、固定种子 `source_index`、可读取最新成功快照的 `source_roots`、七个 `csi_indices`、`topic_securities` 和 `daily_securities`。调用从上游最新快照刷新索引；当日已成功的名单、股票日线和题材复用，下一个本地自然日打开新检查点。`--max-jobs` 控制单次工作块，未完成可续跑；`root/STOP` 暂停新请求，移走后恢复。原始回执、失败信息、旧快照及修订保留，失败或空响应不替换有效快照。
+
+七个中证官方名单与国证399006当前样本先采集，再将全部成员去重后按100只股票共享一次新浪报价请求。八个指数各自列出成员数、行情覆盖数、缺少的代码、较旧报价日期及零成交字段，不把共有股票算成多次独立采集。国证当前样本接口与月度权重文件区分；当前文件只有部分权重数值，其余保留空值和原文，不影响成员身份和行情。新浪报价的价格不复权，成交量为股、成交额为元，原日期、时间、尾字段保留；不宣称尾字段含义或报价最终性。热点题材使用旧TDX F10个股题材名称/说明，`ztrq/rxsj/gld`等未知含义字段原样保留，不解释为已确认公告时间或全市场热度榜。
+
+统一调度支持 `kind=supplemental`、`acceptance_batch=second`，与首批共享现有锁、来源限流、请求准入和停止文件，不另建服务。配置校验固定入口、原表19行及种子索引哈希；`second_batch_rows`独立统计。依赖项完成后运行，当前名单构建在成员行情之前。调度启用、当日缓存复用和自然触发新采在运行记录中分别说明。
 
 第二批字段子集包括票息、PE TTM/PB MRQ、公司资料、分红送转配股、题材名单及两个美国财政部长期平均利率序列；缺字段和供应商分类差异随快照返回。技术指标为不复权收盘价SMA5/10/20及相邻有值交易日收益率，窗口不足返回空值。重叠输入先按证券/交易日及实际接收时间合并，较新观察保留修订；同接收时刻的冲突或混合复权基准拒绝。当前指数成分只连接其源名单日期当日或之后的行情，列出尚未采到行情的成员，不倒填历史成分。

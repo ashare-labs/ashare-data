@@ -13,7 +13,7 @@ from ashare_data.corporate_actions.sources import PARSERS
 from ashare_data.financials.expansion import security, url_for
 
 F10_ENTRIES = {"CWServ.tdxf10_gg_comreq", "CWServ.tdxf10_gg_gsgk",
-               "CWServ.tdxf10_gg_jyfx", "HQServ.hq_nlp_gpsj"}
+               "CWServ.tdxf10_gg_jyfx", "HQServ.hq_nlp_gpsj", "CWServ.tdxf10_gg_rdtc"}
 FUNCTIONS = {"sina_corporate_actions", "tdx_f10_company", "tdx_f10_business", "tdx_f10_valuation"}
 
 # Existing eltdx F10 business-composition field documentation defines these

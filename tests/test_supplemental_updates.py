@@ -75,7 +75,7 @@ def test_long_term_average_keeps_two_series_and_excludes_point_yield():
                 [
                     {"date": "2026-10-29", "RATE_TYPE": kind, "RATE": "2.5"}
                     for kind in ["BC_20year", "Over_10_Years", "Real_Rate"]
-                ],
+                ] + [{"date": "2026-10-29", "BC_20YEAR": "4.8", "BC_10YEAR": "4.1"}],
             )
         ],
     )
@@ -121,3 +121,19 @@ def test_overlapping_daily_windows_use_latest_observation_once():
     conflicting = (dict(newer[0]), [newer[1][0] | {"close": "31"}])
     with pytest.raises(ValueError, match="same-time daily observations conflict"):
         project(51, [newer, conflicting])
+
+
+def test_revised_financial_factor_and_removed_topic_use_latest_observation():
+    older = source("tdx_f10_valuation", [dict(security="sh600000", date="2026-10-30", pe_ttm="6", pb_mrq=".4")])
+    newer = source("tdx_f10_valuation", [dict(security="sh600000", date="2026-10-30", pe_ttm="6.5", pb_mrq=".44")])
+    newer[0].update(observed_at="2026-10-30T12:00:00+00:00", snapshot_id="revision")
+    assert project(50, [older, newer])[0][0]["pe_ttm"] == "6.5"
+    before = source("tdx_f10_hot_topics", [dict(security="sh600000", topic_id="1"), dict(security="sh600000", topic_id="2")])
+    after = source("tdx_f10_hot_topics", [dict(security="sh600000", topic_id="2")])
+    after[0].update(observed_at="2026-10-30T12:00:00+00:00", snapshot_id="current")
+    assert project(214, [before, after])[0] == after[1]
+    action = dict(security="sh600000", native_business_identity=["dividend", "2026-07-10"], value="1")
+    a = source("sina_corporate_actions", [action])
+    b = source("sina_corporate_actions", [action | {"value": "1.1"}])
+    b[0].update(observed_at="2026-10-30T12:00:00+00:00", snapshot_id="revised-event")
+    assert project(207, [a, b])[0] == b[1]
