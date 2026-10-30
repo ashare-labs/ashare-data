@@ -21,7 +21,7 @@ def digest(value):
 def implementation_identity():
     root = Path(__file__).resolve().parents[1]
     paths = ["providers/free_updates.py", "providers/free_update_worker.py",
-             "providers/free_update_board_bars.py", "providers/supplemental_updates.py",
+             "providers/free_update_public_transport.py", "providers/free_update_board_members.py", "providers/free_update_ths_bars.py", "providers/free_update_board_bars.py", "providers/supplemental_updates.py",
              "providers/supplemental_sources.py", "providers/supplemental_batch.py",
              "providers/supplemental-menu.json",
              "providers/free_update_budget.py", "financials/expansion.py",

@@ -202,6 +202,10 @@ class Capture:
 
         urllib.request.urlopen = urlopen
 
+    def get_curl(self, url):
+        from ashare_data.providers.free_update_public_transport import get
+        return get(self, url)
+
     def get(self, url, headers=None):
         request = Request(url, headers={"User-Agent":"ashare-data public-source research", **(headers or {})})
         with self.open(request) as response:
@@ -244,6 +248,12 @@ class Capture:
 
 
 def direct_records(capture, name, params):
+    from ashare_data.providers.free_update_board_members import FUNCTIONS as BOARD_MEMBERS, collect as board_members
+    if name in BOARD_MEMBERS:
+        return board_members(capture, name, params)
+    from ashare_data.providers.free_update_ths_bars import FUNCTIONS as THS_BARS, collect as ths_bars
+    if name in THS_BARS:
+        return ths_bars(capture, name, params)
     from ashare_data.providers.free_update_board_bars import FUNCTIONS as BOARD_BARS, collect as board_bars
     if name in BOARD_BARS:
         return board_bars(capture, name, params)
@@ -532,6 +542,10 @@ def run(request):
         direct_specs.update(dict.fromkeys(NATIVE))
         from ashare_data.providers.free_update_industry_directory import LEVELS
         direct_specs.update(dict.fromkeys(LEVELS))
+        from ashare_data.providers.free_update_board_members import FUNCTIONS as BOARD_MEMBERS
+        direct_specs.update(dict.fromkeys(BOARD_MEMBERS))
+        from ashare_data.providers.free_update_ths_bars import FUNCTIONS as THS_BARS
+        direct_specs.update(dict.fromkeys(THS_BARS))
         from ashare_data.providers.free_update_board_bars import FUNCTIONS as BOARD_BARS
         direct_specs.update(dict.fromkeys(BOARD_BARS))
         from ashare_data.providers.free_update_legacy_reference import FUNCTIONS

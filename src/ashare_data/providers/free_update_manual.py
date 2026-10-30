@@ -32,7 +32,7 @@ REVIEWED_ROWS = frozenset({137, 139, 143, 150, 151, 152, 153, 154, 163, 167,
                            147, 148, 149, 158, 159, 160, 164, 165, 175, 177, 180, 181,
                            110, 173, 190, 191, 193, 194, 228, 66, 67, 192, 28, 68, 69, 70,
                            248, 249, 250, 251, 252, 253, 254, 255, 256, 257, 258, 259, 260,
-                           89, 188, 217, 220, 221, 246, 247, 270, 140, 226, 227, 76})
+                           89, 188, 217, 220, 221, 246, 247, 270, 140, 226, 227, 73, 75, 76})
 OBSERVATION_KEYS = frozenset({"_snapshot_date", "observation_snapshot_date"})
 
 
@@ -55,10 +55,17 @@ def prepare(config_path, *, as_of=None):
             "production roots are forbidden")
     prepared = plan(rows=rows, context=config.get("context"), as_of=as_of,
                     lookback_days=config.get("lookback_days", 14))
-    require(all(not item["missing_context"] and len(item["job_ids"]) == {25: 2, 26: 2, 67: 3, 68: 2, 69: 3, 76: 2, 220: 3}.get(item["excel_row"], 1)
+    require(all(not item["missing_context"] and len(item["job_ids"]) == {25: 2, 26: 2, 67: 3, 68: 2, 69: 3, 73: 2, 75: 2, 76: 2, 220: 3}.get(item["excel_row"], 1)
                 for item in prepared["items"]), "manual profile requires all reviewed full-window source jobs per row")
     for job in prepared["jobs"]:
-        if job['function'] in {'stock_board_concept_hist_em','stock_board_industry_hist_em'}:
+        if job['function'] in {'stock_board_concept_cons_em','stock_board_industry_cons_em'}:
+            from ashare_data.providers.free_update_board_members import parameters
+            parameters(job['function'], job['parameters'])
+        elif job['function'] in {'stock_board_concept_index_ths','stock_board_industry_index_ths'}:
+            from ashare_data.providers.free_update_ths_bars import parameters
+            _, end = parameters(job['function'], job['parameters'])
+            require(end == prepared['as_of'], 'THS static current window must end on the observation day')
+        elif job['function'] in {'stock_board_concept_hist_em','stock_board_industry_hist_em'}:
             from ashare_data.providers.free_update_board_bars import parameters
             _, end = parameters(job['function'], job['parameters'])
             require(end <= prepared['as_of'], 'future board date requested')
@@ -295,6 +302,12 @@ def write_snapshot(root, row, job, records, check):
     # Menu packaging is not a data-bearing scope. Collecting one row alone and
     # later sharing the same job across wrappers must retain its checkpoint.
     scope_job = {k: v for k, v in job.items() if k != "menu_rows"}
+    if job.get("function") in {"stock_board_concept_index_ths", "stock_board_industry_index_ths"}:
+        # A rolling request date is not a new index series. Keep the last
+        # snapshot across daily windows, while retaining every immutable run.
+        scope_job = {k: v for k, v in scope_job.items() if k != "job_id"}
+        scope_job["parameters"] = {k: v for k, v in job["parameters"].items()
+                                   if k not in {"start_date", "end_date"}}
     if job.get("function") == "szse_margin_latest":
         scope_job = {k: v for k, v in scope_job.items() if k != "job_id"}
         scope_job["parameters"] = {}

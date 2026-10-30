@@ -66,6 +66,9 @@ class CapturedResponses:
     def get(self, url, headers=None):
         return self._read(url, "http")
 
+    def get_curl(self, url):
+        return self.get(url)
+
     def native(self, url):
         return self._read(url, "tdx-sdk")
 

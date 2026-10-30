@@ -89,6 +89,10 @@ def acceptance_work(item):
         group = "榜单与实时快照"
         action = "复核源回显日期与请求日期，保存实际取得的榜单/盘口快照；不以今天响应冒充历史日期"
         check = "本范围身份和快照时点明确、数值可读回；未取得的历史快照单列"
+    elif functions & {"stock_board_concept_index_ths", "stock_board_industry_index_ths"}:
+        group = "同花顺指数日线窗口"
+        action = "以已确认原生指数代码直接读取公开年度及当日行情文件，按实际交易日持续保存；目录独立核查"
+        check = "指数代码、OHLC和日期有效，量额保持原值并说明尺度未转换；增量重叠去重及查询通过"
     elif any("hist" in f or "raw_daily" in f or "_daily" in f for f in functions) and item["category"] in {"股票数据", "涨停打板", "成分股板块"}:
         group = "行情历史窗口"
         action = "复用同标的旧日线/指数入口，明确未复权或复权基准；周月注明原生或聚合来源"

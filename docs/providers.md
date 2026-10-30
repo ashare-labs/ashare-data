@@ -395,6 +395,12 @@ v2 使用 `budget_scope: observation_store`，`http_requests_per_day` 和 `respo
 
 东财板块日线使用 `free_update_board_bars` 按已核实的原生 `BK` 代码直接请求原行情端点，目录发现与已有代码更新分开。手动行76配置给出 `em_concept`、`em_industry` 及最近日期窗口；两个类别分别留证。OHLC为指数点，成交量/额保留原生f56/f57并明确未转换尺度。响应身份、日期窗口、OHLC和重复键必须一致；目录暂时断连不能推断行情端点不可用。
 
+同花顺行73使用 `free_update_ths_bars` 直接读取 `d.10jqka.com.cn` 的公开年度和当日日线文件。配置 `ths_concept`、`ths_industry` 为已核实的六位原生指数代码，例如商业航天886078和种植业与林业881101；无需先查另一个主机的目录，也不生成验证令牌或执行挑战脚本。JSONP只解析匹配代码和文件年度的JSON，不执行JavaScript。年度文件可能晚于当日文件更新，同一日期优先当日文件，并保留两份原始响应。
+
+`run-manual --config profile.json --execute` 可运行行73的最近窗口；日期终点必须为本次观察日。OHLC为指数点，成交量与成交额原尺度保存，`dt`和其他未知字段不解释为已确认更新时间或收盘终值。断点按指数身份跨日期窗口延续；重叠数据、修订和退出当前窗口的数据分别计数，原观察不删除。已保存快照可用 `manual-query --snapshot PATH --offset 0 --limit 100` 分页读取。目录行72独立验收，两个指定指数不能称为完整行业概念目录。
+
+东财成分候选 `free_update_board_members` 按原生BK代码请求官网配置的当前成员分页，核对每页数量、总数稳定和跨页身份唯一。原生市场路由码0不直接转换为深圳证券，以免误标北交所成员。该候选的系统curl传输保持普通请求标识、现有系统代理、正常TLS和原有请求预算；不读取curlrc、不生成cookie、不跟随重定向、不在请求内重试。访问拒绝或传输失败仍进入原冷却流程。只收到部分页面不导出“完整成员”快照，候选代码存在不等于当次真实接入已通过。
+
 第二批19项保存在独立 `supplemental-menu.json`，与首批198项身份互斥。`scripts/run_supplemental_updates.py --source-index index.json --root isolated-output` 读取已验证快照列表，生成独立不可变快照及 `latest.json`，不联网、不安装调度、不增加首批完成数。输入索引的 `manual_snapshot_queries` 每项至少包含 `function` 与 `snapshot`；引用快照的内容哈希、来源语义与记录数重新检查。
 
 在线增量使用 `scripts/run_supplemental_updates.py --profile second.json --execute`；省略 `--execute` 只预览。`ad.supplemental-19-batch.v1` 配置指定隔离 `root`、固定种子 `source_index`、可读取最新成功快照的 `source_roots`、七个 `csi_indices`、`topic_securities` 和 `daily_securities`。调用从上游最新快照刷新索引；当日已成功的名单、股票日线和题材复用，下一个本地自然日打开新检查点。`--max-jobs` 控制单次工作块，未完成可续跑；`root/STOP` 暂停新请求，移走后恢复。原始回执、失败信息、旧快照及修订保留，失败或空响应不替换有效快照。
