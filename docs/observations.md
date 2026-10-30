@@ -157,3 +157,35 @@ C01 的完整性只指固定查询返回的 5108 行均齐全，不是对全市�
 只含 close 并保留源标签、源证据及观察／实际采集时钟。接口不返回当日日线的其他字段，
 不把前日 close 称为当日 pre_close 或当前报价，也不认证两个日期是相邻交易日。
 日历事实仍须独立提供；这不改变源数据 `historical_pit=false` 的限制。
+
+## 免费源当期增量
+
+CMES 提供历史底库，免费接口采集当期数据并持续留存。各条目的标的、日期窗口、字段子集以验收表为准。第一批 198 行和第二批 19 行分别验收；不要求免费接口补齐 CMES 全历史。
+
+### 已收到的东财成分页
+
+完整板块采集仍要求所有分页完整、总数一致、证券身份唯一。连接在中途断开时，已收到的合法分页也可以独立保存和查询：
+
+```sh
+.venv/bin/python scripts/import_board_member_page.py \
+  --root /path/to/isolated-board-pages \
+  --function stock_board_concept_cons_em --code BK1024 --page 1 \
+  --body /path/to/received-body.json --receipt /path/to/received-receipt.json
+
+.venv/bin/python -m ashare_data.cli.free_updates manual-query \
+  --snapshot /path/from/import-result --offset 0 --limit 100
+```
+
+这是离线导入已收到响应的入口，没有远端请求。收据必须含原请求 URL、`status=200`、`protocol=http`、实际带时区接收时间 `received_at`、原文 `bytes` 和 `sha256`。URL 必须与指定原生 BK 代码、页码及已验请求参数一致。
+
+每页独立保存原文、收据、证券原生身份及实际采集时间，重复导入同一收据不新增。不同页和完整板块使用不同检查点，某页失败不清除另一页。查询 `coverage.complete_received_page` 仅表示该页完整；`complete_named_board=false` 明确未证明全板块同一时点覆盖。遗漏成员不能据此视为退选。原生市场路由码 0 不直接改写成深圳交易所。
+
+### 第二批的每日新输入
+
+`run_supplemental_updates.py --profile ... --execute` 的第二批采集按北京时间日期创建检查点。同日已成功输入复用，新日重新获取当期名单、题材、日线和去重后的成员行情。新名单先完成，再生成行情队列；失败的行情批次续跑，已成功证券不重抓。
+
+第二批使用第一批的可转债资料、PE/PB、公司资料、分红配股、题材成分和美国国债数据。调度器要求这五组依赖在当前日完成，旧日成功状态不能满足新日依赖。数据来自对应目录下最新的已验证快照，不会永久停留在初始种子文件。源没有新发布时可以无变化，来源实际日期与接收时间分别保留。
+
+`tests/test_supplemental_fresh_day.py` 以离线响应模拟周五到周一：19 项都读取新输入、新成员进入行情队列、新日行情失败不会被旧报价判成功、仅失败批次续采、同日重跑零新增。此测试不代表已观察真实跨交易日网络运行。
+
+部署入口固定于已验证版本；修改工作树不改变已冻结的采集器。真实验收记录和运行版本存放在调用方的独立证据目录中，离线测试不会触发自然调度或写正式 CURRENT。

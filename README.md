@@ -75,6 +75,7 @@ print(prices.attrs)  # 来源、单位和实际观察时间
 | 读取有限事实和条件投影 | [有限研究](docs/finite-research.md) |
 | 生产与消费可移植研究输入 | [组件生产](docs/portable-components.md)、[消费契约](docs/portable-research.md) |
 | 当前时钟观察和已有 JQ 响应 | [观察数据](docs/observations.md) |
+| 免费源当期增量、成分页留存和第二批换日更新 | [当期增量](docs/observations.md#免费源当期增量) |
 | 修改、构建、升级或分发 | [开发与工具](docs/development.md)、[迁移](docs/migration.md)、[来源与许可](docs/sources-and-licensing.md) |
 
 ### 缓存与固定版本
