@@ -76,7 +76,7 @@ class Client:
         self.host=HOST
         if hasattr(capture, "tdx"):
             return  # Immutable captured protocol replay; no socket or SDK calls.
-        from ashare_data.providers.free_update_worker import SourceBlocked
+        from ashare_data.providers.free_updates.free_update_worker import SourceBlocked
         if self.host in capture.blocked:
             raise SourceBlocked("TDX block endpoint is cooling down")
         budget = getattr(capture, "budget", None)
@@ -104,7 +104,7 @@ class Client:
         if hasattr(self.capture, "tdx"):
             wire=self.capture.tdx(url)
         else:
-            from ashare_data.providers.free_update_worker import SourceBlocked
+            from ashare_data.providers.free_updates.free_update_worker import SourceBlocked
             time.sleep(1)
             self.capture.network_before(url, 65551)
             try:

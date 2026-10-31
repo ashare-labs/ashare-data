@@ -128,7 +128,7 @@ b = stream.append(next_frames, universe=next_pool)
 公开测试覆盖全部编号/依赖、共同算子手算、20 个代表公式的独立标量计算（含 012/035/039 符号）、OLS/递推/筛选窗口、异常输入、缺失与池变更、证券重排、全历史与分块逐格一致、前缀因果性及未来数据扰动。真实多股材料及对应原题测试保留本地；公开测试只使用合成输入。
 
 ```sh
-PYTHONPATH=src .venv/bin/python -m pytest -q tests/test_alpha191.py
+PYTHONPATH=src .venv/bin/python -m pytest -q tests/factors/test_alpha191.py
 # 合法固定真实面板：必须提供你已核对的 SHA256
 PYTHONPATH=src .venv/bin/python examples/alpha191_offline.py --panel panel.json --sha256 <hash>
 ```

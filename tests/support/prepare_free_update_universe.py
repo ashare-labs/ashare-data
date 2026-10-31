@@ -58,8 +58,8 @@ def export(root):
 def export_stock_directory(root):
     """Freeze the official directory, retaining aliases and unknown active status."""
     from collections import Counter
-    from ashare_data.providers.free_update_reference import stock_market
-    from ashare_data.providers.free_update_disclosures import DIRECTORY
+    from ashare_data.providers.free_updates.free_update_reference import stock_market
+    from ashare_data.providers.free_updates.free_update_disclosures import DIRECTORY
     root = Path(root).resolve()
     with connect(root, readonly=True) as db:
         candidates = db.execute("SELECT * FROM runs WHERE status IN ('received','empty_source_window') AND json_extract(job_json,'$.function')='stock_zh_a_disclosure_report_cninfo' ORDER BY finished_at DESC").fetchall()

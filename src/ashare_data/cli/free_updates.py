@@ -72,31 +72,31 @@ def main(argv=None):
         if args.command == "catalog":
             result = catalog()
         elif args.command == "run-manual":
-            from ashare_data.providers.free_update_manual import run_manual
+            from ashare_data.providers.free_updates.free_update_manual import run_manual
             result = run_manual(args.config, execute=args.execute, as_of=args.as_of,
                 progress=lambda value: print(json.dumps(value, ensure_ascii=False), flush=True))
         elif args.command == "manual-query":
-            from ashare_data.providers.free_update_manual import query_snapshot
+            from ashare_data.providers.free_updates.free_update_manual import query_snapshot
             result = query_snapshot(args.snapshot, offset=args.offset, limit=args.limit)
         elif args.command == "prepare-handoff":
-            from ashare_data.providers.free_update_handoff import prepare_bundle
+            from ashare_data.providers.free_updates.free_update_handoff import prepare_bundle
             result=prepare_bundle(args.root,args.rows,previous=args.previous,execute=args.execute)
         elif args.command == "preview-intake":
-            from ashare_data.providers.free_update_handoff import intake_preview
+            from ashare_data.providers.free_updates.free_update_handoff import intake_preview
             result=intake_preview(args.bundle,args.coordination)
         elif args.command == "prepare-queue":
-            from ashare_data.providers.free_update_queue import prepare, save
+            from ashare_data.providers.free_updates.free_update_queue import prepare, save
             root, queue = prepare(args.config, as_of=args.as_of)
             result = {"queue_id":queue["queue_id"], "root":str(root), "jobs":len(queue["plan"]["jobs"]),
                       "as_of":queue["plan"]["as_of"], "limits":queue["limits"], "universe":queue["universe"], "saved":False}
             if args.save:
                 result.update(saved=True, path=str(save(args.config, as_of=args.as_of)))
         elif args.command == "run-queue":
-            from ashare_data.providers.free_update_queue import run
+            from ashare_data.providers.free_updates.free_update_queue import run
             result = run(args.queue, execute=args.execute,
                 progress=lambda value: print(json.dumps(value,ensure_ascii=False),flush=True))
         elif args.command == "run-scheduled":
-            from ashare_data.providers.free_update_schedule import run_scheduled
+            from ashare_data.providers.free_updates.free_update_schedule import run_scheduled
             result = run_scheduled(args.config, execute=args.execute, as_of=args.as_of,
                 progress=lambda value: print(json.dumps(value,ensure_ascii=False),flush=True))
         elif args.command in {"plan", "collect"}:

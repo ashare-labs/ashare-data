@@ -63,7 +63,6 @@ def mapper_sha256():
         "schema": t.VERSION, "tables": t.TABLES, "mapping": sha_file(Path(t.__file__)),
         "importer": sha_file(Path(__file__)),
         "official_mapping": sha_file(Path(t.__file__).with_name("table_official.py")),
-        "share_mapping": sha_file(Path(t.__file__).with_name("table_shares.py")),
     })).hexdigest()
 
 
@@ -592,7 +591,7 @@ def prepare(parent, root, batches, *, daily_reviews=(), official_batches=(), sha
             done.extend(import_archive(builder, p) for p in official_batches)
             done.extend(import_daily_review(builder, p) for p in daily_reviews)
         if share_resolutions:
-            from ashare_data.financials.table_shares import import_resolutions
+            from ashare_data.financials.table_official import import_resolutions
             done.extend(import_resolutions(builder, p) for p in share_resolutions)
         if official_repairs:
             from ashare_data.financials.table_official import import_recovered_archive

@@ -25,7 +25,7 @@ from ashare_data.providers.free_updates import (
     implementation_identity,
     source_date,
 )
-from ashare_data.providers.free_update_handoff import read_bundle
+from ashare_data.providers.free_updates.free_update_handoff import read_bundle
 from ashare_data.storage.market_release import (
     MarketRelease,
     ReleaseWriter,
@@ -72,9 +72,9 @@ def verify_object(root, item):
 
 def checked_bundle(path):
     """Reparse the captured HTTP bodies; never trust a declared semantic flag."""
-    from ashare_data.providers.free_update_coverage import CapturedResponses
-    from ashare_data.providers.free_update_macro_history import collect
-    from ashare_data.providers.free_update_semantics import validate_semantics
+    from ashare_data.providers.free_updates.free_update_coverage import CapturedResponses
+    from ashare_data.providers.free_updates.free_update_macro_history import collect
+    from ashare_data.providers.free_updates.free_update_semantics import validate_semantics
 
     path = Path(path).resolve()
     manifest, snapshot = read_bundle(path)
@@ -92,7 +92,7 @@ def checked_bundle(path):
         "Split an oversized macro handoff",
     )
     specs = json.loads(
-        Path(__file__).parents[1].joinpath("providers/public-macro-requests.json").read_text()
+        Path(__file__).parents[1].joinpath("providers/free_updates/public-macro-requests.json").read_text()
     )["specs"]
     expected, contracts, checks = [], {}, {}
     menu = {r["excel_row"]: r for r in catalog()["items"]}
@@ -558,7 +558,7 @@ def verify_contract(root, manifest):
     require(contract["schema"] == VERSION, "MACRO_CONTRACT", "Unknown native macro schema")
     objects, rows = [], set()
     for scope, chain in contract["chains"].items():
-        from ashare_data.providers.free_update_macro_contracts import require_customs_units
+        from ashare_data.providers.free_updates.free_update_macro_contracts import require_customs_units
         for definition in chain["definitions"].values():
             require_customs_units(definition["function"], definition.get("units", {}))
         require(

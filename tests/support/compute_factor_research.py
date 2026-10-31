@@ -12,7 +12,7 @@ import statistics
 from ashare_data import FactorResearchView
 from compare_factor_panels import rank_metrics
 from ashare_data.factors.joinquant.research_view import DEFINITION, FIELDS, LOOKBACK, MODE
-from ashare_data.providers.factor_research_inputs import read_sources
+from factor_research_inputs import read_sources
 
 
 def dump(path, value, *, immutable=False):

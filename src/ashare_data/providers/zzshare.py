@@ -10,18 +10,94 @@ import re
 import urllib.error
 import urllib.parse
 import urllib.request
+from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation, localcontext
 from pathlib import Path
 
 from ashare_data.core.model import DataError, canonical, day, require, symbol, timestamp
 from ashare_data.storage.immutable import identifier, immutable_write, now
-from ashare_data.providers.zzshare_types import (
-    SourceClaimedLimits,
-    ZzshareDailyResult,
-    ZzshareDailyRow,
-    ZzshareValue,
-)
+from ashare_data.research.fact_types import Projection
+
+
+@dataclass(frozen=True)
+class ZzshareValue(Projection):
+    source_field: str
+    raw_token: str | None
+    value: Decimal | int | None
+    state: str
+
+
+@dataclass(frozen=True)
+class SourceClaimedLimits(Projection):
+    high: ZzshareValue
+    low: ZzshareValue
+    classification: str = "source_claimed"
+    server_generation: str = "UNKNOWN"
+    exchange_certified: bool = False
+
+
+@dataclass(frozen=True)
+class ZzshareDailyRow(Projection):
+    security: str
+    trade_date: date
+    open: ZzshareValue
+    high: ZzshareValue
+    low: ZzshareValue
+    close: ZzshareValue
+    prev_close: ZzshareValue
+    volume: ZzshareValue
+    amount: ZzshareValue
+    is_st: ZzshareValue
+    is_paused: ZzshareValue
+    source_claimed_limits: SourceClaimedLimits
+    capture_id: str
+    raw_response_sha256: str
+    response_json_pointer: str
+    request_started_at: str
+    response_received_at: str
+    raw_json: str
+    provider: str = "zzshare"
+    quality: str = "service_reported_unverified"
+    upstream_provider: str = "UNKNOWN"
+    request_mode: int = 0
+    price_basis: str = "source_claimed_mode0"
+    price_unit: str = "CNY/share"
+    volume_unit: str = "shares"
+    amount_unit: str = "CNY"
+    unit_evidence: str = "provider_documentation; not upstream certification"
+    rule_derived_limits: None = None
+    historical_available_at: None = None
+    historical_pit: bool = False
+    events_complete: bool = False
+    execution_permission: bool = False
+
+    @property
+    def source_fields(self):
+        try:
+            with localcontext() as context:
+                context.traps[InvalidOperation] = True
+                return json.loads(self.raw_json, parse_float=Decimal, parse_int=Decimal)
+        except (ValueError, RecursionError, InvalidOperation) as exc:
+            raise DataError(
+                "ZZSHARE_SCHEMA",
+                "源字段无法投影为有界JSON/Decimal",
+                {"capture_id": self.capture_id},
+            ) from exc
+
+
+@dataclass(frozen=True)
+class ZzshareDailyResult:
+    capture_id: str
+    rows: tuple[ZzshareDailyRow, ...]
+    report_json: str
+
+    @property
+    def report(self):
+        return json.loads(self.report_json)
+
+    def to_dict(self):
+        return {"rows": [row.to_dict() for row in self.rows], "report": self.report}
 
 VERSION = "zzshare-research-1"
 PROJECTION_VERSION = "zzshare-projection-2"

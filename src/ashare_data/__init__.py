@@ -56,7 +56,7 @@ from ashare_data.reference.historical_market import HistoricalMarketView
 from ashare_data.corporate_actions.history import CorporateHistoryView
 from ashare_data.providers.baostock import BaoStockSource, BaoStockView
 from ashare_data.providers.zzshare import ZzshareSource, ZzshareView
-from ashare_data.providers.zzshare_types import (
+from ashare_data.providers.zzshare import (
     ZzshareValue,
     SourceClaimedLimits,
     ZzshareDailyRow,

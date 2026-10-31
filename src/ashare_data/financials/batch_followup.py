@@ -20,7 +20,7 @@ from ashare_data.financials import expansion as e
 from ashare_data.financials import limit_expansion as limits
 from ashare_data.financials import official_expansion as official
 from ashare_data.financials import tushare_reference as ts
-from ashare_data.financials.official_access import reviewed_ledger, verified_source
+from ashare_data.financials.official_daily import reviewed_ledger, verified_source
 
 FINISHED = "source_pass_finished_with_explicit_gaps"
 HANDOFF_SCHEMA = "ad.reference-handoff-stop.v1"

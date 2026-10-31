@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 
 from ashare_data.financials.expansion import atomic, encoded, immutable
 from ashare_data.providers.free_updates import implementation_identity
-from ashare_data.providers.free_update_batch import run as security_batch
+from ashare_data.providers.free_updates.free_update_batch import run as security_batch
 from run_legacy_financial_scope import run_profile as financial_batch
 
 

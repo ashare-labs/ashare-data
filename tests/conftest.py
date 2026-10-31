@@ -2,12 +2,16 @@ import sys
 import importlib.util
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent / "support"))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-
 import pytest
 
 from ashare_data import Store
+
+_TESTS_DIR = Path(__file__).resolve().parent
+for _sub in sorted(_TESTS_DIR.iterdir()):
+    if _sub.is_dir() and not _sub.name.startswith((".", "__")) and _sub.name != "fixtures":
+        sys.path.insert(0, str(_sub))
+sys.path.insert(0, str(_TESTS_DIR / "support"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 spec = importlib.util.spec_from_file_location(
     "golden", Path(__file__).parents[1] / "examples" / "golden.py"

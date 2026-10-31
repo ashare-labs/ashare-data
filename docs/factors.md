@@ -35,7 +35,7 @@ print(factor_catalog.catalog("joinquant"))
 
 ## 输入与开发工具
 
-采集、固定解码、计算、比较的分工、命令和依赖见 [开发指南](development.md#其他工具与生成链)。比较既检查共同证券的数值/排名，也检查两侧可选股票池的 top/bottom 变化；共同池相关性不能掩盖缺失候选造成的替换。最小用例见 `tests/test_factor_selection.py`。
+采集、固定解码、计算、比较的分工、命令和依赖见 [开发指南](development.md#其他工具与生成链)。比较既检查共同证券的数值/排名，也检查两侧可选股票池的 top/bottom 变化；共同池相关性不能掩盖缺失候选造成的替换。最小用例见 `tests/factors/test_factor_selection.py`。
 
 ## 单因子效果评价
 
@@ -99,7 +99,7 @@ coverage、上述指标数组、assumptions 和 warnings。`engine.input_sha256`
 离线复放：`scripts/evaluate_factor.py --input INPUT --sha256 SHA256 --output NEW_REPORT`。
 INPUT 的 schema 为 `ad.factor-evaluation-input.v1`，含 `dates`、`securities`、三个二维数组
 `values/prices/membership`、config 及可选 provenance。源文件只读、SHA 不符拒绝、输出文件已存在拒绝覆盖。
-输入/报告存仓外；不得把真实文件当单元测试写入目标。数学边界测试见 `tests/test_factor_evaluation.py`。
+输入/报告存仓外；不得把真实文件当单元测试写入目标。数学边界测试见 `tests/factors/test_factor_evaluation.py`。
 
 ### 依赖选择与许可
 
@@ -139,7 +139,7 @@ values = result.between("2024-07-01", "2024-08-30").values
 
 ### 官方夹具校验与独立比较
 
-`scripts/alpha158_reference.py` 与 `tests/fixtures/alpha158-reference` 提供独立的官方对照校验与比较工具（只需 Python 标准库，回归测试见 `tests/test_alpha158_reference.py`）：
+`scripts/alpha158_reference.py` 与 `tests/fixtures/alpha158-reference` 提供独立的官方对照校验与比较工具（只需 Python 标准库，回归测试见 `tests/factors/test_alpha158_reference.py`）：
 
 ```sh
 python3 scripts/alpha158_reference.py verify

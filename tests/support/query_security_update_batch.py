@@ -4,7 +4,7 @@ from datetime import date
 import json
 from pathlib import Path
 
-from ashare_data.providers.free_update_manual import read_snapshot
+from ashare_data.providers.free_updates.free_update_manual import read_snapshot
 from ashare_data.providers.free_updates import digest
 
 

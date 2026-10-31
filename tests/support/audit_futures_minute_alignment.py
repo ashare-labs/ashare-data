@@ -63,7 +63,7 @@ def compare(one, wider, period, closed_before):
 
 
 def audit(root, closed_before):
-    from ashare_data.providers.free_update_futures_minutes import parse
+    from ashare_data.providers.free_updates.free_update_futures_minutes import parse
     captures, bindings = {}, []
     for file in sorted((root / "runs").glob("*.json")):
         value = json.loads(file.read_text())

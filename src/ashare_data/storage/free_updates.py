@@ -111,19 +111,19 @@ def ingest(db, root, run_id, job, result, *, as_of):
             body = gzip.decompress(path.read_bytes())
             if hashlib.sha256(body).hexdigest() != receipt["sha256"]:
                 raise ValueError("raw response hash mismatch")
-        from ashare_data.providers.free_update_dates import require_dates
+        from ashare_data.providers.free_updates.free_update_dates import require_dates
         date_audit = require_dates(rows, job, observed_day)
         if empty_window:
             if rows or job["function"] != "stock_zh_a_disclosure_report_cninfo":
                 raise ValueError("unreviewed empty-source success")
-            from ashare_data.providers.free_update_coverage import CapturedResponses
-            from ashare_data.providers.free_update_disclosures import collect as reparse
+            from ashare_data.providers.free_updates.free_update_coverage import CapturedResponses
+            from ashare_data.providers.free_updates.free_update_disclosures import collect as reparse
             captured = CapturedResponses(Path(root), result, datetime.fromisoformat(result["started_at"]), datetime.fromisoformat(result["finished_at"]))
             if reparse(captured, job["parameters"]) or captured.dataset_metadata != result["coverage"] or captured.index != len(result["receipts"]):
                 raise ValueError("empty announcement window lacks matching full raw evidence")
             semantics = {"contract_reviewed": False, "empty_window_checked": True, "gaps": ["empty window is not live sample acceptance"]}
         else:
-            from ashare_data.providers.free_update_semantics import validate_semantics
+            from ashare_data.providers.free_updates.free_update_semantics import validate_semantics
             semantics = validate_semantics(rows, job, observed_day)
         result = dict(result, assessment=assessment, semantics=semantics, date_audit=date_audit)
         if assessment["freshness"] in {"stale", "unverified_date", "release_verification_pending"}:
@@ -180,7 +180,7 @@ def _worker_result(root, request_path, output_path, journal_path, timeout):
         environment = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
         for key in ("ASHARE_DEPLOYMENT","ASHARE_DATA_ROOT","ASHARE_QUANT_DB"):
             environment.pop(key,None)
-        child = subprocess.run([sys.executable,"-B","-m","ashare_data.providers.free_update_worker",
+        child = subprocess.run([sys.executable,"-B","-m","ashare_data.providers.free_updates.free_update_worker",
                                 str(request_path),str(output_path)], env=environment,
                                timeout=timeout+2,capture_output=True,check=False)
         if child.returncode==124:
@@ -351,7 +351,7 @@ def query(root, excel_row, *, limit=100, as_of=None, include_superseded=False):
                  source_context={k:v for k,v in json.loads(r["job_json"]).items() if k in {"function","parameters","timezone","implementation_sha256"}},
                  superseded_projection=json.loads(r["job_json"])["function"] in item.get("exclude_superseded_functions", []),
                  payload_sha256=r["payload_sha256"],data=json.loads(r["payload_json"])) for r in rows]
-    from ashare_data.providers.free_update_macro_contracts import CONTRACTS
+    from ashare_data.providers.free_updates.free_update_macro_contracts import CONTRACTS
     for record in output:
         if record["source_context"]["function"] == "macro_china_hgjck":
             record["units"] = {k:v for k,v in CONTRACTS["macro_china_hgjck"].items() if k in record["data"]}
@@ -372,7 +372,7 @@ def report(root):
     verification_path=root/"verification.json"
     proof=json.loads(verification_path.read_text()) if verification_path.exists() else {}
     proof_rows={i["excel_row"]:set(i["run_ids"]) for i in proof.get("verified_menu_rows",[])} if proof.get("implementation_sha256")==implementation_identity() else {}
-    from ashare_data.providers.free_update_coverage import registered_coverage
+    from ashare_data.providers.free_updates.free_update_coverage import registered_coverage
     coverage_rows,coverage_errors=registered_coverage(root)
     for item in catalog()["items"]:
         selection = selections.get(item["excel_row"], {})
@@ -411,7 +411,7 @@ def report(root):
             coverage_status="实现及覆盖验收通过，尚未日常部署" if implemented and coverage else "完整覆盖待验收",
             daily_deployment=False,
             acceptance_complete=False))
-    from ashare_data.providers.free_update_acceptance import acceptance_dimensions
+    from ashare_data.providers.free_updates.free_update_acceptance import acceptance_dimensions
     for item in output:
         item["acceptance_dimensions"] = acceptance_dimensions(item)
     counts={s:sum(i["status"]==s for i in output) for s in sorted({i["status"] for i in output})}

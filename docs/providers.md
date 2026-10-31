@@ -277,7 +277,7 @@ Shibor 保留全部八期限：利率为年化百分率，变动为 BP，按相�
 
 主营构成按发行人、报告期、分类类型和构成项保留原字段。金额为元，比例为小数比例，页面乘100显示百分数；缺失成本、利润、毛利率不补值。收入、成本和利润关系不一致时保留缺口，尤其不能把保险公司的行业口径猜成通用公式。报告期不是公告可见日，未提供公告时间的响应只能从首次实际接收时点可见。读取一个发行人当前返回的全部行，不等于该发行人全历史或全市场完整覆盖。
 
-股票、ETF、指数的指定名单通过 `ashare_data.providers.free_update_batch` 驱动。`ad.security-update-batch.v1` 配置明确给出 `root`、`rows`、`instruments`（`asset_type`、新浪带市场前缀的 `symbol`）、`max_jobs` 和 `lookback_days`。名单最多 10000 个身份，每轮至多 120 个独立请求，默认单并发、75 秒超时、每天两次失败尝试；`--max-jobs` 只能缩小配置预算。配置冻结后不原地改名单，扩大名单需新配置和新的隔离观察根。重复运行按当日检查点续跑，不重新请求已完成任务；在根目录创建 `STOP` 可在任务边界暂停，移除后继续。当前行 60/61 共享股票原生日线请求，不重复采集包装条目。
+股票、ETF、指数的指定名单通过 `ashare_data.providers.free_updates.free_update_batch` 驱动。`ad.security-update-batch.v1` 配置明确给出 `root`、`rows`、`instruments`（`asset_type`、新浪带市场前缀的 `symbol`）、`max_jobs` 和 `lookback_days`。名单最多 10000 个身份，每轮至多 120 个独立请求，默认单并发、75 秒超时、每天两次失败尝试；`--max-jobs` 只能缩小配置预算。配置冻结后不原地改名单，扩大名单需新配置和新的隔离观察根。重复运行按当日检查点续跑，不重新请求已完成任务；在根目录创建 `STOP` 可在任务边界暂停，移除后继续。当前行 60/61 共享股票原生日线请求，不重复采集包装条目。
 
 `tests/support/query_security_update_batch.py --result <result_path> --row 61 --date YYYY-MM-DD` 按交易日跨证券读取，`--row 60 --symbol sh600000` 按股票读取；分钟、因子和日历也支持对应的原生日期。`--offset`、`--limit` 逐页返回，必须固定不可变的 `result_path`，不使用会变化的 `batch-latest.json`。日期无记录明确返回零条，范围尚未采集则报错。查询不联网，也不把后来快照混进此前页面。
 

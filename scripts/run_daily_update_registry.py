@@ -100,7 +100,7 @@ def checked(config_path):
             if not Path(profile["source_root"]).resolve().is_relative_to(scope):
                 raise ValueError("cached source outside isolated workspace")
         if item["kind"] == "supplemental":
-            from ashare_data.providers.supplemental_updates import ROWS
+            from ashare_data.providers.free_updates.supplemental_updates import ROWS
             if item.get("acceptance_batch") != "second" or set(item["rows"]) != ROWS:
                 raise ValueError("second-batch acceptance must remain separate and exact")
             if (not Path(profile["source_index"]).resolve().is_relative_to(scope)
@@ -334,7 +334,7 @@ def child(item, day, jobs):
         )
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        from ashare_data.providers.free_update_budget import financial_fetcher
+        from ashare_data.providers.free_updates.free_update_budget import financial_fetcher
         result = module.run_profile(item["profile"], execute=True, today=day, max_jobs=jobs,
                                     fetcher=financial_fetcher(module.source))
         audit = result["audit"]
@@ -342,13 +342,13 @@ def child(item, day, jobs):
         pending = any(audit["task_states"].get(k, 0) for k in ("pending", "running", "captured"))
         return dict(complete=complete, settled=complete or not pending, result=result)
     if item["kind"] == "cached_macro":
-        from ashare_data.providers.free_update_derived import run_cached_macro
+        from ashare_data.providers.free_updates.free_update_derived import run_cached_macro
         result = run_cached_macro(item["profile"], execute=True, as_of=day)
     elif item["kind"] == "supplemental":
-        from ashare_data.providers.supplemental_batch import run as supplemental
+        from ashare_data.providers.free_updates.supplemental_batch import run as supplemental
         result = supplemental(item["profile"], execute=True, as_of=day, max_jobs=jobs)
     elif item["kind"] == "billboard_queue":
-        from ashare_data.providers.free_update_billboard_queue import run_billboard_queue
+        from ashare_data.providers.free_updates.free_update_billboard_queue import run_billboard_queue
         attempts = 0
         for _ in range(jobs):
             result = run_billboard_queue(item["profile"], execute=True, as_of=day)
@@ -357,11 +357,11 @@ def child(item, day, jobs):
                 break
         result = dict(result, attempted=attempts)
     elif item["kind"] == "manual":
-        from ashare_data.providers.free_update_manual import run_manual
+        from ashare_data.providers.free_updates.free_update_manual import run_manual
 
         result = run_manual(item["profile"], execute=True, as_of=day)
     else:
-        from ashare_data.providers.free_update_batch import run
+        from ashare_data.providers.free_updates.free_update_batch import run
 
         result = run(item["profile"], execute=True, as_of=day, max_jobs=jobs)
     complete = result["all_requested_jobs_received"]
@@ -385,7 +385,7 @@ def invoke(item, day, jobs, output):
     ]
     save(output / "item.json", item)
     env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
-    from ashare_data.providers.free_update_budget import ENV
+    from ashare_data.providers.free_updates.free_update_budget import ENV
     if item.get("request_budget"):
         if sha(item["request_budget"]) != item["request_budget_sha256"]:
             raise ValueError("request budget changed before child launch")
@@ -461,7 +461,7 @@ def run(profile, *, execute=False, clock=None, runner=invoke, usage_reader=usage
         if frozen.exists() and read(frozen) != config:
             raise ValueError("existing registry configuration is immutable")
         save(frozen, config)
-        from ashare_data.providers.free_update_budget import RequestBudget
+        from ashare_data.providers.free_updates.free_update_budget import RequestBudget
         budgets = {}
         for scope in network_roots if parallel else ["registry"]:
             directory = (root / "request-budgets" / hashlib.sha256(scope.encode()).hexdigest()

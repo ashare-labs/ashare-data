@@ -87,4 +87,4 @@ python scripts/verify_wheel.py dist/ashare_data-0.10.0.dev5-py3-none-any.whl --f
 
 JS、SDK/policy JSON、Alpha191 来源与许可通过相邻路径或 importlib.resources 定位；wheel/sdist 必须保留。源码 `.py/.json/.js` 的路径和内容参与 runtime identity；纯注释和文件移动也可能改变身份，新候选必须记录新摘要。数据 schema、owner policy 和包版本分别维护，不能一起盲改。
 
-Alpha158 对照使用 `scripts/alpha158_reference.py`（详见 [因子目录与评价](factors.md#qlib-alpha158)），生产计算专项为 `tests/test_qlib_alpha158.py`。
+Alpha158 对照使用 `scripts/alpha158_reference.py`（详见 [因子目录与评价](factors.md#qlib-alpha158)），生产计算专项为 `tests/factors/test_qlib_alpha158.py`。
