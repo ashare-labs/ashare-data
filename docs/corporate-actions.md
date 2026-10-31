@@ -4,7 +4,7 @@
 
 `CorporateHistoryView` 把公开原文、采集回执、公告逐页引文和标准化记录封存到独立目录。它补充已有 `DailyResearchView`、`HistoricalMarketView` 和独立事件查询接口，不修改复权公式、行情库或账户。开启时必须给外部固定的 binding SHA-256；每个引用文件均验证路径、长度和内容哈希。
 
-采集范围由调用方显式固定；[范围配置示例](../examples/config/corporate-actions.json) 展示格式，运行前应确认证券、窗口和请求预算。示例范围不表示已完成来源采集或全市场覆盖。原文、回执、提取文本和数据包由使用者另行准备，不随软件分发。
+采集范围由调用方通过 JSON 配置文件显式固定，运行前应确认证券、窗口和请求预算。示例范围不表示已完成来源采集或全市场覆盖。原文、回执、提取文本和数据包由使用者另行准备，不随软件分发。
 
 ### 读取
 
@@ -108,10 +108,9 @@ AQ 适配时将 `payment_date` 显式映射为其现金支付字段；`share_cre
 ### 获取、扩展与封存
 
 ```bash
-python scripts/capture_action_history.py /isolated/captures --scope examples/config/corporate-actions.json
-python scripts/plan_action_details.py /isolated/captures --scope examples/config/corporate-actions.json > /isolated/detail-requests.json
+python scripts/capture_action_history.py /isolated/captures --scope /isolated/scope.json
 python scripts/capture_action_history.py /isolated/captures --requests /isolated/detail-requests.json
-python scripts/build_corporate_history.py /isolated/captures /isolated/curation.json /isolated/package --scope examples/config/corporate-actions.json
+python scripts/build_corporate_history.py /isolated/captures /isolated/curation.json /isolated/package --scope /isolated/scope.json
 ashare-data corporate-history coverage --binding /isolated/package/binding.json --sha256 <reviewed-sha> --security 000651.XSHE --start 2020-01-01 --end 2025-12-31
 ```
 

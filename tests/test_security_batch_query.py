@@ -8,7 +8,7 @@ import pytest
 from ashare_data.providers import free_update_batch as batch
 from test_free_update_batch import profile, protocol_worker
 
-spec = importlib.util.spec_from_file_location("batch_query", Path(__file__).parents[1] / "scripts/query_security_update_batch.py")
+spec = importlib.util.spec_from_file_location("batch_query", Path(__file__).resolve().parent / "support/query_security_update_batch.py")
 reader = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(reader)
 

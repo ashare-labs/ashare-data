@@ -129,7 +129,6 @@ b = stream.append(next_frames, universe=next_pool)
 
 ```sh
 PYTHONPATH=src .venv/bin/python -m pytest -q tests/test_alpha191.py
-PYTHONPATH=src .venv/bin/python scripts/benchmark_alpha191.py
 # 合法固定真实面板：必须提供你已核对的 SHA256
 PYTHONPATH=src .venv/bin/python examples/alpha191_offline.py --panel panel.json --sha256 <hash>
 ```

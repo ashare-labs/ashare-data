@@ -95,13 +95,7 @@ print(result.to_dict())
 
 ### 显式本地请求
 
-```sh
-python examples/jq_observations.py \
-  --request data/request.json \
-  --store data/new-store --output data/delivery
-```
-
-示例仅使用请求里的 case_id、证券、单日日期、源路径及 events/jq.py 摘要，其他设置和目标结果不进入数据产品。输出 `delivery.json` 含 dataset_id、manifest、各会话 bootstrap、请求摘要与本机 store 路径。wheel/commit 身份由交付记录单独固定。测试使用显式 `source_kind=synthetic_fixture` 的协议样例，真实数据在包外验证。
+请求参数包含 case_id、证券、单日日期、源路径及 events/jq.py 摘要，其他设置和目标结果不进入数据产品。输出 `delivery.json` 含 dataset_id、manifest、各会话 bootstrap、请求摘要与本机 store 路径。wheel/commit 身份由交付记录单独固定。测试使用显式 `source_kind=synthetic_fixture` 的协议样例，真实数据在包外验证。
 
 稀疏观测不能推断完整会话、开盘行情或历史可见性。范围外的证券、标签、字段和用途分别返回缺项；读取成功不要求隐式扩采。
 
@@ -167,11 +161,6 @@ CMES 提供历史底库，免费接口采集当期数据并持续留存。各条
 完整板块采集仍要求所有分页完整、总数一致、证券身份唯一。连接在中途断开时，已收到的合法分页也可以独立保存和查询：
 
 ```sh
-.venv/bin/python scripts/import_board_member_page.py \
-  --root /path/to/isolated-board-pages \
-  --function stock_board_concept_cons_em --code BK1024 --page 1 \
-  --body /path/to/received-body.json --receipt /path/to/received-receipt.json
-
 .venv/bin/python -m ashare_data.cli.free_updates manual-query \
   --snapshot /path/from/import-result --offset 0 --limit 100
 ```

@@ -10,7 +10,7 @@ import pytest
 
 @pytest.fixture(scope="module")
 def refs():
-    return runpy.run_path(str(Path(__file__).parents[1] / "scripts/execution_delivery_refs.py"))
+    return runpy.run_path(str(Path(__file__).resolve().parent / "support/execution_delivery_refs.py"))
 
 
 def save(path, value):

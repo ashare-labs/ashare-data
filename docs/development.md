@@ -57,16 +57,15 @@ node scripts/decode-research-daily.cjs "$RESEARCH_ROOT" --verify
 
 ## 其他工具与生成链
 
-`scripts/local-daily.sh` 是 POSIX sh 环境选择器：使用 `ASHARE_LOCAL_DATA_ENV` 或仓库 `.venv-local-data` 中的已安装 CLI，参数原样转交；没有第二套行情逻辑。`capture_factor_panel.py`、`capture_factor_research.py`、`capture_action_history.py` 的显式采集流程还需要 curl。两个因子采集入口沿用调用方环境的代理配置，不强制本机端口；不要在报告中输出代理凭据。uv 用于锁定依赖、构建与隔离验包。这些外部命令不是普通 Python 读取 API 的依赖。
+`capture_action_history.py` 的显式采集流程需要 curl。uv 用于锁定依赖、构建与隔离验包。这些外部命令不是普通 Python 读取 API 的依赖。
 
 | 任务 | 入口与输入 → 输出 |
 |---|---|
-| 因子研究 | capture_factor_panel / capture_factor_research → 原文、回执 → 显式 decoder → compute_factor_panel / compute_factor_research → 面板 |
-| 因子复验 | verify_factor_panel / verify_factor_research、compare_factor_panels / compare_factor_reference / validate_factor_reference；只读明确输入，生成本次报告 |
-| 公司行动 | capture_action_history / plan_action_details → 人工核对事实 → build_corporate_history；[公司行动指南](corporate-actions.md) |
-| 日频与历史状态 | build_daily_research / build_daily_execution / build_historical_market；固定来源和外部基线摘要 → 新绑定 |
-| 本地库维护 | complete_local_daily_batch / collect_early_baostock / report_early_history；accept_local_daily / accept_local_compatible / audit_local_daily 为显式本地核验 |
-| 开发交付 | execution_delivery_refs 检查交付指针；check_cli / check_structure / verify_wheel 检查产品；check_live 显式联网；benchmark_alpha191 测性能 |
+| 因子研究与复验 | `scripts/evaluate_factor.py`、测试辅助 `tests/support/compute_factor_research.py`、`tests/support/compare_factor_panels.py`、`tests/support/compare_factor_reference.py`、`tests/support/validate_factor_reference.py` |
+| 公司行动 | `scripts/capture_action_history.py` → 人工核对事实 → `scripts/build_corporate_history.py`；[公司行动指南](corporate-actions.md) |
+| 日频与历史状态 | `scripts/build_daily_research.py` / `scripts/build_daily_execution.py` / `scripts/build_historical_market.py`；固定来源和外部基线摘要 → 新绑定 |
+| 本地库维护 | `scripts/collect_early_baostock.py`、`scripts/accept_local_daily.py`、`scripts/audit_local_daily.py`、`scripts/accept_daily_update.py` |
+| 开发交付 | `tests/support/execution_delivery_refs.py` 检查交付指针；`scripts/check_structure.py`、`scripts/verify_wheel.py` 检查产品 |
 
 生产脚本不是一般行情 API；保留它们的边界、必需参数及失败状态。新生成物写入新目录，旧 manifest、hash、失败记录不能被“整理”成新通过。命令具体选项以各 Python 脚本 `--help` 为准。
 
@@ -88,4 +87,4 @@ python scripts/verify_wheel.py dist/ashare_data-0.10.0.dev5-py3-none-any.whl --f
 
 JS、SDK/policy JSON、Alpha191 来源与许可通过相邻路径或 importlib.resources 定位；wheel/sdist 必须保留。源码 `.py/.json/.js` 的路径和内容参与 runtime identity；纯注释和文件移动也可能改变身份，新候选必须记录新摘要。数据 schema、owner policy 和包版本分别维护，不能一起盲改。
 
-Alpha158 对照使用 [固定官方夹具与比较器](../scripts/alpha158-reference.md)，生产计算专项为 `tests/test_qlib_alpha158.py`。
+Alpha158 对照使用 `scripts/alpha158_reference.py`（详见 [因子目录与评价](factors.md#qlib-alpha158)），生产计算专项为 `tests/test_qlib_alpha158.py`。

@@ -6,21 +6,20 @@
 
 ```sh
 UV_PROJECT_ENVIRONMENT=.venv-local-data uv sync --locked --no-config --python 3.12 --extra local-data
-scripts/local-daily.sh --help
-scripts/local-daily.sh --root "$DATA_ROOT" update --start 2010-01-01
-scripts/local-daily.sh --root "$DATA_ROOT" status
-scripts/local-daily.sh --root "$DATA_ROOT" resume --retry-failed
+ashare-data local-daily --help
+ashare-data local-daily --root "$DATA_ROOT" update --start 2010-01-01
+ashare-data local-daily --root "$DATA_ROOT" status
+ashare-data local-daily --root "$DATA_ROOT" resume --retry-failed
 ```
 
-shell 入口只选择 `.venv-local-data` 中的 CLI，可用 ASHARE_LOCAL_DATA_ENV 指定已有环境。DATA_ROOT 是用户明确选择的数据目录；先查看 `--help` 确认本次范围。`update` 默认从 2010-01-01 至源时钟下最新可采集日，18:00 前不把当天纳入完成范围。日线、证券清单、日历和源累计因子分别存储，不按价格自动推导状态。
+DATA_ROOT 是用户明确选择的数据目录；先查看 `--help` 确认本次范围。`update` 默认从 2010-01-01 至源时钟下最新可采集日，18:00 前不把当天纳入完成范围。日线、证券清单、日历和源累计因子分别存储，不按价格自动推导状态。
 
 | 操作 | 用途与边界 |
 |---|---|
 | update / resume | 显式采集或继续已登记任务；成功原件和修订留存，重复数据去重 |
 | update --repair-gaps | 对未知缺口实际请求；来源仍缺行就保持未知 |
 | supplement --source sohu / tencent | 对显式证券/日期补采独立来源，不自动改写原来源行 |
-| `scripts/complete_local_daily_batch.py` | 按显式参数完成 HTTP、BaoStock 和搜狐批次；它不是定时服务 |
-| `scripts/accept_local_daily.py` / `audit_local_daily.py` | 为指定库生成本次覆盖/一致性检查，不能用旧报告数值证明新库 |
+| `scripts/accept_local_daily.py` / `scripts/audit_local_daily.py` | 为指定库生成本次覆盖/一致性检查，不能用旧报告数值证明新库 |
 
 HTTP 任务和 BaoStock 队列分开；HTTP 默认3 workers、主机间隔1秒、有限超时和最多3次尝试。401/403/429 暂停该主机，连续传输失败进入30分钟冷却。根目录 STOP 允许正在进行的请求结束后停下；完整批次还使用 STOP_BAOSTOCK。重开会把未完成 running 工作恢复为 pending，不能靠删除状态绕过失败。
 
@@ -92,7 +91,7 @@ finally:
 - 来源明确停牌，或已核对公告与来源交易状态冲突，就阻断补值；可信身份的坏 OHLC 行仍可贡献停牌阻断，不被选择性忽略。
 - 每个补值保留 field_provenance、完整 observations/conflicts。组合行的单一 raw ID/hash/time 为 None，不能假装来自一份原子响应。
 
-返回区分 native_observed_days、returned_days、missing_days 和补字段计数；没有原生行的别名停牌占位只进入 metadata.unfilled_days，不制造交易行或增加原生覆盖。相关证据缺失、hash 不符会报错，不能静默使用更宽松规则。`scripts/accept_local_compatible.py` 针对明确本地库生成当前验证。
+返回区分 native_observed_days、returned_days、missing_days 和补字段计数；没有原生行的别名停牌占位只进入 metadata.unfilled_days，不制造交易行或增加原生覆盖。相关证据缺失、hash 不符会报错，不能静默使用更宽松规则。
 
 ## 早期历史
 
@@ -106,7 +105,7 @@ BaoStock 早期工具用 archive_only=True，原件进入 raw/early-baostock，�
 
 改代码期间必须有显式代码区间和公告证据。旧代码捕获、换算单位和有效日期校验后才能参与别名查询；不能把供应商按新名称回填的旧名单作为历史名称证明，也不能因正式退市日仍有供应商条目而重新纳入股票池。
 
-早期采集/查询入口和参数见 `scripts/collect_early_baostock.py --help`、`scripts/report_early_history.py --help` 与 LocalDailyStore 的公开方法；接口不会自动请求任意历史。别名和边界证据在调用方 reports 中，按固定原文/hash 复验，不从本机路径或旧报告结论推导资格。
+早期采集/查询入口和参数见 `scripts/collect_early_baostock.py --help` 与 LocalDailyStore 的公开方法；接口不会自动请求任意历史。别名和边界证据在调用方 reports 中，按固定原文/hash 复验，不从本机路径或旧报告结论推导资格。
 
 累计后复权因子用于价格调整，不是完整现金/股份事件账本。分红支付、法定权益日期与价格调整生效可不同；股本、配股、到账及可卖日期由 [公司行动](corporate-actions.md) 的独立事实处理。来源分歧保留原值与诊断，不自动按多数票改历史。
 
@@ -181,17 +180,6 @@ volume/amount/money、源 preclose 及状态字段保持原价语义，详见 `a
 当前快照是事后研究观察，不能证明过去已知这些值。现金分红支付日、股份到账/可卖日、
 现金和持仓账务继续由公司行动事实及账户模型负责，因子不替代这些证据。
 
-少量真实窗口可复验：
-
-```sh
-python scripts/validate_cmes_factors.py --packages "$CMES_PACKAGES" \
-  --output "$NEW_VALIDATION_DIR" --through 2026-10-21
-```
-
-此脚本只读取两个因子 ZIP 和明确列出的两个证券日线 ZIP，比较除权前收的复权值与源除权
-参考价（允许源分位舍入的 0.005 元误差），核对 HFQ/QFQ 方向及固定版本重开。
-它仅用于价格约定验证；不能据此认证公告、送转支付日期或账户收益。输出写入显式新目录。
-
 ### 原价查询与发布
 
 ```python
@@ -265,17 +253,6 @@ SHA 占位符须替换为经过核对的绑定身份。另一类集合为 `{"kin
 
 复制 Store 后，读取冻结输入和恢复已有任务均不要求原 PDF 在线。任务恢复还需要 AQ 控制状态、策略、日志、账户、native 检查点、未结权益和回执，不能只备份 SQLite。要在恢复环境进行新发布，需要保留所选参考包的 binding 及全部被绑定文件，以及正式行情库；小型参考包应随能力备份保存。主库原始响应压缩正文继续原位保留，发布回执引用 SHA；完整主库源备份须另外保存一致 SQLite 快照、raw、采集状态和库外证据。
 
-可离线检查任意已配置范围及行情来源一致性，不采集或复制主库：
-
-```sh
-python scripts/verify_local_daily_product.py --deployment "$DEPLOYMENT" \
-  --security 000333.XSHE --security 000651.XSHE --security 000858.XSHE \
-  --window 2020-02-03:2020-02-14 --window 2022-04-01:2022-04-15 \
-  --output data/verification
-```
-
-该检查验证数据发布和冻结重读；原生账户、故障恢复与资金成交一致性由 AQ 独立验收。
-
 来源协议和解码依赖见 [提供者](providers.md)、[开发工具职责](development.md)。行情/可见性保证见 [行情查询](market-data.md)，历史股票池严格接口见 [历史市场](historical-market.md)。
 
 ## 行情发布与恢复
@@ -344,9 +321,6 @@ with market.sql(tables=("bars_1d",), securities=["600036.XSHG"]) as db:
 在选定受控目录运行首轮构建；重复命令从已验证的批次日志恢复，不增加重复事实。
 
 ```sh
-python scripts/merge_market.py --entry "$ENTRY" --root "$MARKET" core
-python scripts/audit_stockdb_merge.py --entry "$ENTRY" --root "$AUDIT"
-python scripts/finalize_market.py --entry "$ENTRY" --root "$MARKET" --stockdb-audit "$AUDIT" --publish
 python -m ashare_data.product.release_cli --root "$MARKET" verify
 python -m ashare_data.product.release_cli --root "$MARKET" --release-id 1 backup --destination "$BACKUP"
 python -m ashare_data.product.release_cli --root "$BACKUP" restore --destination "$RESTORE"

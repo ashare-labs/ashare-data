@@ -10,17 +10,17 @@ from ashare_data.providers.free_updates import implementation_identity
 
 
 def module():
-    scripts = Path(__file__).parents[1] / "scripts"
-    sys.path.insert(0, str(scripts))
+    support = Path(__file__).resolve().parent / "support"
+    sys.path.insert(0, str(support))
     try:
         spec = importlib.util.spec_from_file_location(
-            "cycle", scripts / "run_incremental_update_cycle.py"
+            "cycle", support / "run_incremental_update_cycle.py"
         )
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         return mod
     finally:
-        sys.path.remove(str(scripts))
+        sys.path.remove(str(support))
 
 
 def profile(tmp_path):

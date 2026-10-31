@@ -101,7 +101,7 @@ PYTHONPATH=src python -B -m ashare_data.financials.limit_expansion read \
 
 ### 官方公告核验与日粒度历史读取
 
-`ashare_data.financials.official_expansion`（搭配系统 Swift 编译的 `scripts/extract-official-pdf.swift`）核实官方机构 ID 并分页抓取定期报告、更正与修订索引。经逐字段版面核验（`ad.official-field-review.v1`）后，可通过 `official_daily.reader` 在 `DAILY_MODE` 下执行有证据边界的日粒度历史查询：
+`ashare_data.financials.official_expansion` 核实官方机构 ID 并分页抓取定期报告、更正与修订索引。经逐字段版面核验（`ad.official-field-review.v1`）后，可通过 `official_daily.reader` 在 `DAILY_MODE` 下执行有证据边界的日粒度历史查询：
 
 ```python
 from ashare_data.financials.official_daily import reader

@@ -118,15 +118,7 @@ SQLAlchemy、fastcache、cached_property、six，未选择安装。仓库 LICENS
 
 ## Qlib Alpha158
 
-`ashare_data.factors.qlib_alpha158.Alpha158` computes the **official default**
-158 engineered features, not a count of effective strategies. Discovery uses
-`ashare_data.factors.catalog.catalog("qlib_alpha158")`; identifiers such as
-`qlib_alpha158:ROC5` are separate from GTJA `alpha191:alpha158`.
-Qlib v0.9.7 is pinned to `da920b7f954f48ab1bb64117c976710de198373e`.
-The packaged `features.json` records exact official order, expressions and
-lookback/lookahead; `qlib-license.txt` retains the Microsoft MIT license.
-The [official reference and comparator](../scripts/alpha158-reference.md) are
-independent test tooling. Production does not depend on Qlib or a model framework.
+`ashare_data.factors.qlib_alpha158.Alpha158` 计算官方默认的 158 个工程化特征（9 个 K 线特征 + 4 个当日价格比值 + 29 组 × 5 个滚动窗口），通过 `ashare_data.factors.catalog.catalog("qlib_alpha158")` 发现；标识符（如 `qlib_alpha158:ROC5`）与国泰君安 `alpha191:alpha158` 独立。Qlib v0.9.7 固定于提交 `da920b7f954f48ab1bb64117c976710de198373e`。随包 `features.json` 记录精确官方顺序、表达式与 `lookback/lookahead`；`qlib-license.txt` 保留 Microsoft MIT 许可原文。生产计算不依赖 Qlib 或模型框架。
 
 ```python
 from ashare_data.factors.qlib_alpha158 import Alpha158
@@ -139,43 +131,21 @@ result = Alpha158(
 values = result.between("2024-07-01", "2024-08-30").values
 ```
 
-`data` maps open/high/low/close/volume/vwap (optional unused amount) to
-numeric date × security DataFrames, exactly aligned to explicit Boolean
-`universe`. Dates are unique increasing timezone-naive midnight session labels.
-No resampling, collection, sorting, fill, price adjustment or VWAP inference occurs.
-Absent fields give `MISSING_DEPENDENCY`; NaN observations remain part of the grid.
-Price units are CNY/share and volume is shares; adjusted inputs require an
-`adjusted:<immutable snapshot/policy>` identity and same-basis OHLC/VWAP.
-Caller must describe actual `volume_basis` and `vwap_basis`. This implementation
-does not promise equality with an unspecified vendor's adjusted price/volume
-feed. Existing raw CMES amount/share-volume VWAP is a declared daily ratio, not
-certification of Qlib vendor VWAP, tick VWAP or total-return adjustment.
+`data` 将 `open/high/low/close/volume/vwap`（及可选未使用的 `amount`）映射为数值型 `date × security` DataFrame，并与显式布尔 `universe` 严格对齐。日期为唯一递增的无时区午夜会话标签；不做重采样、采集、排序、填充、复权或 VWAP 推导。缺失字段报 `MISSING_DEPENDENCY`；NaN 观测保留在网格中。价格单位为人民币元/股，成交量为股；复权输入须使用 `adjusted:<不可变快照/策略>` 身份及同口径 OHLC/VWAP。调用方须声明实际的 `volume_basis` 与 `vwap_basis`。
 
-Inputs are quantized to float32 like official local binary storage; intermediate
-operator dtypes follow Qlib and final values are float32. Infinite inputs and
-float32 input overflow are rejected; zero prices are permitted for explicit edge
-probes. Outputs preserve NaN and signed infinity. `status_labels()` distinguishes
-`QLIB_NAN`, `POSITIVE_INFINITY`, `NEGATIVE_INFINITY`, missing dependencies and
-membership exclusions. `QLIB_NAN` may mean missing observation, insufficient
-history or undefined arithmetic; it does not assert a single inferred cause.
-Finite CNTP can be zero even when all close inputs are NaN, as official comparisons
-return false. Do not replace these values using Alpha191's missingness policy.
+输入与官方本地二进制存储一致先量化为 float32；中间算子类型遵循 Qlib，最终值为 float32。拒绝无穷输入与 float32 溢出；零价格允许用于显式边界探针。输出保留 NaN 与带符号无穷，`status_labels()` 区分 `QLIB_NAN`、`POSITIVE_INFINITY`、`NEGATIVE_INFINITY`、缺失依赖与股票池排除。有限值 `CNTP` 在 `close` 全为 NaN 时也可为 0（官方比较算子对 NaN 返回 false），不得套用 Alpha191 的缺失策略替换。
 
-Rolling windows are 5/10/20/30/60, include today and use `min_periods=1`.
-`full_window_rows` means available context, **not** a compulsory warmup mask:
-MA60 can be available on day one; ROC60 needs 61 rows. Std uses ddof=1; Rank is
-the average tied percentile; IdxMax/Min uses the first one-based position and
-upstream NaN behavior. Corr/Rsquare preserve Qlib's absolute 2e-5 degeneracy rule.
-Only the expressions' original epsilon constants are used. No fitted processor,
-label, training, cross-security rank or model is added. Membership masks output
-only and does not erase calculation history. Optional `instrument_ranges` names
-every security's inclusive lifetime; missing rows within a lifetime still count
-as sessions. Compute over all needed history, then slice via `between`; metadata
-records the history start because floating-point recurrences depend on it.
+滚动窗口为 `5/10/20/30/60`（含当日，`min_periods=1`）。`full_window_rows` 表示可用上下文而非强制预热掩码：`MA60` 首日即可有值，`ROC60` 需 61 行上下文。标准差使用 `ddof=1`；`Rank` 取并列平均分位；`IdxMax/Min` 使用从 1 起的首次极值位置及上游 NaN 行为；`Corr/Rsquare` 保留 Qlib 的 `2e-5` 绝对退化阈值。股票池掩码只作用于输出，不抹除计算历史。
 
-AQ reuses frozen source registration, bounded workers and the existing evaluator.
-JSON/plots expose nonfinite values as null with their explicit status (and `inf`
-text for signed infinities); evaluator input uses only finite OK values. Raw
-feature exploration and adjusted evaluation-return prices remain separately
-identified in provenance. Package tests compare every official synthetic row and
-column, including IEEE masks, without selecting only a finite intersection.
+### 官方夹具校验与独立比较
+
+`scripts/alpha158_reference.py` 与 `tests/fixtures/alpha158-reference` 提供独立的官方对照校验与比较工具（只需 Python 标准库，回归测试见 `tests/test_alpha158_reference.py`）：
+
+```sh
+python3 scripts/alpha158_reference.py verify
+alpha158_fixture=tests/fixtures/alpha158-reference
+python3 scripts/alpha158_reference.py compare \
+  --candidate "$alpha158_fixture/expected.csv.gz"
+```
+
+如需在隔离环境重跑官方 Qlib v0.9.7 生成器，可使用独立项目定义 `scripts/alpha158-reference-environment/pyproject.toml` 与 `scripts/alpha158-reference-environment/uv.lock`。

@@ -20,7 +20,7 @@ DailyStatusResult.rows 是 frozen DailyStatusRow 元组。suspended/is_st 分别
 
 每行保留 capture/原记录/响应 hash、source_fields 副本、raw_json、同页末字节 response_received_at。策略 daily-source-status-2 核对时钟与 wall_clock_events，一致性错误 DAILY_STATUS_CLOCK_INVALID；记录的时钟失败保持 None。它不是历史发布时间或已认证响应完成；压缩外层未知时 received 仍拒绝，verified 报 PIT_UNAVAILABLE。historical_available_at/eligible=None，intraday_halts_verified/execution_permission=False。
 
-CLI：baostock-fetch daily_status、baostock-query statuses --capture ID [--require-known]；示例 `examples/daily_status.py`。
+CLI：baostock-fetch daily_status、baostock-query statuses --capture ID [--require-known]；示例见 `examples/baostock_demo.py`。
 
 ## 源前收
 
@@ -30,7 +30,7 @@ state 区分 source_observed、source_zero、field_not_requested、row_missing_u
 
 price_basis=`source_reference_adjustflag_3`，单位 CNY/share。来源明确在除权除息时可调整 preclose，所以它**不是前一日实际 raw close**。不计算限价、复权因子或事件完整性，也不把字段与前行close对齐/回填。保留 request/source_adjustflag、definition_version、来源字段/证据及完整 hash。
 
-投影 source-preclose-1、capture baostock-source-preclose-1/receipt-4.1 与旧 capture 分开；未请求该字段返回 field_not_requested，不自动补采。时钟绑定错误 SOURCE_PRECLOSE_CLOCK_INVALID；historical_available_at/reference_price_eligible=None，PIT/events_complete/execution_permission=False。CLI baostock-fetch daily_preclose、baostock-query preclose；示例 `examples/preclose.py`。
+投影 source-preclose-1、capture baostock-source-preclose-1/receipt-4.1 与旧 capture 分开；未请求该字段返回 field_not_requested，不自动补采。时钟绑定错误 SOURCE_PRECLOSE_CLOCK_INVALID；historical_available_at/reference_price_eligible=None，PIT/events_complete/execution_permission=False。CLI：baostock-fetch daily_preclose、baostock-query preclose。
 
 ## 源日历
 
@@ -40,7 +40,7 @@ SourceCalendarFlag 保存 is_trading_day 原串：1/0→True/False，成功空�
 
 `get_calendar_links(trading_dates=[...])` 接受1～31个唯一 date/规范日期串，按输入顺序返回。每个锚点必须是同一 capture 内已知开市日；previous_open/next_open 必须严格早/晚，所跨全部自然日有据关闭。越出捕获范围、没有邻日、未知链或闭市锚点分别报 OUT_OF_SCOPE、BOUNDARY_UNKNOWN、UNKNOWN、NOT_OPEN（SOURCE_CALENDAR_ 前缀）；不拼 capture、不凭周末推算或退回当天。
 
-links.evidence_rows 保留完整自然日链；日期/timezone错误、同页接收与事件不一致拒绝。exchange_scope=provider_calendar_unspecified_exchange，没有认证各交易所个股资格、session、历史可见或最终性。批量任一失败整体拒绝。CLI baostock-query calendar [--require-known]、calendar-links --dates；后者不接受 require-known。示例 `examples/source_calendar.py`。
+links.evidence_rows 保留完整自然日链；日期/timezone错误、同页接收与事件不一致拒绝。exchange_scope=provider_calendar_unspecified_exchange，没有认证各交易所个股资格、session、历史可见或最终性。批量任一失败整体拒绝。CLI：baostock-query calendar [--require-known]、calendar-links --dates；后者不接受 require-known。
 
 ## 上市事实
 
@@ -55,7 +55,7 @@ links.evidence_rows 保留完整自然日链；日期/timezone错误、同页接
 
 事件日期、文件发布日期、实际收件时间分别保留。新包文件元数据为2018-08-24 17:12:17但来源未标时区，保持 None；必需证据接收完成为2026-10-10T04:43:49.030165+00:00，不倒填为2018历史可见。默认 posthoc 不接隐式 knowledge_at；received 要求 aware knowledge_at≥接收完成，verified 始终 PIT_UNAVAILABLE。返回副本与原 PDF/元数据定位可追溯，时间仍不证明当时系统采用该事实。
 
-listing_fact_snapshots/recover_listing_facts 显式列出/恢复，新旧版本共存；CLI 与最小例见 `examples/listing_fact.py`。
+listing_fact_snapshots/recover_listing_facts 显式列出/恢复，新旧版本共存。
 
 ## 固定日历
 

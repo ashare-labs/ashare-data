@@ -155,7 +155,7 @@ def test_technical_and_current_window_are_not_publication_freshness():
 def test_stock_directory_keeps_migration_aliases_and_excludes_b_and_cdr(tmp_path, monkeypatch):
     import importlib.util
     from pathlib import Path
-    spec = importlib.util.spec_from_file_location("universe_export_test", Path(__file__).resolve().parents[1]/"scripts/prepare_free_update_universe.py")
+    spec = importlib.util.spec_from_file_location("universe_export_test", Path(__file__).resolve().parent / "support/prepare_free_update_universe.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     from ashare_data.providers.free_update_disclosures import DIRECTORY

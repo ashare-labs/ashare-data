@@ -14,7 +14,6 @@ ashare-data free-updates plan --rows 17 18 19 --context scope.json
 ashare-data free-updates collect --root captures/cmes-free --rows 17 18 19 --context scope.json
 ashare-data free-updates query --root captures/cmes-free --row 17 --limit 5
 ashare-data free-updates report --root captures/cmes-free --output acceptance.json
-python scripts/verify_free_updates.py --root captures/cmes-free --output captures/cmes-free/verification.json
 ```
 
 `scope.json` 可以是 `{"stock_upper":"SH600000"}`，也可以是多个明确范围对象的列表。
@@ -67,7 +66,7 @@ python scripts/verify_free_updates.py --root captures/cmes-free --output capture
 原候选和替换原因仍在清单中，统计月与发布日期分开，预测值和缺失公告日期不补造。
 年度数据按年度统计期核对新旧，金十空实际值的预测行不用于提升新鲜度。
 
-`scripts/report_free_update_coverage.py` 导出原始 198 行、当前样本范围、采集与最新数据日期、
+覆盖报告导出原始 198 行、当前样本范围、采集与最新数据日期、
 逐项完整覆盖缺口和阻塞类别。401/403 只证明接口拒绝，不能据此认定用户需要购买权限。
 
 宏观审核保留统计期、发布日、修订版本和原始单位。工业增加值的缺失单月值不以累计值填充；
@@ -137,7 +136,7 @@ Bao 分钟原始17位标签保留毫秒，按 Asia/Shanghai 解释；bar_start/b
 
 上限须带时区、秒精度、最多6位小数的 datetime/ISO；纯日期、无时区及隐式截断拒绝。窗口前上限返回空表，窗口后返回现存行，均不推断市场不存在数据。selection 单独记录上限，原 query_complete 不随筛选升级；筛选 lineage 不泄出窗口外原行，审计完整回执须另开原视图。标签筛选不是恶意同进程策略沙箱。
 
-状态、源前收、源日历与邻接日的 typed API 和错误见 [参考数据](reference-data.md)。CLI 使用 baostock-fetch、baostock-import、baostock-query；示例见 `examples/baostock_demo.py`、`examples/baostock_minute_demo.py`、`examples/baostock_cutoff.py`。
+状态、源前收、源日历与邻接日的 typed API 和错误见 [参考数据](reference-data.md)。CLI 使用 baostock-fetch、baostock-import、baostock-query；示例见 `examples/baostock_demo.py`。
 
 ## tdx-分钟柱
 
@@ -180,7 +179,7 @@ price 为元/股；volume_lots 整数手，volume_shares=手×100 不恢复不�
 | closing_auction_matching | 显式角色，保留14:57边界与14:58–15:00，逐条到模型时刻才可读 |
 | jq_daily_initial_capacity | 显式引擎事后容量政策，可提前取同日 volume；不含日 close，strategy_visible=False/non_pit=True |
 
-phase 分类仍 unverified，零量不删除或证明停牌。源 bar_start/bar_end/available_at 保持 null；普通日数据 replay_available_at 不早于15:00，容量另列 model_access_at。export 是引擎完整输入，不是策略历史快照。`examples/tdx_minute_session.py CONFIG OUTPUT` 拒绝覆盖已有输出；[分钟证据门禁](historical-market.md#分钟证据) 保持独立。
+phase 分类仍 unverified，零量不删除或证明停牌。源 bar_start/bar_end/available_at 保持 null；普通日数据 replay_available_at 不早于15:00，容量另列 model_access_at。export 是引擎完整输入，不是策略历史快照；[分钟证据门禁](historical-market.md#分钟证据) 保持独立。
 
 ## zzshare
 
@@ -197,7 +196,7 @@ strict=True 拒绝缺自然日/未知必需字段，False 可看部分数据；�
 
 无重试或重定向；拒绝、限流（保存 Retry-After）、连接/截断/API/schema/身份错误明确区别。新捕获保留去敏感头的有序 response_header_pairs，任何重复 Content-Length 或长度不符拒绝；旧字典回执标记重复头不可知，不伪造证据。发布成功仅是封存，失败 capture 的 daily 查询仍抛原错误。
 
-当前 projection-2 与 research-1 清单分开：同原件保持同 capture_id，复现还需固定 wheel。historical_available_at=None，PIT/完整覆盖/事件覆盖/执行许可均 False。CLI 为 zzshare-import/fetch/query/snapshots/recover --enable-research，最小示例 `examples/zzshare.py`。
+当前 projection-2 与 research-1 清单分开：同原件保持同 capture_id，复现还需固定 wheel。historical_available_at=None，PIT/完整覆盖/事件覆盖/执行许可均 False。CLI 为 zzshare-import/fetch/query/snapshots/recover --enable-research。
 
 ### 免费来源冻结队列
 
@@ -211,7 +210,7 @@ strict=True 拒绝缺自然日/未知必需字段，False 可看部分数据；�
 
 经审核的直连宏观报告在 `free-updates plan/collect` 上支持显式 `--source-start`、`--source-end` 与 `--page-size`。来源日期过滤使用经审核的报告期字段（LPR 使用 `TRADE_DATE`）。各分页须与来源声明总数一致，空页、重复页、日期过滤失效或期次冲突均判定失败。行业指标保留精确返回 ID 与名称，完全重复的行业投影在去重前显式计数，原始响应保持不可变。
 
-`scripts/verify_free_update_history.py --root <isolated-store> --rows 156 170 174 176 --as-of YYYY-MM-DD --seed-end YYYY-MM-DD --delta-start YYYY-MM-DD --output proof.json` 预演五阶段验证（加 `--execute` 执行）：采集种子历史、无变化重复采集、重叠后续日期窗口、完整来源历史及第二次完整重复采集。验证使用带阶段检查点的独立子存储，重叠部分与新增行须与完整来源及按接收时间查询结果完全一致。
+五阶段验证涵盖：采集种子历史、无变化重复采集、重叠后续日期窗口、完整来源历史及第二次完整重复采集。验证使用带阶段检查点的独立子存储，重叠部分与新增行须与完整来源及按接收时间查询结果完全一致。
 
 覆盖报告重新核验原始响应哈希、精确请求 URL、分页、数据库链接、语义校验与当前实现身份。报告中的 `coverage_verified` 与样本 `implementation_verified`、`daily_deployment` 相互独立。对小型月度报表而言，每日全历史读取开销受控且能捕获早期修订，内容去重避免制造虚假的逐日统计观测。
 
@@ -231,7 +230,7 @@ strict=True 拒绝缺自然日/未知必需字段，False 可看部分数据；�
 
 公共查询为 `MarketRelease(...).native_macro()`，也可使用 `ashare-data native-macro query/point`。CLI 必须显式提供 release 和 manifest SHA。查询指定原表行号、原字段及统计期；`received_by` 只表示本地实际接收时点，不能当作首次公告可见时间。源修订及改回旧值各保留版本，旧 release 和已有行情/证券身份保持不变。无变化交接只追加采集证据和计数，不重复写宏观事实行。
 
-`scripts/verify_native_macro_release.py` 在新的隔离验证目录中，将明确提供的两份真实采集交接包从候选、公共发布、原子指针恢复验证到 CLI 查询。宿主发布及行情哨兵是合成夹具，宏观数据和回执来自输入包；它不联网，也不操作正式根或加载定时器。
+隔离验证目录中可将两份真实采集交接包从候选、公共发布、原子指针恢复验证到 CLI 查询。宿主发布及行情哨兵是合成夹具，宏观数据和回执来自输入包；它不联网，也不操作正式根或加载定时器。
 
 新增的月度原始表契约保留新浪四张表的原始字段、单位和统计月，遇字段或单位变化即拒收；同花顺人民币存款、贷款、股票筹资保留网页原始表头。存款页的“新增”表头实际对应余额，贷款页的“累计”列是余额；映射会明确标注，不改成当月或年内新增。当前月筹资是截至采集时的累计观察，缺值不补零。新浪黄金数量为万盎司，东方财富黄金储备为亿美元金额，两条序列分别保留。
 
@@ -252,7 +251,7 @@ Shibor 保留全部八期限：利率为年化百分率，变动为 BP，按相�
 
 巨潮公司概况和 IPO 日程按原生字段名重新解析，保留所有原始字段并核对 `count/total`、请求代码、POST 方法及正文哈希。注册资本是万元，成立日和上市日不代表资料更新时间；近三年 IPO 窗口不是全部发行历史。`F042N` 网上申购上限单位尚未证实，明确保留缺口，不擅自换算。可转债原生表的 `ONLINE_GENERAL_AAU` 是千元，与 `ISSUE_PRICE` 发行价区分；缺失行情不填面值。未来合同到期日、公布发行日程与实际观察日期分开，未核实的退市迁移或分离债身份阻止整批通过，不静默过滤。
 
-`prepare_free_update_universe.py --kind stock-directory` 只从已有哈希校验的巨潮公告目录回执冻结全部 A 股目录身份；保留同一机构的旧、新证券代码，列出排除的 B 股和 CDR。目录缺少现役上市状态，不能称为当前全市场名单；据此生成的全目录采集计划仍需逐任务执行和验收。
+`tests/support/prepare_free_update_universe.py --kind stock-directory` 只从已有哈希校验的巨潮公告目录回执冻结全部 A 股目录身份；保留同一机构的旧、新证券代码，列出排除的 B 股和 CDR。目录缺少现役上市状态，不能称为当前全市场名单；据此生成的全目录采集计划仍需逐任务执行和验收。
 
 房价与地区碳行情由 `free_update_regional_prices` 读取命名字段及完整分页/图表。房价同比、环比是基准 100 的指数，固定基期分别保留，缺失定基值不补写；湖北碳图表的空白日期仍入原始证据，未解释的 `zx` 不当作行情价格。来源窗口验收与最新官方发布对账分开，第二次真实读取零新增不等于已观察跨发布周期。
 
@@ -260,31 +259,31 @@ Shibor 保留全部八期限：利率为年化百分率，变动为 BP，按相�
 
 新浪分钟适配器保留原生时间文本、周期及代码，严格校验 OHLC、重复标签和量。夜盘归属、区间起止和实际交割合约身份未确认时，`trading_date`、`timestamp` 保持空值；日线验证不能代替分钟语义验证。最近窗口的全部返回数据不等于完整历史。
 
-`scripts/audit_futures_minute_alignment.py` 只重放已有回执，比较完整分钟区间的左右标签假设，按 Decimal 对账 OHLC、成交量及末持仓。未结束日期、窗口截断及含缺失分钟的区间单列；不补分钟、不修改原值，也不将样本吻合视为供应商时间定义。
+`tests/support/audit_futures_minute_alignment.py` 只重放已有回执，比较完整分钟区间的左右标签假设，按 Decimal 对账 OHLC、成交量及末持仓。未结束日期、窗口截断及含缺失分钟的区间单列；不补分钟、不修改原值，也不将样本吻合视为供应商时间定义。
 
 搜猪省级排行榜用 `soozhu_province_rank` 读取原页面 `provincerank` 响应，保留源展示次序和缺失省份。地图接口的无序数据不再冒充排行榜。价格为页面所示元/公斤；原始变化文本保留，不标为百分数。页面更新时间由浏览器时钟生成，不能推成数据发布日期；快照沿用实际接收时间。来源当前列表覆盖不意味着全国各省齐全或历史排名完整。
 
-`scripts/run_verified_free_updates.py --runtime-manifest <frozen.json> --boundaries <bounds.json> --output <reports>` 提供冻结入口的手动预览；加 `--execute` 运行一次。执行前检查 UID、全部包文件与配置哈希，通过独立安装解释器的 `-I` 模式调用采集器。成功后只从哈希已验证的完整交接快照导出逐行 CSV，单位和实际接收时间写入 `result.json`；失败返回非零状态并保留日志，不把旧导出当本次成功。该脚本不加载定时器、不处理权限弹窗、不正式发布。
+`tests/support/run_verified_free_updates.py --runtime-manifest <frozen.json> --boundaries <bounds.json> --output <reports>` 提供冻结入口的手动预览；加 `--execute` 运行一次。执行前检查 UID、全部包文件与配置哈希，通过独立安装解释器的 `-I` 模式调用采集器。成功后只从哈希已验证的完整交接快照导出逐行 CSV，单位和实际接收时间写入 `result.json`；失败返回非零状态并保留日志，不把旧导出当本次成功。该脚本不加载定时器、不处理权限弹窗、不正式发布。
 
 对已核实完整来源窗口的条目，可用 `free-updates run-manual --config <profile.json> --execute`。配置采用 `ad.free-update-manual.v1`，显式列出 `rows`、`root` 和必要的 `context`，仅接受已审阅条目；房价必须提供两个城市参数均为“全部”。同一轮按来源节流和检查点续跑；18项、单并发、75秒/任务、每天最多2次尝试为上限。每项重新解析真实回执，核对日期、单位、业务键、总数及数据库读回，再独立生成不可变的本机快照和CSV。某项失败不会将其旧数据导出为新成功，也不阻止其他项读取；整体有失败时退出码为2。
 
 边界记录的 `mode: manual-source-windows` 让冻结入口使用上述手动模式，不依赖或加载 plist。`free-updates manual-query --snapshot <snapshot-directory> --offset 0 --limit 1000` 返回固定快照的当前页及 `next_offset`；整个翻页过程固定同一快照ID，后来的修订不会混入旧页面。历史查询仍使用 `free-updates query`。来源全历史声明下旧键消失会拒收；近期滚动窗口移出旧键时只记录窗口变化，不删除历史，两个窗口不重叠时报告可能漏采。原始接收时间、统计期和正式发布日期各自保留；下一次真实发布尚未观察不能写成已观察。
 
-`scripts/prepare_futures_universe.py` 按来源导航逐节点冻结期货目录和原始回执，断点续传须校验原响应哈希与节点身份。它不把供应商目录当交易所全部上市品种。只有 `futures-product-contracts.json` 已核报价单位、合约量纲的主连可以形成试采任务；未核品种留在目录，不猜单位。周、月以日线派生并重读当前未结束周期，主连与交割合约、换月和复权仍须分别验收。
+期货目录和原始回执按来源导航逐节点冻结，断点续传须校验原响应哈希与节点身份。它不把供应商目录当交易所全部上市品种。只有 `futures-product-contracts.json` 已核报价单位、合约量纲的主连可以形成试采任务；未核品种留在目录，不猜单位。周、月以日线派生并重读当前未结束周期，主连与交割合约、换月和复权仍须分别验收。
 
-本机验收只保留一个最新入口，由 `scripts/merge_free_update_acceptance.py` 合并显式逐行证据，再经 `scripts/build-free-update-acceptance.mjs` 更新原布局 XLSX，最后由 `scripts/export_free_update_acceptance.py` 导出 CSV/JSON 并原子更新 `latest.json`。XLSX 脚本使用文档运行环境提供的 `@oai/artifact-tool`，不属于 Python 采集器依赖。入口校验原表的 198 行身份、原字段和版本绑定；历史台账与原始回执保留。以上命令不上传文件、不加载调度、不修改正式数据根。
+本机验收只保留一个最新入口，校验原表的 198 行身份、原字段和版本绑定；历史台账与原始回执保留，不上传文件、不加载调度、不修改正式数据根。
 
 涨跌停池按原生命名字段读取，核对数量、证券身份及封板时钟；北交所 `920` 号段的来源市场值也是 `0`，不能由该值直接推定深市。统计天数 `days` 与涨停次数 `ct` 分列保存，炸板池允许两项均为零。历史日期请求曾返回不同 `qdate`，因此有效交易日保持未知：不一致的响应拒收，相等也不自动通过时间语义验收。流通市值高于总市值的源差值全部保留并列为缺口，不设置放宽阈值凑通过。
 
 主营构成按发行人、报告期、分类类型和构成项保留原字段。金额为元，比例为小数比例，页面乘100显示百分数；缺失成本、利润、毛利率不补值。收入、成本和利润关系不一致时保留缺口，尤其不能把保险公司的行业口径猜成通用公式。报告期不是公告可见日，未提供公告时间的响应只能从首次实际接收时点可见。读取一个发行人当前返回的全部行，不等于该发行人全历史或全市场完整覆盖。
 
-股票、ETF、指数的指定名单使用 `scripts/run_security_update_batch.py --profile profile.json` 预览；加 `--execute` 才采集。`ad.security-update-batch.v1` 配置明确给出 `root`、`rows`、`instruments`（`asset_type`、新浪带市场前缀的 `symbol`）、`max_jobs` 和 `lookback_days`。名单最多 10000 个身份，每轮至多 120 个独立请求，默认单并发、75 秒超时、每天两次失败尝试；`--max-jobs` 只能缩小配置预算。配置冻结后不原地改名单，扩大名单需新配置和新的隔离观察根。重复运行按当日检查点续跑，不重新请求已完成任务；在根目录创建 `STOP` 可在任务边界暂停，移除后继续。当前行 60/61 共享股票原生日线请求，不重复采集包装条目。
+股票、ETF、指数的指定名单通过 `ashare_data.providers.free_update_batch` 驱动。`ad.security-update-batch.v1` 配置明确给出 `root`、`rows`、`instruments`（`asset_type`、新浪带市场前缀的 `symbol`）、`max_jobs` 和 `lookback_days`。名单最多 10000 个身份，每轮至多 120 个独立请求，默认单并发、75 秒超时、每天两次失败尝试；`--max-jobs` 只能缩小配置预算。配置冻结后不原地改名单，扩大名单需新配置和新的隔离观察根。重复运行按当日检查点续跑，不重新请求已完成任务；在根目录创建 `STOP` 可在任务边界暂停，移除后继续。当前行 60/61 共享股票原生日线请求，不重复采集包装条目。
 
-`scripts/query_security_update_batch.py --result <result_path> --row 61 --date YYYY-MM-DD` 按交易日跨证券读取，`--row 60 --symbol sh600000` 按股票读取；分钟、因子和日历也支持对应的原生日期。`--offset`、`--limit` 逐页返回，必须固定不可变的 `result_path`，不使用会变化的 `batch-latest.json`。日期无记录明确返回零条，范围尚未采集则报错。查询不联网，也不把后来快照混进此前页面。
+`tests/support/query_security_update_batch.py --result <result_path> --row 61 --date YYYY-MM-DD` 按交易日跨证券读取，`--row 60 --symbol sh600000` 按股票读取；分钟、因子和日历也支持对应的原生日期。`--offset`、`--limit` 逐页返回，必须固定不可变的 `result_path`，不使用会变化的 `batch-latest.json`。日期无记录明确返回零条，范围尚未采集则报错。查询不联网，也不把后来快照混进此前页面。
 
 每个证券、周期独立保存可翻页的 JSON/CSV 快照，`batch-latest.json` 列出成功、尚未尝试与失败任务，退出码 2 表示仍有未完成项。当天成功请求重复运行不会盘中刷新；下一自然日会重新取得滚动窗口，重叠键比较新增与修订，窗口外历史保留。盘中捕获的当日日线仍会变化，不当作收盘定值。新浪分钟最多 800 根/证券/周期；间隔过长可能漏出源窗口，系统明确记录缺口，不凭空补齐。股票日线保留原生未复权价和数量，前后复权因子单列为新浪口径；交易日历只交付 2010 年至采集日已返回日期，不声称未来官方日程。
 
-财报复用 `scripts/run_legacy_financial_scope.py --profile profile.json --execute`。`ad.legacy-financial-scope.v1` 指定哈希绑定的 `source_universe`、`source_universe_sha256`、证券 `symbols`、报告起点 `start`、隔离 `root` 和 `max_jobs`；每家公司分别请求资产负债表、利润表、现金流量表。日期分批保存，已完成任务续跑零请求，跨日保留拒绝与冷却状态；未知原字段及原单位保留，公告日和报告期分开，不制造精确首次披露时刻。配置支持较大名单不代表已经实测全部公司。两个批量入口均不安装定时器，不调用正式发布器，不修改现有日常配置。
+财报复用 `tests/support/run_legacy_financial_scope.py --profile profile.json --execute`。`ad.legacy-financial-scope.v1` 指定哈希绑定的 `source_universe`、`source_universe_sha256`、证券 `symbols`、报告起点 `start`、隔离 `root` 和 `max_jobs`；每家公司分别请求资产负债表、利润表、现金流量表。日期分批保存，已完成任务续跑零请求，跨日保留拒绝与冷却状态；未知原字段及原单位保留，公告日和报告期分开，不制造精确首次披露时刻。配置支持较大名单不代表已经实测全部公司。两个批量入口均不安装定时器，不调用正式发布器，不修改现有日常配置。
 
 可转债指定名单也使用该批量入口，`asset_type: convertible_bond`，行38–42及54；每个身份必须带目录名称和证据。配置的 `tdx` 对象明确 `host`、`sdk_python`、`sdk_sha256`，只调用已有且按全部源码/原生库哈希固定的 eltdx 3.0.3。每次单节点、单连接、单页最多800根，2秒间隔、22秒子进程上限；无节点探测、自动安装或失败换源。原始wire与SDK解码值同时保存并离线重解析；价格使用原整数毫元，量额保持原生字段，不套用股票手/股换算。
 
@@ -319,7 +318,7 @@ v2 使用 `budget_scope: observation_store`，`http_requests_per_day` 和 `respo
 
 央行社融增量入口直接读取官方当年表，保留人民币亿元单位、月度增量、未发布月份空位与实际接收时点。统计月份不冒充公告日期。油价入口发现最新发改委政策公告及上海车用汽柴油价格表：全国调整额为元/吨，上海最高零售价分别保留元/吨和元/升；优先取公告明确的实际执行调整额，区分理论涨幅，不猜转换密度，不将上海价格称为全国各省或实际加油站成交价。公告日期与生效时刻分列，24时转次日零时。
 
-`python scripts/repair_customs_snapshot.py OLD_SNAPSHOT ISOLATED_REPLACEMENTS` 为退休的错误海关单位快照生成新身份。原生数值和原接收时刻保留，四项金额的注记改为千美元，贸易差额按明确公式派生；新清单绑定原清单与记录哈希。旧证据不可变，当前读者继续拒绝旧错误标签。修复可安全重复，不联网、不写正式数据根。
+退休的错误海关单位快照须生成新身份：原生数值和原接收时刻保留，四项金额的注记改为千美元，贸易差额按明确公式派生；新清单绑定原清单与记录哈希。旧证据不可变，当前读者继续拒绝旧错误标签。修复可安全重复，不联网、不写正式数据根。
 
 可转债基本资料通过公开HTTP入口独立执行，不要求本机通达信SDK；可转债K线、原生财务与盘口仍各自保留SDK运行条件。F10公司资料、主营构成和估值属于现有HTTP入口，不应归入Python3.13后台权限组。
 
@@ -339,9 +338,9 @@ v2 使用 `budget_scope: observation_store`，`http_requests_per_day` 和 `respo
 
 东财成分候选 `free_update_board_members` 按原生BK代码请求官网配置的当前成员分页，核对每页数量、总数稳定和跨页身份唯一。原生市场路由码0不直接转换为深圳证券，以免误标北交所成员。该候选的系统curl传输保持普通请求标识、现有系统代理、正常TLS和原有请求预算；不读取curlrc、不生成cookie、不跟随重定向、不在请求内重试。访问拒绝或传输失败仍进入原冷却流程。只收到部分页面不导出“完整成员”快照，候选代码存在不等于当次真实接入已通过。
 
-第二批19项保存在独立 `supplemental-menu.json`，与首批198项身份互斥。`scripts/run_supplemental_updates.py --source-index index.json --root isolated-output` 读取已验证快照列表，生成独立不可变快照及 `latest.json`，不联网、不安装调度、不增加首批完成数。输入索引的 `manual_snapshot_queries` 每项至少包含 `function` 与 `snapshot`；引用快照的内容哈希、来源语义与记录数重新检查。
+第二批19项保存在独立 `supplemental-menu.json`，与首批198项身份互斥。`ashare_data.providers.free_update_supplemental` 读取已验证快照列表，生成独立不可变快照及 `latest.json`，不联网、不安装调度、不增加首批完成数。输入索引的 `manual_snapshot_queries` 每项至少包含 `function` 与 `snapshot`；引用快照的内容哈希、来源语义与记录数重新检查。
 
-在线增量使用 `scripts/run_supplemental_updates.py --profile second.json --execute`；省略 `--execute` 只预览。`ad.supplemental-19-batch.v1` 配置指定隔离 `root`、固定种子 `source_index`、可读取最新成功快照的 `source_roots`、七个 `csi_indices`、`topic_securities` 和 `daily_securities`。调用从上游最新快照刷新索引；当日已成功的名单、股票日线和题材复用，下一个本地自然日打开新检查点。`--max-jobs` 控制单次工作块，未完成可续跑；`root/STOP` 暂停新请求，移走后恢复。原始回执、失败信息、旧快照及修订保留，失败或空响应不替换有效快照。
+在线增量通过 `ad.supplemental-19-batch.v1` 配置指定隔离 `root`、固定种子 `source_index`、可读取最新成功快照的 `source_roots`、七个 `csi_indices`、`topic_securities` 和 `daily_securities`。调用从上游最新快照刷新索引；当日已成功的名单、股票日线和题材复用，下一个本地自然日打开新检查点。`--max-jobs` 控制单次工作块，未完成可续跑；`root/STOP` 暂停新请求，移走后恢复。原始回执、失败信息、旧快照及修订保留，失败或空响应不替换有效快照。
 
 七个中证官方名单与国证399006当前样本先采集，再将全部成员去重后按100只股票共享一次新浪报价请求。八个指数各自列出成员数、行情覆盖数、缺少的代码、较旧报价日期及零成交字段，不把共有股票算成多次独立采集。国证当前样本接口与月度权重文件区分；当前文件只有部分权重数值，其余保留空值和原文，不影响成员身份和行情。新浪报价的价格不复权，成交量为股、成交额为元，原日期、时间、尾字段保留；不宣称尾字段含义或报价最终性。热点题材使用旧TDX F10个股题材名称/说明，`ztrq/rxsj/gld`等未知含义字段原样保留，不解释为已确认公告时间或全市场热度榜。
 

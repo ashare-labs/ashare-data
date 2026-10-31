@@ -9,7 +9,7 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 
 
-spec = importlib.util.spec_from_file_location("financial_scope", Path(__file__).parents[1] / "scripts/run_legacy_financial_scope.py")
+spec = importlib.util.spec_from_file_location("financial_scope", Path(__file__).resolve().parent / "support/run_legacy_financial_scope.py")
 recipe = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(recipe)
 
