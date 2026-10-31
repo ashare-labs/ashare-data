@@ -1,5 +1,12 @@
 # 更新记录
 
+## 0.10.0.dev98
+
+- Integrate scoped public-source incremental collectors, their separate supplemental data packages, frozen daily dispatch, and query/readback tools.
+- Retain the recoverable all-market daily-update CLI, explicit source continuation, and original financial archive pagination recovery without replacing newer release readers.
+- Preserve source definitions, original capture times, snapshot identities, shared cooldowns, and separate collection/publication responsibilities. Existing installed collectors remain pinned until explicitly migrated or upgraded.
+- Update the large-selection regression to the current complete-read contract; keep invalid-selection and explicit missing-coverage checks.
+
 ## 0.10.0.dev20
 
 - Add isolated `qlib_alpha158` namespace with the official v0.9.7 default 158 features, explicit float32/input-basis contracts, and independently generated reference comparisons. Preserve CMES, Alpha191 and evaluation APIs.

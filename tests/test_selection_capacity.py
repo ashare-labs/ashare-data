@@ -6,7 +6,9 @@ from ashare_data import DataError
 from ashare_data.factors.evaluation import EvaluationConfig
 from ashare_data.product import LocalDailyProduct
 from ashare_data.product.daily import _selection
-from tests.test_local_daily_product import library as library
+from tests import test_local_daily_product as daily_fixtures
+
+library = daily_fixtures.library
 
 
 @pytest.mark.parametrize("count", [101, 300, 5000])
@@ -30,15 +32,18 @@ def test_complete_selection_returns_every_registered_security(library, count):
     assert (root / "daily.sqlite3").stat().st_mtime_ns == before
 
 
-def test_removed_count_gate_keeps_selection_and_row_budget_checks(library):
+def test_removed_count_gate_keeps_selection_and_explicit_missing_coverage(library):
     for ids in ([], ["600000.XSHG", "600000.XSHG"], ["invalid"]):
         with pytest.raises(DataError):
             _selection(ids, "2010-01-01", "2025-01-01", "auto")
-    with pytest.raises(DataError) as refused:
-        LocalDailyProduct(library[0]).prices([f"{600000+i}.XSHG" for i in range(5000)],
-                                           library[1][0], library[1][-1])
-    assert refused.value.code == "PRODUCT_RESOURCE_LIMIT"
-    assert "security sessions" in refused.value.message
+    ids = [f"{600000+i}.XSHG" for i in range(5000)]
+    result = LocalDailyProduct(library[0]).prices(ids, library[1][0], library[1][-1])
+    assert result["securities"] == ids
+    assert {row["security"] for row in result["coverage"]} == set(ids)
+    assert len(result["coverage"]) == len(ids)
+    assert sum(row["returned_days"] for row in result["coverage"]) == len(result["rows"])
+    assert result["rows"] and result["gaps"]
+    assert {row["security"] for row in result["rows"]} <= set(ids)
 
 
 def test_evaluation_minimum_has_no_invented_upper_count():

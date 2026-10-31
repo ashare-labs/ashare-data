@@ -4,10 +4,12 @@ import json
 import hashlib
 
 from test_market_release import metadata, manifest
-from test_local_minute_product import deployment as deployment
+import test_local_minute_product as minute_fixtures
 from ashare_data.product.minute import LocalMinuteProduct
 from ashare_data.product.released_references import ReleasedReferences
 from ashare_data.storage.market_release import MarketRelease, ReleaseWriter, connection
+
+deployment = minute_fixtures.deployment
 
 
 def test_published_minutes_beyond_one_hundred_thousand_are_complete(tmp_path):
