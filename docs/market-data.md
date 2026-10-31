@@ -93,7 +93,7 @@ CLI 的 `price` 支持 --as-of/--visibility/--coverage-contract/--require-comple
 | get_security_info | 当前名称/代码/交易所，上市等未知字段为 None |
 | get_all_securities | 未支持，不生成历史股票池 |
 
-`ashare_data.providers.joinquant_style.JQStyle` 另提供绑定明确 Snapshot 的高级离线适配，返回带 snapshot_id 的字典，见 [固定快照](snapshots.md)。其用户声明的分钟契约不能直接套到新浪源；它不加载账号、策略或回测引擎。已有 JQ 固定响应的导入和限制见 [观察数据](observations.md)。
+`ashare_data.providers.joinquant.joinquant_style.JQStyle` 另提供绑定明确 Snapshot 的高级离线适配，返回带 snapshot_id 的字典，见 [固定快照](snapshots.md)。其用户声明的分钟契约不能直接套到新浪源；它不加载账号、策略或回测引擎。已有 JQ 固定响应的导入和限制见 [观察数据](observations.md)。
 
 ## 已登记本地分钟行情查询
 

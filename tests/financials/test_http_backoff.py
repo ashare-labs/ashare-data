@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from ashare_data.financials.http_backoff import diagnostics, failure, retry_after, success
+from ashare_data.financials.expansion import diagnostics, failure, retry_after, success
 
 
 def test_headers_case_http_date_and_clock_skew_are_respected():

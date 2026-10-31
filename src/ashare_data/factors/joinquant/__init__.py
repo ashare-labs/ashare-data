@@ -1,6 +1,6 @@
 """Explicit factor calculations over supplied, validated research inputs."""
 
-from ashare_data.financials.validation import AcceptanceError
+from ashare_data.financials.ledger import AcceptanceError
 from ashare_data.financials.ledger import (
     FinancialLedger,
     InputUnavailable as FinancialInputUnavailable,

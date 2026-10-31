@@ -67,7 +67,7 @@ def audit(root):
         if store.db.execute(
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name='source_captures'"
         ).fetchone():
-            from ashare_data.providers.baostock_collection import read_capture, verify_capture
+            from ashare_data.providers.baostock_receipt.baostock_collection import read_capture, verify_capture
 
             for row in store.db.execute("SELECT id,path FROM source_captures"):
                 try:

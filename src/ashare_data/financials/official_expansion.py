@@ -30,7 +30,7 @@ from ashare_data.financials.expansion import (
     PRESERVE_TEMPORARIES, atomic, digest, encoded, immutable, now,
     preserve_temporaries, security,
 )
-from ashare_data.financials import http_backoff
+from ashare_data.financials import expansion as http_backoff
 
 SCHEMA = "ad.official-financial-batch.v1"
 NORMALIZER_SHA256 = digest(Path(__file__).read_bytes())

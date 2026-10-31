@@ -13,7 +13,7 @@ import re
 import zlib
 
 from ashare_data.market.client import _security
-from ashare_data.providers.baostock_collection import FIELDS, read_capture, verify_capture
+from ashare_data.providers.baostock_receipt.baostock_collection import FIELDS, read_capture, verify_capture
 from ashare_data.storage.local_daily import digest, parse_day
 from ashare_data.providers.daily_sources import decimal, validate_bars
 

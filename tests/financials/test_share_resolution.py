@@ -7,7 +7,7 @@ import pytest
 
 from ashare_data.corporate_actions.share_charts import chart_observation, structure_charts
 from ashare_data.financials import expansion as e
-from ashare_data.financials.expansion_access import SnapshotReader, SourceUseDenied
+from ashare_data.financials.official_daily import SnapshotReader, SourceUseDenied
 from ashare_data.financials.share_resolution import ShareResolutionReader, listing_class, prepare
 
 SECURITY = "001226.XSHE"

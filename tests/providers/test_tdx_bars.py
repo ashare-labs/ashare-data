@@ -9,8 +9,8 @@ import json
 import pytest
 
 from ashare_data import DataError, TDXBarSource, TDXBarView
-from ashare_data.providers.tdx_bars import _seal
-from ashare_data.providers.tdx_collection import collect_pages, encoded, request
+from ashare_data.providers.tdx.tdx_bars import _seal
+from ashare_data.providers.tdx.tdx_collection import collect_pages, encoded, request
 
 
 @dataclass

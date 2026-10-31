@@ -5,7 +5,7 @@ import math
 
 import pytest
 
-from ashare_data.financials.validation import AcceptanceError
+from ashare_data.financials.ledger import AcceptanceError
 from ashare_data.factors.joinquant.amount_inputs import RESEARCH_ROLE
 from ashare_data.factors.joinquant.amount import bounded_prediction
 from ashare_data.factors.joinquant import (

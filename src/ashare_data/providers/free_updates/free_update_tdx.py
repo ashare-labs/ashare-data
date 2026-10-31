@@ -15,7 +15,7 @@ import subprocess
 import time
 from urllib.parse import urlencode
 
-from ashare_data.providers.tdx_collection import validate_page
+from ashare_data.providers.tdx.tdx_collection import validate_page
 
 FUNCTIONS = {"tdx_native_bond_bars", "tdx_native_finance", "tdx_native_depth"}
 HOST = "116.205.183.150:7709"

@@ -61,7 +61,7 @@ class BoundedSocket:
 
 
 def sdk_identity(root):
-    spec = json.loads(Path(__file__).with_name("baostock-sdk.json").read_text())
+    spec = json.loads((Path(__file__).resolve().parents[1] / "baostock-sdk.json").read_text())
     root = Path(root).resolve()
     actual = {str(p.relative_to(root)) for p in (root / "baostock").rglob("*.py")}
     if actual != set(spec["files"]):

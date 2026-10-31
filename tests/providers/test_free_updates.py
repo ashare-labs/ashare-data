@@ -158,7 +158,7 @@ def test_writer_lock(tmp_path):
 
 def test_tdx_protocol_records_and_truncation():
     import struct
-    from ashare_data.providers.tdx_blocks import parse_blocks,parse_members,packet,exchange_code
+    from ashare_data.providers.tdx.tdx_blocks import parse_blocks,parse_members,packet,exchange_code
     data=bytearray(164)
     struct.pack_into("<H",data,0,2)
     struct.pack_into("<H",data,4,1)

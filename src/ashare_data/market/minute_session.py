@@ -9,7 +9,7 @@ from decimal import Decimal, localcontext
 import copy
 
 from ashare_data.core.model import canonical, day, digest, require, symbol, timestamp
-from ashare_data.providers.tdx_bars import TDXBarView
+from ashare_data.providers.tdx.tdx_bars import TDXBarView
 
 SCHEMA = "ad-tdx-minute-session.v1"
 OBSERVATIONS_SCHEMA = "ad-minute-session-observations.v1"

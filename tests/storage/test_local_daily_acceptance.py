@@ -8,7 +8,7 @@ import runpy
 
 import pytest
 
-from ashare_data.providers.baostock_collection import import_captures
+from ashare_data.providers.baostock_receipt.baostock_collection import import_captures
 from ashare_data.storage.local_daily import LocalDailyStore
 
 

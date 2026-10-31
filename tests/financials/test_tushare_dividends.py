@@ -9,7 +9,7 @@ import sqlite3
 import pytest
 
 from ashare_data.financials import expansion as e
-from ashare_data.financials import tushare_dividends as d
+from ashare_data.financials import tushare_reference as d
 from ashare_data.financials import tushare_gaps as g
 from ashare_data.financials import tushare_reference as ts
 

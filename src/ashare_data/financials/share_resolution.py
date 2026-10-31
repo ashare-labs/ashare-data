@@ -17,7 +17,7 @@ from ashare_data.corporate_actions.share_charts import chart_observation, struct
 from ashare_data.corporate_actions.sources import parse_sina_float, parse_sina_structure
 from ashare_data.corporate_actions import share_charts
 from ashare_data.financials import expansion as e
-from ashare_data.financials.expansion_access import SnapshotReader, SourceUseDenied, assess
+from ashare_data.financials.official_daily import SnapshotReader, SourceUseDenied, assess
 
 SCHEMA = "ad.share-resolution-bundle.v1"
 

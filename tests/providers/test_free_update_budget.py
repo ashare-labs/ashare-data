@@ -73,10 +73,10 @@ def test_capture_stops_before_opener_when_shared_budget_is_exhausted(tmp_path, m
 
 def test_tdx_budget_blocks_before_connection(tmp_path, monkeypatch):
     from ashare_data.providers.free_updates.free_update_worker import Capture
-    from ashare_data.providers.tdx_blocks import Client
+    from ashare_data.providers.tdx.tdx_blocks import Client
     b = configured(tmp_path, monkeypatch, requests=1)
     b.reserve("https://example", 0)
-    monkeypatch.setattr("ashare_data.providers.tdx_blocks.socket.create_connection",
+    monkeypatch.setattr("ashare_data.providers.tdx.tdx_blocks.socket.create_connection",
                         lambda *_a, **_k: pytest.fail("TDX connected despite budget"))
     with pytest.raises(ResourceBudgetReached):
         Client(Capture(tmp_path / 'raw', interval=0))

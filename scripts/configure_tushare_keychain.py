@@ -8,7 +8,7 @@ from pathlib import Path
 import sys
 import warnings
 
-from ashare_data.financials import tushare_keychain as keychain
+from ashare_data.financials import tushare_reference as keychain
 from ashare_data.financials.expansion import atomic, encoded, immutable, now
 
 

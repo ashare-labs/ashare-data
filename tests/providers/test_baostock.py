@@ -538,7 +538,7 @@ def test_source_bad_ohlc_stored_as_failed_evidence(tmp_path):
 
 @pytest.mark.parametrize("fault", ["eof", "timeout", "bytes", "short_send", "vip"])
 def test_sdk_login_socket_bounded(fault):
-    from ashare_data.providers.baostock_worker import BoundedSocket
+    from ashare_data.providers.baostock_receipt.baostock_worker import BoundedSocket
     import time
 
     fake = SimpleNamespace(

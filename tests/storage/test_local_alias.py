@@ -7,7 +7,7 @@ import json
 import pytest
 
 from ashare_data.market import alias as local_alias
-from ashare_data.providers.baostock_collection import FIELDS, verify_capture
+from ashare_data.providers.baostock_receipt.baostock_collection import FIELDS, verify_capture
 from ashare_data.storage.local_daily import LocalDailyStore
 
 READ_ALIAS_CAPTURE = local_alias.read_alias_capture

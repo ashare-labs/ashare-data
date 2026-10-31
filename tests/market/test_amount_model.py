@@ -10,7 +10,7 @@ from fractions import Fraction as F
 import pytest
 
 
-from ashare_data.financials.validation import AcceptanceError
+from ashare_data.financials.ledger import AcceptanceError
 
 
 from ashare_data.factors.joinquant.amount_inputs import InputUnavailable, RESEARCH_ROLE

@@ -34,14 +34,14 @@ from ashare_data.research.preflight import (
     ResearchInputRow,
     ResearchPreflightResult,
 )
-from ashare_data.providers.joinquant_observations import (
+from ashare_data.providers.joinquant.joinquant_observations import (
     JQObservationInput,
     JQObservationRead,
     JQObservationView,
 )
-from ashare_data.providers.joinquant_queries import JQQueryView
-from ashare_data.providers.tdx_points import TDXPointInput, TDXPointView
-from ashare_data.providers.tdx_bars import TDXBarSource, TDXBarView
+from ashare_data.providers.joinquant.joinquant_queries import JQQueryView
+from ashare_data.providers.tdx.tdx_points import TDXPointInput, TDXPointView
+from ashare_data.providers.tdx.tdx_bars import TDXBarSource, TDXBarView
 from ashare_data.providers.neigezhu import NeigezhuMinuteView
 from ashare_data.market.minute_session import TDXMinuteSessionView, TDXSessionSource
 from ashare_data.reference.bounded_calendar import BoundedCalendarView

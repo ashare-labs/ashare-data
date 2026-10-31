@@ -8,7 +8,7 @@ from pathlib import Path
 import signal
 import time
 
-from ashare_data.financials import batch_followup as follow
+from ashare_data.financials import source_repair as follow
 from ashare_data.financials.expansion import atomic, digest, encoded, now
 
 

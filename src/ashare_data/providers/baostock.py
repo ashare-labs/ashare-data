@@ -23,12 +23,12 @@ from ashare_data.providers.baostock_receipt.protocol import (
     decode_response,
 )
 from ashare_data.providers.baostock_receipt.timing import wall_clock_order, monotonic_duration
-from ashare_data.providers.baostock_worker import sdk_identity
+from ashare_data.providers.baostock_receipt.baostock_worker import sdk_identity
 from ashare_data.market.client import _security
 from ashare_data.core.model import DataError, canonical, require, timestamp
 from ashare_data.research.datasets import ResearchResult, _bao, _day, _decimal, _read
 from ashare_data.storage.immutable import identifier, immutable_write
-from ashare_data.providers import minute_labels as minutes
+from ashare_data.providers.baostock_receipt import minute_labels as minutes
 from ashare_data.reference import daily_status
 from ashare_data.reference import previous_close as preclose
 from ashare_data.reference import calendar as source_calendar
@@ -257,7 +257,7 @@ class BaoStockSource:
                 raise DataError("SOURCE_BUSY", "已有 BaoStock 查询；禁止并发连接") from exc
             with tempfile.TemporaryDirectory(prefix=".baostock-", dir=store.root) as stage:
                 config = {"sdk_path": self._sdk_path, "timeout": self._timeout, "request": req}
-                boot = "import sys,runpy;sys.path.insert(0,sys.argv.pop(1));runpy.run_module('ashare_data.providers.baostock_worker',run_name='__main__')"
+                boot = "import sys,runpy;sys.path.insert(0,sys.argv.pop(1));runpy.run_module('ashare_data.providers.baostock_receipt.baostock_worker',run_name='__main__')"
                 try:
                     proc = subprocess.run(
                         [

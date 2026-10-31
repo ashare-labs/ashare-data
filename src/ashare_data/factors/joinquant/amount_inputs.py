@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 import re
 
-from ashare_data.financials.validation import AcceptanceError
+from ashare_data.financials.ledger import AcceptanceError
 
 RESEARCH_ROLE = "retrospective_native_source"
 

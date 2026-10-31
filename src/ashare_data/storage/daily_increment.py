@@ -145,7 +145,7 @@ class IncrementStore:
             self.event("seeded_historical_identities", {"count": self.db.execute("SELECT count(*) FROM instruments").fetchone()[0]})
 
     def plan(self, day, members, basics=()):
-        from ashare_data.providers.daily_increment import equity_security
+        from ashare_data.providers.daily_sources import equity_security
         current = {r["security"]: r for r in members}
         with self.db:
             prior = {r["security"] for r in self.db.execute("SELECT security FROM instruments WHERE state IN ('active','absent_unknown')")}

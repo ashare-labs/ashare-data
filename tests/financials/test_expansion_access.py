@@ -8,7 +8,7 @@ import tempfile
 import unittest
 
 from ashare_data.financials.expansion import encoded
-from ashare_data.financials.expansion_access import SnapshotReader, SourceUseDenied, assess
+from ashare_data.financials.official_daily import SnapshotReader, SourceUseDenied, assess
 from ashare_data.financials.ledger import FinancialLedger
 
 

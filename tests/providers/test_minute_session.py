@@ -9,8 +9,8 @@ import pytest
 from ashare_data import DataError, TDXMinuteSessionView, TDXSessionSource
 from ashare_data.market.minute_session import MODEL, _labels
 from ashare_data.core.model import timestamp
-from ashare_data.providers.tdx_bars import _seal
-from ashare_data.providers.tdx_collection import collect_pages, encoded, request
+from ashare_data.providers.tdx.tdx_bars import _seal
+from ashare_data.providers.tdx.tdx_collection import collect_pages, encoded, request
 from test_tdx_bars import Bar
 
 HISTORY = "2026-10-08"

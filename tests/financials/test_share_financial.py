@@ -6,7 +6,7 @@ import struct
 
 import pytest
 
-from ashare_data.financials.validation import AcceptanceError
+from ashare_data.financials.ledger import AcceptanceError
 from ashare_data.financials.ledger import (
     FinancialLedger,
     InputUnavailable,

@@ -12,7 +12,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from ashare_data.financials.validation import AcceptanceError, instant, number
+from ashare_data.financials.ledger import AcceptanceError, instant, number
 from ashare_data.financials.ledger import (
     FIELDS,
     DAILY_MODE,

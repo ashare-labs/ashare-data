@@ -7,11 +7,11 @@ import sqlite3
 
 import pytest
 
-from ashare_data.financials import batch_followup as follow
+from ashare_data.financials import source_repair as follow
 from ashare_data.financials import expansion as e
 from ashare_data.financials import official_expansion as o
 from ashare_data.financials import source_repair as repair
-from ashare_data.financials.expansion_access import SnapshotReader, SourceUseDenied
+from ashare_data.financials.official_daily import SnapshotReader, SourceUseDenied
 
 
 SYMBOL = "sh600000"

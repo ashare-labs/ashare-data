@@ -11,7 +11,7 @@ from decimal import Decimal
 import pytest
 
 from ashare_data import DataError, Store
-from ashare_data.providers.joinquant_style import JQStyle
+from ashare_data.providers.joinquant.joinquant_style import JQStyle
 
 SYM = "000001.XSHE"
 A = "2026-04-09T14:53:00+08:00"

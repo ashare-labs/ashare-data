@@ -317,7 +317,7 @@ class Projection:
                      basis=row["basis"], carry_forward_authorized=False)
             endpoint = "factor"
         elif schema == "ad.corporate-source-observation.v1" and row["category"] == "shares":
-            from ashare_data.financials.expansion_access import share_overlap
+            from ashare_data.financials.official_daily import share_overlap
             fields = native.get("fields", {})
             for field, value in fields.items():
                 if not field.endswith("_shares"):

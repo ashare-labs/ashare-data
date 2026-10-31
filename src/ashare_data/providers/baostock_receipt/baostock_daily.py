@@ -22,7 +22,7 @@ import time
 from zoneinfo import ZoneInfo
 import zlib
 
-from ashare_data.providers.baostock_worker import BoundedSocket, PinnedLoader, sdk_identity
+from ashare_data.providers.baostock_receipt.baostock_worker import BoundedSocket, PinnedLoader, sdk_identity
 from ashare_data.providers.baostock_receipt.capture import SocketMonitor, utc_now
 from ashare_data.providers.baostock_receipt.protocol import (
     END, SEP, MAX_BYTES, header, crc_checked_core, decode_request, decode_response, check_identity,

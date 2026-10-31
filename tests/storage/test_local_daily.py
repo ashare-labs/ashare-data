@@ -838,7 +838,7 @@ def test_auto_source_chooses_whole_series_without_splicing(tmp_path):
 
 
 def test_bao_supplement_only_plans_missing_source_segments(tmp_path):
-    from ashare_data.providers.baostock_collection import daily_requests
+    from ashare_data.providers.baostock_receipt.baostock_collection import daily_requests
 
     s = setup_store(tmp_path)
     job = dict(

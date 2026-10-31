@@ -272,7 +272,7 @@ def test_early_job_scope_cannot_cross_boundary(store, start, end):
 
 
 def test_archive_only_collector_never_opens_or_publishes_a_library(tmp_path, monkeypatch):
-    from ashare_data.providers import baostock_collection as local_baostock
+    from ashare_data.providers.baostock_receipt import baostock_collection as local_baostock
 
     (tmp_path / "raw").mkdir()
     monkeypatch.setattr(

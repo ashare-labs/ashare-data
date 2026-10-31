@@ -9,7 +9,7 @@ from pathlib import Path
 import time
 
 from ashare_data.providers.baostock_receipt.protocol import decode_response
-from ashare_data.providers.baostock_collection import (
+from ashare_data.providers.baostock_receipt.baostock_collection import (
     collect,
     capture_path,
     read_capture,

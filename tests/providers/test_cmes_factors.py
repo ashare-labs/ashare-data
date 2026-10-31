@@ -10,7 +10,7 @@ import pytest
 
 from ashare_data import DataError, Store
 from ashare_data.core.model import canonical, digest
-from ashare_data.providers.cmes_factors import CMESFactorView, adjust_prices, import_cmes_factors
+from ashare_data.providers.cmes import CMESFactorView, adjust_prices, import_cmes_factors
 
 SECURITY = "600000.XSHG"
 MEMBER = "SH.600000.csv"

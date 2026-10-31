@@ -9,7 +9,7 @@ from fractions import Fraction
 import math
 import struct
 
-from ashare_data.financials.validation import instant, number
+from ashare_data.financials.ledger import instant, number
 from ashare_data.financials.ledger import InputUnavailable, RESEARCH_MODE, VisibilityUnproven
 from ashare_data.financials.ledger import annual_bridge
 from ashare_data.factors.joinquant.precision import require, six_decimal_profiles

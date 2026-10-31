@@ -64,10 +64,10 @@ PYTHONPATH=src python -B -m ashare_data.financials.expansion audit \
   --root "$DATA_ROOT/financial-reference/batches/public-v1" --verify --write
 ```
 
-下游读取使用 `ashare_data.financials.expansion_access.SnapshotReader`：
+下游读取使用 `ashare_data.financials.official_daily.SnapshotReader`：
 
 ```sh
-PYTHONPATH=src python -B -m ashare_data.financials.expansion_access \
+PYTHONPATH=src python -B -m ashare_data.financials.official_daily \
   --root "$DATA_ROOT/financial-reference/batches/public-v1" \
   --task sina_income-sh600176 --period 2025-09-30 --field net_profit \
   --purpose source_research --as-of 2026-10-19T12:30:00+00:00

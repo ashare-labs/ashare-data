@@ -198,32 +198,32 @@ class Store:
         return LocalDailyProductView(self, dataset_id)
 
     def import_jq_observations(self, sources, *, source_kind):
-        from ashare_data.providers.joinquant_observations import import_observations
+        from ashare_data.providers.joinquant.joinquant_observations import import_observations
 
         return import_observations(self, sources, source_kind=source_kind)
 
     def jq_observations(self, dataset_id):
-        from ashare_data.providers.joinquant_observations import JQObservationView
+        from ashare_data.providers.joinquant.joinquant_observations import JQObservationView
 
         return JQObservationView(self, dataset_id)
 
     def import_jq_queries(self, sources, *, source_kind):
-        from ashare_data.providers.joinquant_queries import import_queries
+        from ashare_data.providers.joinquant.joinquant_queries import import_queries
 
         return import_queries(self, sources, source_kind=source_kind)
 
     def jq_queries(self, dataset_id):
-        from ashare_data.providers.joinquant_queries import JQQueryView
+        from ashare_data.providers.joinquant.joinquant_queries import JQQueryView
 
         return JQQueryView(self, dataset_id)
 
     def import_tdx_points(self, source, *, source_kind):
-        from ashare_data.providers.tdx_points import import_points
+        from ashare_data.providers.tdx.tdx_points import import_points
 
         return import_points(self, source, source_kind=source_kind)
 
     def tdx_points(self, dataset_id):
-        from ashare_data.providers.tdx_points import TDXPointView
+        from ashare_data.providers.tdx.tdx_points import TDXPointView
 
         return TDXPointView(self, dataset_id)
 

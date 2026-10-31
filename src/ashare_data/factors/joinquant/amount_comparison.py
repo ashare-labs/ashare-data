@@ -9,7 +9,7 @@ This adapter does not certify the source-precision or output-rounding hypotheses
 import math
 from fractions import Fraction
 
-from ashare_data.financials.validation import AcceptanceError
+from ashare_data.financials.ledger import AcceptanceError
 from ashare_data.factors.joinquant.amount import (
     DEFINITION,
     decimal_text,

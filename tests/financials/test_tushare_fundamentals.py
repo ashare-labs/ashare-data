@@ -8,7 +8,7 @@ import sqlite3
 import pytest
 
 from ashare_data.financials import expansion as e
-from ashare_data.financials import tushare_fundamentals as f
+from ashare_data.financials import tushare_reference as f
 from ashare_data.financials import tushare_gaps as gaps
 from ashare_data.financials import tushare_reference as ts
 

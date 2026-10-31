@@ -14,10 +14,10 @@ from urllib.parse import urlencode, parse_qs, urlsplit
 from zoneinfo import ZoneInfo
 
 from ashare_data.market.increment import exact_number, normalize_values, sohu_capture
-from ashare_data.providers.baostock_daily import DailySession
+from ashare_data.providers.baostock_receipt.baostock_daily import DailySession
 from ashare_data.providers.baostock_receipt.capture import utc_now
 from ashare_data.providers.cmes import native_security
-from ashare_data.providers.daily_increment import (
+from ashare_data.providers.daily_sources import (
     universe, seed_files, equity_security, fetch_minute, assess_minutes, IncrementHTTP,
 )
 from ashare_data.providers.daily_sources import SourceBlocked

@@ -78,7 +78,7 @@ store.recover()
 错误为 `DataError(code, message, details)`，CLI 错误输出到 stderr 并退出 2。
 calendar 日期范围首尾均包含；sessions 交易时段为半开区间。
 
-聚宽风格 SDK 是单独的 `ashare_data.providers.joinquant_style.JQStyle`，绑定 Snapshot 后使用；未来回测上下文
+聚宽风格 SDK 是单独的 `ashare_data.providers.joinquant.joinquant_style.JQStyle`，绑定 Snapshot 后使用；未来回测上下文
 负责策略时钟、账户、订单及 history，SDK 本身不引入这些状态。
 
 安全边界：单本机发布写入者、非对抗式本地文件系统。内容 hash 检测篡改但不是数字签名；

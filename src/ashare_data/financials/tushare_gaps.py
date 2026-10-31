@@ -18,7 +18,7 @@ from uuid import uuid4
 
 from ashare_data.financials import expansion as e
 from ashare_data.financials import tushare_reference as ts
-from ashare_data.financials import tushare_fundamentals as f
+from ashare_data.financials import tushare_reference as f
 
 KINDS = {"sina_income": "income", "sina_balance": "balancesheet", "sina_cashflow": "cashflow", "sina_actions": "dividend"}
 META = {api: ts.FINANCIAL_ID.split(",") for api in f.STATEMENTS}

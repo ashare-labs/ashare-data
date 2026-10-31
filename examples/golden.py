@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 from ashare_data import Store
-from ashare_data.providers.joinquant_style import JQStyle
+from ashare_data.providers.joinquant.joinquant_style import JQStyle
 
 SYMBOL = "000001.XSHE"
 START = "2026-04-09T14:53:00+08:00"

@@ -130,7 +130,7 @@ def prepare(config_path, *, as_of=None):
                     and re.fullmatch(r"\d{6}", str(job["parameters"]["symbol"])),
                     "explicit CSI index code required")
         elif job["function"] == "tdx_members":
-            from ashare_data.providers.tdx_blocks import exchange_code
+            from ashare_data.providers.tdx.tdx_blocks import exchange_code
             require(set(job["parameters"]) == {"block_code"}, "explicit single board required")
             exchange_code(job["parameters"]["block_code"])
         elif job["function"] == "security_events_em":

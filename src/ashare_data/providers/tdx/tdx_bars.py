@@ -14,7 +14,7 @@ import pandas as pd
 
 from ashare_data.core.model import DataError, require, timestamp
 from ashare_data.research.datasets import ResearchResult
-from ashare_data.providers.tdx_collection import (
+from ashare_data.providers.tdx.tdx_collection import (
     MAX_PAGE_BYTES,
     SCHEMA,
     encoded,

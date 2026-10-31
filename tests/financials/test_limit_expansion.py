@@ -173,7 +173,7 @@ class ReferenceBatchTests(unittest.TestCase):
         self.assertNotIn("secret", str(receipt))
 
     def test_read_keeps_current_reference_separate_from_pit_and_absence(self):
-        from ashare_data.financials.expansion_access import SourceUseDenied
+        from ashare_data.financials.official_daily import SourceUseDenied
 
         with patch.object(p, "fetch", return_value=(200, body(), {})):
             p.run(self.batch, max_jobs=1)

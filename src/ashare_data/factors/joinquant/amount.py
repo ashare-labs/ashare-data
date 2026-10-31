@@ -8,7 +8,7 @@ from __future__ import annotations
 from decimal import Decimal, localcontext
 from fractions import Fraction
 
-from ashare_data.financials.validation import AcceptanceError
+from ashare_data.financials.ledger import AcceptanceError
 from ashare_data.factors.joinquant.amount_inputs import (
     InputUnavailable,
     NativeSeries,

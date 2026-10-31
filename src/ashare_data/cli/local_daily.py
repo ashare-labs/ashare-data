@@ -174,7 +174,7 @@ def command(args):
             )
         with store.writer():
             if args.action == "import-bao":
-                from ashare_data.providers.baostock_collection import import_captures
+                from ashare_data.providers.baostock_receipt.baostock_collection import import_captures
 
                 result = import_captures(store)
                 store.report()

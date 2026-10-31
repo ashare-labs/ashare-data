@@ -121,7 +121,7 @@ def test_catalogue_search_pagination_coverage_and_read_only(library):
 def test_explicit_cmes_adjustment_uses_existing_prices_without_library_writes(library, tmp_path):
     import zipfile
     from decimal import Decimal
-    from ashare_data.providers.cmes_factors import CMESFactorView, import_cmes_factors
+    from ashare_data.providers.cmes import CMESFactorView, import_cmes_factors
 
     root, days = library
     product = LocalDailyProduct(root)

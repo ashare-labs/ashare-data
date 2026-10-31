@@ -342,7 +342,7 @@ class ReferenceReader:
             raise ValueError("Not a reference batch")
 
     def read(self, symbol, trade_date, field, *, purpose="source_research", as_of=None):
-        from ashare_data.financials.expansion_access import SourceUseDenied, timestamp, SHANGHAI
+        from ashare_data.financials.official_daily import SourceUseDenied, timestamp, SHANGHAI
 
         if (
             purpose not in {"source_research", "source_audit", "historical_pit"}

@@ -19,7 +19,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from ashare_data.market.increment import normalize_values, sohu_capture
 from ashare_data.providers.cmes import native_security
-from ashare_data.providers.daily_increment import assess_minutes, equity_security
+from ashare_data.providers.daily_sources import assess_minutes, equity_security
 from ashare_data.storage.daily_increment import IncrementStore
 from ashare_data.storage.market_release import FIELDS, MarketRelease, atomic_write, canonical, connection
 

@@ -10,7 +10,7 @@ import pytest
 
 from ashare_data.providers.baostock_receipt.capture import capture_query
 from ashare_data.providers.baostock_receipt.protocol import decode_response, FrameError
-from ashare_data.providers.baostock_collection import verify_capture, FIELDS
+from ashare_data.providers.baostock_receipt.baostock_collection import verify_capture, FIELDS
 
 
 @pytest.mark.parametrize(
@@ -23,7 +23,7 @@ from ashare_data.providers.baostock_collection import verify_capture, FIELDS
 def test_reconnect_budget_is_bounded_without_stopping_batches_that_keep_progressing(
     tmp_path, monkeypatch, progress, expected_delays, exit_code
 ):
-    from ashare_data.providers import baostock_collection as module
+    from ashare_data.providers.baostock_receipt import baostock_collection as module
 
     outcomes = iter(progress)
 

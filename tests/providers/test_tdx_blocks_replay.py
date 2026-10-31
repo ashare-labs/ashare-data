@@ -8,7 +8,7 @@ import zlib
 
 import pytest
 
-from ashare_data.providers import tdx_blocks as blocks
+from ashare_data.providers.tdx import tdx_blocks as blocks
 from ashare_data.providers.free_updates.free_update_coverage import CapturedResponses
 from ashare_data.providers.free_updates.free_update_worker import Capture, SourceBlocked
 

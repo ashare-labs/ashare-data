@@ -4,7 +4,7 @@ from decimal import Decimal
 from fractions import Fraction
 import struct
 
-from ashare_data.financials.validation import AcceptanceError
+from ashare_data.financials.ledger import AcceptanceError
 
 
 def require(condition, message):

@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from ashare_data.providers.joinquant_observations import (
+from ashare_data.providers.joinquant.joinquant_observations import (
     BASE_FIELDS,
     JQObservationInput,
     JQObservationRead,
@@ -19,7 +19,7 @@ from ashare_data.providers.joinquant_observations import (
     _source_time,
     _values,
 )
-from ashare_data.providers.joinquant_queries import (
+from ashare_data.providers.joinquant.joinquant_queries import (
     FIELDS,
     _extract_queries,
     _parameters,

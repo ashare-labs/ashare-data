@@ -123,7 +123,7 @@ BaoStock 早期工具用 archive_only=True，原件进入 raw/early-baostock，�
 from pathlib import Path
 from ashare_data import Store
 from ashare_data.product import LocalDailyProduct
-from ashare_data.providers.cmes_factors import CMESFactorView, import_cmes_factors
+from ashare_data.providers.cmes import CMESFactorView, import_cmes_factors
 
 product = LocalDailyProduct("data/local-daily")
 packages = Path("data/cmes-packages")

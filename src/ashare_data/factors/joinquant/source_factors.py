@@ -7,7 +7,7 @@ not retrospectively certified by their regression tests or prior background work
 from decimal import Decimal, localcontext
 from pathlib import Path
 
-from ashare_data.financials.validation import AcceptanceError, number
+from ashare_data.financials.ledger import AcceptanceError, number
 from ashare_data.financials.ledger import FinancialLedger, RESEARCH_MODE
 from ashare_data.factors.joinquant.amount_inputs import (
     NativeSeries,

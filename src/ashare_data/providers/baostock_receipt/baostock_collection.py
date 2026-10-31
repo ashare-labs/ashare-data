@@ -28,7 +28,7 @@ from ashare_data.providers.baostock_receipt.protocol import (
     decode_response,
     check_identity,
 )
-from ashare_data.providers.baostock_worker import BoundedSocket, PinnedLoader, sdk_identity
+from ashare_data.providers.baostock_receipt.baostock_worker import BoundedSocket, PinnedLoader, sdk_identity
 from ashare_data.storage.local_daily import DEFAULT_ROOT, LocalDailyStore, contiguous, digest
 from ashare_data.storage.immutable import immutable_write
 

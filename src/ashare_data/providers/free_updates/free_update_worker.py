@@ -425,7 +425,7 @@ def direct_records(capture, name, params):
                 unit_evidence='Eastmoney hgjck.js: raw amount fieldfmt zoom=-5 under 亿美元 heading')
         return records
     if name in {"tdx_blocks","tdx_members"}:
-        from ashare_data.providers.tdx_blocks import collect
+        from ashare_data.providers.tdx.tdx_blocks import collect
         return collect(capture,name,params)
     if name == "ths_hot":
         body=capture.get("https://eq.10jqka.com.cn/open/api/hot_list/v1/hot_stock/a/hour/data.txt")

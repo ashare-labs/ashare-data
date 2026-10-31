@@ -10,7 +10,7 @@ from datetime import date
 from decimal import Decimal
 import re
 
-from ashare_data.providers.joinquant_observations import (
+from ashare_data.providers.joinquant.joinquant_observations import (
     BASE_FIELDS,
     JQObservationInput,
     JQObservationRead,

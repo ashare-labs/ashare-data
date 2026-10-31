@@ -13,7 +13,7 @@ import warnings
 
 import pytest
 
-from ashare_data.financials import tushare_keychain as keychain
+from ashare_data.financials import tushare_reference as keychain
 
 SECRET = "synthetic-credential-only-for-offline-regression"
 

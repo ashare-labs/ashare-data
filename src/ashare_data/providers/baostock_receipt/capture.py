@@ -181,7 +181,7 @@ def capture_query(
         and not (allow_universe and method in {"query_all_stock", "query_stock_basic"})
     ):
         raise ValueError("no universe queries")
-    source_hashes = {p.name: bh(p.read_bytes()) for p in sorted(Path(__file__).parent.glob("*.py"))}
+    source_hashes = {p.name: bh(p.read_bytes()) for p in sorted(Path(__file__).parent.glob("*.py")) if p.name in {"__init__.py", "capture.py", "frames.py", "protocol.py", "timing.py"}}
     clock_errors = []
     started_at = read_clock(clock, clock_errors, "query_started")
     start_ns = read_clock(monotonic, clock_errors, "monotonic_operation_start")

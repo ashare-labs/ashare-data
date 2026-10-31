@@ -19,7 +19,7 @@ import warnings
 
 from ashare_data.financials import tushare_reference as ts
 from ashare_data.financials import tushare_gaps as gaps
-from ashare_data.financials import batch_followup as follow
+from ashare_data.financials import source_repair as follow
 from ashare_data.financials.expansion import atomic, encoded, now
 from run_reference_expansion import share_source_restrictions, supervise
 
@@ -97,7 +97,7 @@ def main():
         print(json.dumps(result))
         return 0 if result["state"] == "worker_initialized_authentication_unverified" else 1
     if args.keychain:
-        from ashare_data.financials.tushare_keychain import read_token, verify_helper
+        from ashare_data.financials.tushare_reference import read_token, verify_helper
         verify_helper(args.keychain_helper, root / "credential-policy.json")
         token = read_token(args.keychain_helper)
     transport = ts.Transport(token)
@@ -252,7 +252,7 @@ def collect(root, baseline, transport, prompted, calendar, limits, capped, facto
     stored = credential_origin == "macos_keychain"
     modules = [("transport", ts), ("fundamentals", gaps.f), ("gap_planner", gaps)]
     if coalesce_dividends:
-        from ashare_data.financials import tushare_dividends as dividends
+        from ashare_data.financials import tushare_reference as dividends
         modules.append(("dividend_coalescing", dividends))
     atomic(root / "worker.json", encoded({"pid": os.getpid(), "started_at": now(),
            "source": "tushare", "credential_source": credential_origin or ("local_hidden_prompt" if prompted else "existing_environment_reference"),
@@ -311,7 +311,7 @@ def collect(root, baseline, transport, prompted, calendar, limits, capped, facto
             if ts.e.digest(ts.e.encoded(plan)) != manifest["gap_plan_sha256"]:
                 raise ValueError("Frozen gap plan changed")
         if coalesce_dividends:
-            from ashare_data.financials import tushare_dividends as dividends
+            from ashare_data.financials import tushare_reference as dividends
             capture = root / "dividend-coalesced"
             dividends.prepare(capture, target)
             dividends.apply(capture)  # Reuse captured responses before another request.

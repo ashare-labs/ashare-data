@@ -71,7 +71,7 @@ def due_plan(store, now=None, *, fetch_calendar=True):
 
 def historical_members(store, day, current, batches):
     """Use a dated source list when available; label extrapolated membership unknown."""
-    from ashare_data.providers.daily_increment import equity_security
+    from ashare_data.providers.daily_sources import equity_security
     dated = batches.get("query_all_stock", {})
     proven = {}
     if dated.get("status") == "ok":

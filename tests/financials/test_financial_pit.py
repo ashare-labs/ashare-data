@@ -8,7 +8,7 @@ import json
 import pytest
 
 from ashare_data import FinancialPIT
-from ashare_data.financials.validation import AcceptanceError
+from ashare_data.financials.ledger import AcceptanceError
 from ashare_data.financials.ledger import RESEARCH_MODE
 
 

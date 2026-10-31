@@ -318,7 +318,7 @@ class LocalDailyProduct:
         self, securities, start, end, source="auto", *,
         adjustment=None, basis_date=None, factors=None,
     ):
-        from ashare_data.providers.cmes_factors import adjust_prices
+        from ashare_data.providers.cmes import adjust_prices
 
         securities, start, end = _selection(securities, start, end, source, native_security=self._native_security)
         with self._read() as store:

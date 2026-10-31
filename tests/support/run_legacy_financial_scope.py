@@ -16,7 +16,7 @@ import sqlite3
 from zoneinfo import ZoneInfo
 
 from ashare_data.financials import expansion as source
-from ashare_data.financials.expansion_access import SnapshotReader
+from ashare_data.financials.official_daily import SnapshotReader
 
 
 def prepare_scope(profile, *, today=None):

@@ -6,9 +6,9 @@ import pytest
 
 from ashare_data.cli.daily_increment import main
 from ashare_data.market.increment import DEFAULT_MINUTE_WINDOW, minute_rows
-from ashare_data.providers.baostock_daily import BULK, DailySession, decode_bulk
+from ashare_data.providers.baostock_receipt.baostock_daily import BULK, DailySession, decode_bulk
 from ashare_data.providers.baostock_receipt.protocol import END, SEP
-from ashare_data.providers.daily_increment import equity_security, assess_minutes, session_labels, universe
+from ashare_data.providers.daily_sources import equity_security, assess_minutes, session_labels, universe
 from ashare_data.storage.daily_increment import initialize, IncrementStore
 
 
@@ -167,7 +167,7 @@ def test_live_market_root_rejected(tmp_path):
 
 
 def test_access_denial_persists_between_invocations(tmp_path, monkeypatch):
-    from ashare_data.providers.daily_increment import IncrementHTTP
+    from ashare_data.providers.daily_sources import IncrementHTTP
     from ashare_data.providers.daily_sources import PublicHTTP, SourceBlocked
     def deny(self, url, referer):
         self.blocked["example.test"] = "HTTP 403; blocked"
@@ -181,7 +181,7 @@ def test_access_denial_persists_between_invocations(tmp_path, monkeypatch):
 
 def test_sdk_validation_failure_releases_single_connection_lock(tmp_path, monkeypatch):
     import fcntl
-    from ashare_data.providers import baostock_daily
+    from ashare_data.providers.baostock_receipt import baostock_daily
     monkeypatch.setattr(baostock_daily.tempfile, "gettempdir", lambda: str(tmp_path))
     def reject(path):
         raise ValueError("invalid pinned sdk")

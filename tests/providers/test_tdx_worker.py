@@ -7,7 +7,7 @@ import sys
 
 import pytest
 
-from ashare_data.providers.tdx_bars import TDXBarSource
+from ashare_data.providers.tdx.tdx_bars import TDXBarSource
 
 
 @pytest.mark.parametrize(
