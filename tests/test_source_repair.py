@@ -65,6 +65,17 @@ def cache(tmp_path):
     return Cache(tmp_path / "official")
 
 
+def test_original_query_cache_is_reused_without_transport(cache):
+    def forbidden_transport(*args):
+        raise AssertionError("Existing query identities must reuse their original responses")
+
+    client = o.Client(cache.root, transport=forbidden_transport)
+    result = o.index_security(client, SYMBOL, repair.read(cache.root / "manifest.json"))
+    assert client.calls == 0
+    assert result["announcements"] == []
+    assert all(query["pagination_complete_for_query"] for query in result["queries"])
+
+
 def test_count_drift_keeps_cached_rows_without_claiming_completeness(cache):
     cache.page("periodic", 1, 3, True, [row("a")])
     cache.page("periodic", 2, 4, True, [row("b")])
