@@ -26,6 +26,43 @@ HTTP 任务和 BaoStock 队列分开；HTTP 默认3 workers、主机间隔1秒�
 
 本地目录包含 daily.sqlite3、raw 压缩原文及摘要、reports、任务/源状态。SQLite WAL 支持采集时读取，写者锁保护任务；源码或安装包不携带这些数据。不要清理活跃锁、原件、回执或失败诊断，不把库目录作为测试/构建输出。
 
+## 全市场日常增量
+
+安装后的 `ashare-data daily-update` 是独立的单次增量入口，不改变上面的旧库默认股票池或部署清单。
+它每天冻结新浪当前 A 股名单，并由 BaoStock 当日股票分类名单补充遗漏（包括其股票分类内的 CDR），包含沪深主板、科创板、创业板及北交所；加入新证券，保留历史证券。
+未出现在新名单不自动认定退市。历史补日优先使用来源当日名单；从前后名单推知的范围标为未知。
+CMES 文件清单只用于保留身份，不扫描或复制其历史价格。
+
+```sh
+# INCREMENT_ROOT 是统一数据目录下的独立子目录；BASE_BINDING 固定 market_release 三元组。
+# SDK_ROOT 为固定 SHA 校验的官方 BaoStock 0.9.4 源码目录（不使用 API_KEY）。
+ashare-data daily-update init --root "$INCREMENT_ROOT" --sdk-path "$SDK_ROOT" \
+  --base-binding "$BASE_BINDING" --seed-directory "$CMES_DAILY_PACKAGES" \
+  --minute-window 1970 --interval 1 --budget-gib 8 --reserve-gib 50
+ashare-data daily-update run --root "$INCREMENT_ROOT" --date 2026-10-22
+ashare-data daily-update status --root "$INCREMENT_ROOT" --date 2026-10-22
+# 重复同一 run 恢复未完成任务；STOP 文件或 SIGTERM 停止本采集进程的后续提交。
+# --due 按 Asia/Shanghai 20:30 后可采日期和已知交易日历，优先处理最早未完成日。
+ashare-data daily-update run --root "$INCREMENT_ROOT" --due
+# 只输出配置，不注册 launchd；安装/启用调度需部署者另行决定。
+ashare-data daily-update schedule --root "$INCREMENT_ROOT"
+# 生成隔离 MarketRelease；不切换 deployment.json 或其他库的 CURRENT。
+ashare-data daily-update candidate --root "$INCREMENT_ROOT" --date 2026-10-22 \
+  --output "$INCREMENT_ROOT/candidates/market"
+```
+
+`schedule` 输出使用调用时的 Python，需在该解释器安装 wheel。首次只采最新可采日；以后默认追补最近 10 个自然日的已知交易日，`--retry-window-days` 可配置 1–31 日。超窗待办仍保留，不把配置界限当作来源已过期的证明。日历未知不猜工作日。补多个日期时共享同一份最新分钟响应，按证券日分别归档完成状态，避免重复下载滚动窗口。
+
+BaoStock 新按日接口通过单连接批量取 A 股日线和因子，每日最多 48,000 次发送、至少间隔 1 秒；同机本入口使用互斥锁。免费节点失败会保留失败状态。日线第一次成功采集时按固定优先顺序选择，默认为 BaoStock、搜狐，可用 `--daily-sources` 显式选择；已完成证券日的选择冻结，迟到来源不替换它，也不逐字段拼成行情。新浪分钟每主机每秒最多一次请求，窗口 1970 条只是已观测支持的请求参数，不保证固定历史天数。401/403/429 会持久停止该主机，后续运行不会绕过；普通传输失败有限重试并冷却。
+
+`jobs` 记录是否取回来源窗口，`coverage` 记录实际证券日的标签/字段覆盖，两者不能混作“全市场完整”。分钟保留 09:30、竞价及稀疏标签，单独列出常规 240 标签的缺项；少两条不自动补数或认定停牌。完整游标只越过已知交易日的完整数据，不跳过失败证券。零量、空响应、过期窗口、尚未更新、结构异常分别保留，未确认的历史 PIT 不开放为已证实事实。
+
+BaoStock 当日交易状态作为独立来源证据保存，后续空价格响应不会抹掉它。来源明确停牌且没有可接纳价格行时，覆盖记为 `suspended`；原价格/量额仍保留在回执或隔离记录中，不制造零量行情。已有分钟响应可以在补齐状态证据后离线重判，跨日也无需重新下载。任务全部结束仍可能存在稀疏分钟或不支持的因子，报告分别列明。
+
+首个单日候选可用 `python scripts/accept_daily_update.py --root "$INCREMENT_ROOT" --date 2026-10-22 --candidate "$INCREMENT_ROOT/candidates/market"` 做有界全键/值核验；它验证原回执、状态、原生因子、隔离记录与候选落盘值，不联网。若存在额外修订版本或候选未采用的规范观察，会明确阻断这项首轮验收，不能把总行数相同当成完整对账。
+
+候选沿用冻结 CMES 身份和每证券历史终日，只追加此后的原价日线/分钟；冲突隔离，旧发布继续复现。历史对象以同卷硬链接复用，不复制全库；不同卷会明确拒绝。查询仍用 `ReleasedDailyProduct` / `minute_prices` / `MarketRelease.sql`，来源过滤严格，不会回退到其他源。候选保存字段映射、来源原文摘要、证券日限制及按键值往返校验结果。来源因子另存 `increment_factors` 原始观察；在与 CMES 累计因子的方向、基准和事件日期衔接验证前，不自动连乘、不把因子空集造为 1。该首版不是财报、公司行动或逐笔采集服务。
+
 ## 查询与来源选择
 
 ```python

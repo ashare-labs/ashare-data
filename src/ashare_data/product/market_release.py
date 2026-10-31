@@ -68,9 +68,13 @@ class FrozenDailyStore(LocalDailyStore):
     def get_price(self, security, start="2010-01-01", end=None, source="auto", **unused):
         selected = "canonical" if source in ("auto", "canonical") else source
         cmes = getattr(self.release, "manifest", {}).get("cmes")
+        increment = getattr(self.release, "manifest", {}).get("free_daily_updates")
+        exact_source = None
         if cmes or selected == "cmes":
-            require(cmes and selected in ("canonical", "cmes"), "MARKET_SOURCE_SCOPE",
+            allowed = ("canonical", "cmes", *self.release.manifest.get("free_daily_contract", {}).get("source_priority", [])) if increment else ("canonical", "cmes")
+            require(cmes and selected in allowed, "MARKET_SOURCE_SCOPE",
                     "CMES candidates contain only their explicit file source; no fallback")
+            exact_source = selected if increment and selected != "canonical" else None
             selected = "canonical"
         if selected not in ("canonical", "free_stockdb"):
             from ashare_data.storage.source_observations import daily_source, incremental_daily
@@ -124,6 +128,8 @@ class FrozenDailyStore(LocalDailyStore):
         rows = []
         for series in (5,) if selected == "free_stockdb" else (1, 5):
             rows.extend(self.release.read("bars_1d", security, start, end, series_id=series))
+        if exact_source:
+            rows = [r for r in rows if r.get("source") == exact_source]
         rows.sort(key=lambda row: row["trade_date"])
         require(
             len({row["trade_date"] for row in rows}) == len(rows),
@@ -343,7 +349,9 @@ class ReleasedDailyProduct(LocalDailyProduct):
             ]
         if self.release.manifest.get("cmes"):
             value["limitations"] = [
-                "CMES raw prices with explicit file unit profiles; no fallback or field filling.",
+                ("CMES history with an explicitly frozen free-source continuation; per-row provenance and no field filling."
+                 if self.release.manifest.get("free_daily_updates") else
+                 "CMES raw prices with explicit file unit profiles; no fallback or field filling."),
                 "ST membership is positive evidence only; absence, suspension and listing history remain unknown.",
                 "Calendar flags are provider observations; common sessions require SH/SZ agreement; BJ is not inferred.",
                 "Historical code changes and publication times are unverified; file retrieval is not historical PIT.",

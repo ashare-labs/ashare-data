@@ -344,9 +344,11 @@ def build(a):
                     )
                 continue
             if source == "sina_minute":
-                parsed = minute_rows(body, after_date=minute_base, end_date=scope["end"])
+                from ashare_data.market.increment import LEGACY_MINUTE_WINDOW
+                window = scope.get("minute_window", LEGACY_MINUTE_WINDOW)
+                parsed = minute_rows(body, after_date=minute_base, end_date=scope["end"], max_rows=window)
                 native_array = json.loads(body) or []
-                truncated_day = native_array[0]["day"][:10] if len(native_array) == 1023 else None
+                truncated_day = native_array[0]["day"][:10] if len(native_array) == window else None
                 for rec in parsed:
                     if rec["disposition"] == "adopted":
                         previous = prior_minute.get(rec["label_at"])

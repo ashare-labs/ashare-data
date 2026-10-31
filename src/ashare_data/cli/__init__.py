@@ -46,6 +46,7 @@ def parser():
     sub.add_parser("cmes", help="Offline CMES file import and isolated candidate queries")
     sub.add_parser("free-updates", help="Frozen CMES menu public-source sample updates and acceptance")
     sub.add_parser("native-macro", help="Prepare native macro candidates and query pinned releases")
+    sub.add_parser("daily-update", help="Recoverable daily all-market public-source updates")
     from ashare_data.cli.zzshare import add_parsers as add_zzshare_parsers
 
     add_zzshare_parsers(sub)
@@ -349,6 +350,10 @@ def main(argv=None):
         from ashare_data.cli.free_updates import main as free_updates_main
 
         return free_updates_main(argv[1:])
+    if argv[:1] == ["daily-update"]:
+        from ashare_data.cli.daily_increment import main as daily_increment_main
+
+        return daily_increment_main(argv[1:])
     if argv[:1] == ["cmes"]:
         from ashare_data.cli.cmes import main as cmes_main
 

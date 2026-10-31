@@ -14,6 +14,14 @@ from ashare_data.storage.market_release import FIELDS
 NATIVE_FIELDS = ("open", "high", "low", "close", "volume", "amount")
 MAPPING_VERSION = "recent-source-observations.v2"
 MINUTE_SERIES = 6
+LEGACY_MINUTE_WINDOW = 1023
+DEFAULT_MINUTE_WINDOW = 1970
+
+
+def minute_window(value):
+    if type(value) is not int or not 240 <= value <= 10000:
+        raise ValueError("minute window must be between 240 and 10000 source labels")
+    return value
 
 
 def exact_number(value, *, volume=False, nullable=False):
@@ -61,7 +69,7 @@ def normalize_values(row):
     return values
 
 
-def minute_rows(body, *, after_date, end_date):
+def minute_rows(body, *, after_date, end_date, max_rows=LEGACY_MINUTE_WINDOW):
     """Return every input row with an exclusive destination and original locator.
 
     Older response-window rows are explicitly out of this append-only increment.
@@ -70,7 +78,7 @@ def minute_rows(body, *, after_date, end_date):
     raw = json.loads(body)
     if raw is None:
         return []
-    if not isinstance(raw, list) or len(raw) > 1023:
+    if not isinstance(raw, list) or len(raw) > minute_window(max_rows):
         raise ValueError("invalid_bounded_minute_envelope")
     result = []
     groups = {}
