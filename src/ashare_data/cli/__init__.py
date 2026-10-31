@@ -50,7 +50,7 @@ def parser():
     from ashare_data.cli.zzshare import add_parsers as add_zzshare_parsers
 
     add_zzshare_parsers(sub)
-    from ashare_data.storage.local_daily import add_parser as add_local_daily_parser
+    from ashare_data.cli.local_daily import add_parser as add_local_daily_parser
 
     add_local_daily_parser(sub)
     from ashare_data.cli.corporate_actions import add_parser as add_corporate_history_parser

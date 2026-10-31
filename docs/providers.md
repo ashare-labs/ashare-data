@@ -199,91 +199,29 @@ strict=True 拒绝缺自然日/未知必需字段，False 可看部分数据；�
 
 当前 projection-2 与 research-1 清单分开：同原件保持同 capture_id，复现还需固定 wheel。historical_available_at=None，PIT/完整覆盖/事件覆盖/执行许可均 False。CLI 为 zzshare-import/fetch/query/snapshots/recover --enable-research，最小示例 `examples/zzshare.py`。
 
-### Free-source frozen queues
+### 免费来源冻结队列
 
-`ashare-data free-updates prepare-queue --config queue.json` is read-only. Add `--save`
-to persist a content-addressed plan inside the isolated observation store.
-`ashare-data free-updates run-queue --queue <saved-json> --execute` processes the bounded
-job budget and resumes exact job IDs across days. Successful jobs are skipped;
-untried jobs precede retries; failed-attempt limits use the actual Asia/Shanghai
-execution day. Source cooldowns and the single store writer still apply. No
-timer or production release is installed.
+`ashare-data free-updates prepare-queue --config queue.json` 为只读预演；添加 `--save` 可在隔离观察库中保存内容寻址计划。`ashare-data free-updates run-queue --queue <saved-json> --execute` 在限定任务预算内推进采集并支持跨日续跑精确任务 ID：已成功任务自动跳过，未尝试任务优先于重试任务，每日失败尝试次数按 `Asia/Shanghai` 实际执行自然日统计。来源冷却与单 Store 写入锁同样生效，不安装定时器或发布生产数据。
 
-The config schema is `ad.free-update-queue-config.v1`, with `root`, explicit
-`rows`, `as_of`, `lookback_days`, and either `context` or `context_file` plus
-`context_sha256`. A context file is an `ad.free-update-universe.v1` manifest
-containing `contexts`, `scope`, `source_receipts`, `observed_at`, and
-`coverage_limitations`. A changed manifest or implementation needs a new queue;
-old queues and evidence remain intact. Completion means every frozen job was
-received, not that a supplied manifest proves the entire market or history.
-Every CMES catalog row now carries a separate `collection_goal`; the six
-original spreadsheet columns remain unchanged. Discontinued indicators retain
-their menu identity and official evidence and are excluded from all plans.
+配置模式为 `ad.free-update-queue-config.v1`，包含 `root`、显式 `rows`、`as_of`、`lookback_days`，以及 `context` 或带 `context_sha256` 的 `context_file`（`ad.free-update-universe.v1` 清单，含 `contexts`、`scope`、`source_receipts`、`observed_at` 与 `coverage_limitations`）。清单或实现变更需生成新队列，旧队列与证据保持不变。队列完成仅代表全部冻结任务已接收，不代表所给清单覆盖全市场或全部历史。CMES 目录每行携带独立的 `collection_goal`，原始表格六列保持不变；停发指标保留菜单身份与官方依据，并从所有采集计划中排除。
 
-Security event adapters preserve raw security codes and source dates, read all
-reported pages within an explicit bounded window, and reconcile source counts.
-Dividends retain amounts per 10 shares. Block trades retain multiplicity of
-identical source dimensions and rounded source volume/amount precision; their
-occurrence labels are not exchange trade IDs. LHB arithmetic exceptions remain
-visible quality gaps and cannot earn core acceptance. SooZhu source product
-specifications and per-head/per-kg units are persisted separately; its recent
-rolling window does not provide unlimited historical recovery.
+证券事件适配器保留原始证券代码与来源日期，读取显式限定窗口内的全部报告分页并核对来源总数：分红保留每 10 股金额；大宗交易保留同维度重复记录及来源四舍五入精度（序号标签并非交易所成交编号）；龙虎榜算术差异作为可见质量缺口保留；搜猪产品规格与元/头、元/公斤单位分别持久化。
 
-### Macro history coverage acceptance
+### 宏观历史覆盖验收
 
-Reviewed direct macro reports accept explicit `--source-start`, `--source-end`
-and `--page-size` on `free-updates plan/collect`. Source date filters use the
-reviewed report date field (LPR uses `TRADE_DATE`). Every page must agree on the
-source count; empty or repeated pages, ignored date filters and conflicting
-periods fail. Industry indicators carry the exact returned ID and name. Exact
-duplicate industry projections are counted explicitly before collapse; original
-responses remain immutable. Unknown units or a narrower insurance definition do
-not earn core acceptance.
+经审核的直连宏观报告在 `free-updates plan/collect` 上支持显式 `--source-start`、`--source-end` 与 `--page-size`。来源日期过滤使用经审核的报告期字段（LPR 使用 `TRADE_DATE`）。各分页须与来源声明总数一致，空页、重复页、日期过滤失效或期次冲突均判定失败。行业指标保留精确返回 ID 与名称，完全重复的行业投影在去重前显式计数，原始响应保持不可变。
 
-`scripts/verify_free_update_history.py --root <isolated-store> --rows 156 170 174 176
---as-of YYYY-MM-DD --seed-end YYYY-MM-DD --delta-start YYYY-MM-DD --output proof.json`
-previews a five-stage trial. Add `--execute` to collect seed history, an unchanged
-seed repeat, an overlapping later date window, full source history, and a second
-unchanged full repeat. A trial uses a fresh child store with stage-specific
-checkpoints, so restarting skips completed requests. The overlap and new rows
-must reconcile exactly with the full source and with received-by queries. Source
-revisions during the trial leave it unverified instead of hiding differences.
+`scripts/verify_free_update_history.py --root <isolated-store> --rows 156 170 174 176 --as-of YYYY-MM-DD --seed-end YYYY-MM-DD --delta-start YYYY-MM-DD --output proof.json` 预演五阶段验证（加 `--execute` 执行）：采集种子历史、无变化重复采集、重叠后续日期窗口、完整来源历史及第二次完整重复采集。验证使用带阶段检查点的独立子存储，重叠部分与新增行须与完整来源及按接收时间查询结果完全一致。
 
-Coverage reports revalidate raw response hashes, exact request URLs, pagination,
-database links, semantic checks and current implementation identity. A report's
-`coverage_verified` is separate from sample `implementation_verified` and from
-`daily_deployment`. Historical window extension uses real HTTP requests but is
-not proof of a future release or an operating daily timer. For the small monthly
-reports, a daily full-history read is bounded and also catches older revisions;
-content deduplication avoids manufacturing daily statistical observations.
+覆盖报告重新核验原始响应哈希、精确请求 URL、分页、数据库链接、语义校验与当前实现身份。报告中的 `coverage_verified` 与样本 `implementation_verified`、`daily_deployment` 相互独立。对小型月度报表而言，每日全历史读取开销受控且能捕获早期修订，内容去重避免制造虚假的逐日统计观测。
 
-### Isolated daily staging and publisher handoff
+### 隔离日常暂存与发布交接
 
-`free-updates prepare-handoff --root <observation-store> --rows ...` previews a
-bundle from current, accepted, complete macro captures. `--execute` atomically
-saves it under that store's `outbox/`; `--previous <bundle-id>` compares snapshots
-by business key. New periods, revised values and reversions are upserts. Removed
-source periods require review; no historical deletion is generated. Bundles keep
-native source units and their own history bounds, not a claim of CMES equivalence.
-Manifest, snapshot, delta, source receipts and compressed bodies are hash checked.
+`free-updates prepare-handoff --root <observation-store> --rows ...` 从当前已验收的完整宏观捕获预演交接包；`--execute` 将其原子保存在该存储的 `outbox/` 下；`--previous <bundle-id>` 按业务主键对比快照，新增期次、修订值与回退均作为 upsert 记录，来源消失期次需人工复核而不生成历史删除。交接包保留原生来源单位与自身历史边界，清单、快照、增量、来源回执与压缩正文均经哈希校验。
 
-The schedule config may set `prepare_handoff: true`. After a successful bounded
-collection, it resumes the last prepared bundle checkpoint automatically. Failed
-jobs give a nonzero CLI exit and prevent export. The checkpoint acknowledges only
-local preparation, never production publication. A launchd plist can be rendered
-with `free_update_handoff.render_launch_agent`; rendering does not load or enable
-it. Use a pinned, verified installed wheel, and confirm the host clock's timezone.
+调度配置可设置 `prepare_handoff: true`，在受控采集成功后自动续接上次准备的交接包检查点；任务失败时返回非零退出码并阻止导出。`free_update_handoff.render_launch_agent` 仅渲染 `launchd` plist 而不自动加载或启用。`free-updates preview-intake --bundle <bundle-dir> --coordination <writer-json>` 仅只读检查交接包与既有写入器状态，绝不改写正式 `CURRENT` 指针或启动第二个生产发布器。
 
-`free-updates preview-intake --bundle <bundle-dir> --coordination <writer-json>`
-only reads the bundle and existing writer's status. Production still needs an
-explicit native-macro consumer in the existing writer, unit/namespace review and
-its normal locked, expected-parent atomic release. These commands never write
-the formal CURRENT pointer or start a second production publisher.
-
-News capture preserves provider IDs and timezone-aware publication times. THS
-epoch conversion is independent of the host timezone; latest-page retention is
-reported explicitly. Latest news pages alone are not ready for complete daily
-news delivery until paging/cursor and missed-interval coverage are verified.
+新闻采集保留供应商 ID 与带时区的发布时间（同花顺时间戳转换不依赖宿主时区），并显式报告最新页保留范围。
 
 ### 原生宏观数据的公共发布与查询
 

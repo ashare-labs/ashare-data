@@ -2,82 +2,71 @@
 
 ## 0.10.0.dev98
 
-- Integrate scoped public-source incremental collectors, their separate supplemental data packages, frozen daily dispatch, and query/readback tools.
-- Retain the recoverable all-market daily-update CLI, explicit source continuation, and original financial archive pagination recovery without replacing newer release readers.
-- Preserve source definitions, original capture times, snapshot identities, shared cooldowns, and separate collection/publication responsibilities. Existing installed collectors remain pinned until explicitly migrated or upgraded.
-- Update the large-selection regression to the current complete-read contract; keep invalid-selection and explicit missing-coverage checks.
+- 接入受控公开源当期增量采集器、独立补充数据包、冻结日级调度与查询/回读工具。
+- 保留可恢复的全市场日级更新 CLI、显式来源续跑与原始财务归档分页恢复能力，不替换既有发布读取器。
+- 保留来源定义、原始捕获时间、快照身份、共享冷却机制与采集/发布职责边界。
+- 将大范围筛选回归测试对齐至当前完整读取契约，保留无效筛选与显式覆盖缺口检查。
 
 ## 0.10.0.dev20
 
-- Add isolated `qlib_alpha158` namespace with the official v0.9.7 default 158 features, explicit float32/input-basis contracts, and independently generated reference comparisons. Preserve CMES, Alpha191 and evaluation APIs.
+- 新增独立的 `qlib_alpha158` 命名空间，包含官方 v0.9.7 默认 158 项特征、显式 float32/输入基准契约及独立生成的参考比较器；保持 CMES、Alpha191 与因子评价接口不变。
 
 ## 0.10.0.dev19
 
-- Add optional offline single-factor diagnostics backed by pinned Alphalens Reloaded 0.5.0: lagged session labels, Pearson IC, Spearman RankIC, quantile returns/spreads, stability, turnover and explicit cohort cost sensitivity.
-- Preserve signal-date membership before label filtering, reject ambiguous quantile ties, expose coverage, and keep incomplete quantile returns undefined. No execution simulation or market-data acquisition is introduced.
+- 新增基于固定版本 Alphalens Reloaded 0.5.0 的可选离线单因子诊断：滞后交易日标签、Pearson IC、Spearman RankIC、分位数收益/价差、稳定性、换手率及显式队列成本敏感度。
+- 在标签过滤前保留信号日成员关系，拒绝存在歧义的分位数并列值，公开覆盖率并保持不完整分位数收益为未定义。
 
 ## 0.10.0.dev18
 
-- Connect ordinary daily backtests to release-pinned formal status, price limits and corporate source evidence; preserve legacy reference groups and explicit missing-data blockers.
-- Bound unresolved old stock-credit dates by observed tradability without inventing dates; serialize repeated publication reads with the existing write lock.
+- 将普通日频回测接入发布锁定的正式交易状态、涨跌停价限与公司行动来源证据；保留既有参考组与显式缺数阻断。
+- 以已观察到的可交易性限定未解决的早期送转股到账日边界，复用既有写锁串行化重复发布读取。
 
 ## 0.10.0.dev16
 
-- Validate financial relationship endpoints one type at a time, retaining exact endpoint checks without two simultaneous unions of the full financial fact tables. Reuse verified dev15 candidates without reimporting their captured responses.
+- 按端点类型逐类校验财务关系端点，避免同时合并两份全量财务事实表；直接复用已验证的 dev15 候选而不重复导入捕获响应。
 
 ## 0.10.0.dev15
 
-- Import retained responses from explicitly stopped source batches while recording unvisited tasks only as coverage gaps. Freeze stop evidence and receipt inventories for resumable imports.
-- Keep the published financial schema and reader contracts unchanged; preserve source values, unknown units, historical visibility restrictions and prior release objects.
+- 支持从显式停止的源批次导入已保留响应，未访问任务仅记录为覆盖缺口；冻结停止证据与回执清单以支持可恢复导入。
+- 保持已发布财务 schema 与读取器契约不变，保留源数值、未知单位、历史可见性限制与历史发布对象。
 
 ## 0.10.0.dev14
 
-- Publish reviewed source-unit rules with their immutable proof closure; exact source-field queries use the release-bound annotations while preserving original financial observations, missing values and historical visibility restrictions.
-- Append bounded market calendar sessions from retained, agreeing source calendars; verify the complete metadata delta before one atomic publication with unchanged market facts.
-- Preserve prior releases, accept interrupted publication retries and reject dropped unit evidence.
+- 发布经审阅的源单位规则及其不可变证据闭包；精确源字段查询使用发布绑定的单位注释，同时保留原始财务观察、缺失值与历史可见性限制。
+- 从已保留且一致的源日历追加有界市场日历交易时段，在原子发布前校验完整元数据增量。
 
 ## 0.10.0.dev13
 
-- Accept the reviewed financial reference and recovered official-index candidates without re-parsing prior frozen inputs. Retain source-code quarantine and incomplete index coverage.
-- Keep JSON consumer stdout free of DuckDB progress output; preserve returned financial values and version bindings.
+- 接纳经审阅的财务参考与恢复的官方公告索引候选，无需重新解析已冻结输入；保留源代码隔离与不完整索引覆盖记录。
+- 保持 JSON 消费者标准输出不受 DuckDB 进度输出污染。
 
 ## 0.10.0.dev12
 
-- Add resumable recent daily/minute collection and exact source-to-release admission with immutable response and destination evidence.
-- Add release-pinned Sina minute selection and explicit recent daily observation captures; preserve prior releases and source contracts.
-- Make repeated replacement plans idempotent and update coverage only for changed scopes.
-- Compose reviewed financial/reference candidates into the same immutable release; retain source-code identity, capture cutoffs, unit restrictions and prior market facts.
-- Resolve incremental raw-response provenance in daily read receipts, including native Sohu batch positions.
-
+- 新增可恢复的近期日线/分钟采集及源到发布的精确准入校验，保留不可变响应与去向证据。
+- 新增发布锁定的新浪分钟筛选与近期日线观察捕获，使重复替换计划保持幂等并仅更新变更范围的覆盖统计。
+- 将经审阅的财务/参考候选合入同一不可变发布，解析日线读取回执中的增量原始响应溯源（含搜狐原生批次位置）。
 
 ## 0.10.0.dev5
 
-- Integrate formal daily publication and generic source-labelled minute research exports in one paired runtime; retain the existing source, quality and visibility boundaries.
+- 在同一配对运行时内集成正式日线发布与通用带来源标签的分钟研究导出，保留既有来源、质量与可见性边界。
 
 ## 0.10.0.dev4
 
-新增正式日线产品目录、只读查询与发布：大库行情通过显式参考集合接入普通条件研究，保留逐日交易状态、派生价限、独立公司行动计划和可验证来源绑定。缺失或冲突的数据明确拒绝，价格诊断保留为独立模式。统一数据根及资产配置，支持可恢复发布和来源确证。
-
-修复 TDX 子进程入口导入旧模块的回归，新增真实进程启动测试。
+- 新增正式日线产品目录、只读查询与发布：大库行情通过显式参考集合接入普通条件研究，保留逐日交易状态、派生价限、独立公司行动计划和可验证来源绑定。
+- 修复 TDX 子进程入口导入旧模块的回归，新增真实进程启动测试。
 
 ## 0.10.0.dev3
 
-- 增加公开 `export_minute_research`：从固定快照生成有界来源标签研究文档，保留原始/派生字段、质量、未知可见时间和来源摘要；不授予执行权限。
-
-将 docs 从 48 个文件收敛为 19 篇任务指南，合并重复入口并移除两份可生成覆盖 CSV；明确两份开发 CJS、随包 JS、QuickJS 与 Node 的职责和依赖，修复导航及源码文档引用。
-
-恢复 Eastmoney 原生 fields1 的 f1/f2 协议标识，新增沪深请求构造回归，防止业务命名整理改变线协议。移除 CLI 帮助中的旧固定验收计数；因子采集工具继承调用方代理配置，移除写死的本机端口。包版本/runtime 身份更新；数据、owner/schema/policy 版本与冻结交付保持原义。
+- 新增公开 `export_minute_research`：从固定快照生成有界来源标签研究文档，保留原始/派生字段、质量、未知可见时间和来源摘要。
+- 将 `docs/` 从 48 个文件收敛为任务指南，合并重复入口并移除可由 API 生成的覆盖 CSV；明确开发脚本、随包 JS、QuickJS 与 Node 的职责和依赖。
+- 恢复 Eastmoney 原生 fields1 的 f1/f2 协议标识，新增沪深请求构造回归测试。
 
 ## 0.10.0.dev2
 
-将通用 TVMA6 来源区间、舍入输出比较和汇总放回 `factors/joinquant/amount_comparison.py`，测试直接使用安装包公开入口。保持原数值边界与未认证声明，不恢复历史批次 API。
-
-修复包门面的 `catalog` 函数遮蔽同名模块的问题，常规模块导入可调用目录查询。增加离线金额示例和隔离 wheel 入口验证。包版本和代码身份更新，有限事实、条件与可移植研究的既有 owner/schema/policy 版本保持原义。
+- 将通用 TVMA6 来源区间、舍入输出比较和汇总放回 `factors/joinquant/amount_comparison.py`，测试直接使用安装包公开入口。
+- 修复包门面的 `catalog` 函数遮蔽同名模块的问题，增加离线金额示例和隔离 wheel 入口验证。
 
 ## 0.10.0.dev1
 
-按功能组织行情、参考数据、公司行动、财务、因子、存储、提供者、观察和研究代码。D1/BR1/M2 类型与方法改为有限事实、条件研究、可移植研究名称；旧模块不提供兼容别名。F1/F2 因子改为明确字段和计算入口，Alpha191 正式编号保留。
-
-移除历史实验和验收输出，将仍有用途的精确算术留在运行包、比较工具留在 scripts、回归反例收敛到合成测试。修正包资源、子进程入口及安装后命令；文档只描述当前契约，增加轻量结构校验。
-
-新 owner、资源和代码指纹属于本版本，不继承旧运行验收。数据库和冻结账户不迁移；调用者按[迁移说明](docs/migration.md)创建新环境与新输出。此前版本的具体变更和材料保留在 Git 历史。
+- 按功能组织行情、参考数据、公司行动、财务、因子、存储、提供者、观察和研究代码。D1/BR1/M2 类型与方法改为有限事实、条件研究、可移植研究名称；F1/F2 因子改为明确字段和计算入口，Alpha191 正式编号保留。
+- 移除历史实验和验收输出，将精确算术留在运行包、比较工具留在 `scripts/`、回归反例收敛到合成测试。

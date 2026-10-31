@@ -43,8 +43,6 @@ select = ["E4", "E7", "E9", "F"]
 # Source archives contain distributable project files only, including in Git worktrees.
 [tool.hatch.build.targets.sdist]
 include = ["/src", "/tests", "/examples", "/scripts", "/docs", "/README.md", "/CHANGELOG.md", "/CONTRIBUTING.md", "/pyproject.toml", "/uv.lock", "/.gitignore"]
-exclude = ["/docs/feasibility.md", "/docs/rc1-to-rc2.md", "/examples/local_probe.py", "/review/rc1", "/src/ashare_data/pilot_evidence", "/tests/fixtures/calendar_pilot"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ashare_data"]
-exclude = ["/src/ashare_data/pilot_evidence"]

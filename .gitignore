@@ -1,15 +1,15 @@
 .venv/
+.venv-*/
 __pycache__/
 .pytest_cache/
 .ruff_cache/
 *.egg-info/
 dist/
+.DS_Store
 .data/
 .local-evidence/
 evidence/
 exports/
-CONTENT.sha256
-RELEASE.json
 .cache/
 .state/
 .env
@@ -31,17 +31,4 @@ RELEASE.json
 *.zip
 *.tar
 *.tar.gz
-
 probes/
-
-.venv-local-data/
-
-# Local development and acceptance records from the initial rc1/rc2 work.
-/docs/feasibility.md
-/docs/rc1-to-rc2.md
-/examples/local_probe.py
-/review/rc1/
-
-# Separately held third-party pilot material is never part of public source.
-/src/ashare_data/pilot_evidence/
-/tests/fixtures/calendar_pilot/
