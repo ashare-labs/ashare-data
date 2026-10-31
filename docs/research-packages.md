@@ -107,6 +107,7 @@ Portable 子系统（`ashare_data.research.portable*`）将本地原始响应（
 | `Store.import_portable(directory)` | 在新 `Store` 中离线校验全部原件与派生规则并导入可移植数据集 |
 
 - **组件与数值约束**：价格、金额与前收使用 `decimal_text`（最长 48 字符，至多 8 位小数，禁止非有限数）；成交量为 1–24 位非负整数股字符串。`facts` 组件须提供 `security_identity`、`initial_listing_date`、`buy_round_lot`、`price_tick`、`normal_daily_limit_ratio`、`same_day_resale` 六项带原文定位引用的声明及窗口筛查记录（`coverage`）。
+- **协议世代标识说明**：`ashare_data.research`（`portable.py`、`conditional.py`、`finite_facts.py`、`conditional_listing.py`）中的 `VERSION / OWNER_VERSION = "0.10.0.dev1"` 以及 `ashare_data.reference.listing` 中的 `OWNER_VERSION = "0.8.2.dev1"` 是冻结研究包与上市事实的**协议 schema 世代号**（下游 `data-runtime.json` 中记录为 `portable_owner_version`），用于校验历史冻结夹具契约，不随 `ashare-data` 发行包版本（如 `0.10.0.dev98`）递增。
 
 ### 消费与验证接口
 

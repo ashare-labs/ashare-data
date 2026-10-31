@@ -128,7 +128,13 @@ def checked(config_path):
             raise ValueError("child deadline out of bounds")
         if item["runtime_manifest"] not in manifests:
             frozen = read(item["runtime_manifest"])
-            if config.get("enforce_request_admission") and "providers/free_update_budget.py" not in frozen["frozen_package_files"]:
+            if config.get("enforce_request_admission") and not (
+                {
+                    "providers/free_update_budget.py",
+                    "providers/free_updates/free_update_budget.py",
+                }
+                & set(frozen["frozen_package_files"])
+            ):
                 raise ValueError("scheduled runtime lacks per-request admission guard")
             origin = Path(frozen["package_origin"]).resolve().parent
             if not origin.is_relative_to(scope) or not Path(

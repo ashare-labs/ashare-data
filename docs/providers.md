@@ -147,7 +147,7 @@ ashare-data free-updates manual-query --snapshot <snapshot-dir> --offset 0 --lim
 
 - **批量与多源注册表调度**：
   - 股票/ETF/指数/可转债批量采集由 `ashare_data.providers.free_updates.free_update_batch` 驱动（配置 schema `ad.security-update-batch.v1`）。
-  - 第二批 19 项增量由 `ashare_data.providers.free_updates.free_update_supplemental` 驱动，支持 `depends_on` 依赖检查（确保可转债、PE/PB、公司资料、分红配股、题材成分与美债等前置项当日完成后再生成成员行情队列）。
+  - 第二批 19 项增量由 `ashare_data.providers.free_updates.supplemental_updates` 驱动，支持 `depends_on` 依赖检查（确保可转债、PE/PB、公司资料、分红配股、题材成分与美债等前置项当日完成后再生成成员行情队列）。
   - 多源并发注册表通过 `scripts/run_daily_update_registry.py --profile registry.json --execute`（schema `ad.daily-update-registry.v2`）管理按观察库隔离的每日请求数与响应字节预算（`budget_scope: observation_store`）、来源级冷却与根目录 `STOP` 优雅暂停。
 
 ### 交接包与原生宏观发布（`native-macro`）
