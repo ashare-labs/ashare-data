@@ -1,6 +1,6 @@
 """Versioned, offline GTJA Alpha191 research formulas over explicit panel inputs.
 
-See docs/alpha191.md for the numerical contract and remaining source ambiguities.
+See docs/factors.md for the numerical contract and remaining source ambiguities.
 The 18 pre-existing FACTOR_PANEL/FACTOR_RESEARCH factors and their JQ comparisons are independent APIs.
 """
 

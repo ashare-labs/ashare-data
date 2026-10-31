@@ -1,427 +1,107 @@
-# 维护与查询本地日线库
+# 本地日线与分钟主库
 
-本地库保存显式采集的多来源原文、来源行和修订，适合长期日线维护。维护 CLI 的显式 `--root` 优先；未提供时读取共享部署清单的日线资产。只有完全未配置清单时才使用 `~/.local/share/ashare-data`。SDK 的构造参数继续显式选择库；发现配置不会搬库、更新数据或启动后台服务。
+本篇介绍本地全量行情主库 `LocalDailyStore`、多源日线增量维护，以及面向下游消费的不可变产品发布接口 `MarketRelease` 与 `LocalMinuteProduct`。
 
-## 本地日线
+## 本地日线主库（`LocalDailyStore`）
 
-```sh
-UV_PROJECT_ENVIRONMENT=.venv-local-data uv sync --locked --no-config --python 3.12 --extra local-data
-ashare-data local-daily --help
-ashare-data local-daily --root "$DATA_ROOT" update --start 2010-01-01
-ashare-data local-daily --root "$DATA_ROOT" status
-ashare-data local-daily --root "$DATA_ROOT" resume --retry-failed
-```
-
-DATA_ROOT 是用户明确选择的数据目录；先查看 `--help` 确认本次范围。`update` 默认从 2010-01-01 至源时钟下最新可采集日，18:00 前不把当天纳入完成范围。日线、证券清单、日历和源累计因子分别存储，不按价格自动推导状态。
-
-| 操作 | 用途与边界 |
-|---|---|
-| update / resume | 显式采集或继续已登记任务；成功原件和修订留存，重复数据去重 |
-| update --repair-gaps | 对未知缺口实际请求；来源仍缺行就保持未知 |
-| supplement --source sohu / tencent | 对显式证券/日期补采独立来源，不自动改写原来源行 |
-| `scripts/accept_local_daily.py` / `scripts/audit_local_daily.py` | 为指定库生成本次覆盖/一致性检查，不能用旧报告数值证明新库 |
-
-HTTP 任务和 BaoStock 队列分开；HTTP 默认3 workers、主机间隔1秒、有限超时和最多3次尝试。401/403/429 暂停该主机，连续传输失败进入30分钟冷却。根目录 STOP 允许正在进行的请求结束后停下；完整批次还使用 STOP_BAOSTOCK。重开会把未完成 running 工作恢复为 pending，不能靠删除状态绕过失败。
-
-本地目录包含 daily.sqlite3、raw 压缩原文及摘要、reports、任务/源状态。SQLite WAL 支持采集时读取，写者锁保护任务；源码或安装包不携带这些数据。不要清理活跃锁、原件、回执或失败诊断，不把库目录作为测试/构建输出。
-
-## 全市场日常增量
-
-安装后的 `ashare-data daily-update` 是独立的单次增量入口，不改变上面的旧库默认股票池或部署清单。
-它每天冻结新浪当前 A 股名单，并由 BaoStock 当日股票分类名单补充遗漏（包括其股票分类内的 CDR），包含沪深主板、科创板、创业板及北交所；加入新证券，保留历史证券。
-未出现在新名单不自动认定退市。历史补日优先使用来源当日名单；从前后名单推知的范围标为未知。
-CMES 文件清单只用于保留身份，不扫描或复制其历史价格。
-
-```sh
-# INCREMENT_ROOT 是统一数据目录下的独立子目录；BASE_BINDING 固定 market_release 三元组。
-# SDK_ROOT 为固定 SHA 校验的官方 BaoStock 0.9.4 源码目录（不使用 API_KEY）。
-ashare-data daily-update init --root "$INCREMENT_ROOT" --sdk-path "$SDK_ROOT" \
-  --base-binding "$BASE_BINDING" --seed-directory "$CMES_DAILY_PACKAGES" \
-  --minute-window 1970 --interval 1 --budget-gib 8 --reserve-gib 50
-ashare-data daily-update run --root "$INCREMENT_ROOT" --date 2026-10-22
-ashare-data daily-update status --root "$INCREMENT_ROOT" --date 2026-10-22
-# 重复同一 run 恢复未完成任务；STOP 文件或 SIGTERM 停止本采集进程的后续提交。
-# --due 按 Asia/Shanghai 20:30 后可采日期和已知交易日历，优先处理最早未完成日。
-ashare-data daily-update run --root "$INCREMENT_ROOT" --due
-# 只输出配置，不注册 launchd；安装/启用调度需部署者另行决定。
-ashare-data daily-update schedule --root "$INCREMENT_ROOT"
-# 生成隔离 MarketRelease；不切换 deployment.json 或其他库的 CURRENT。
-ashare-data daily-update candidate --root "$INCREMENT_ROOT" --date 2026-10-22 \
-  --output "$INCREMENT_ROOT/candidates/market"
-```
-
-`schedule` 输出使用调用时的 Python，需在该解释器安装 wheel。首次只采最新可采日；以后默认追补最近 10 个自然日的已知交易日，`--retry-window-days` 可配置 1–31 日。超窗待办仍保留，不把配置界限当作来源已过期的证明。日历未知不猜工作日。补多个日期时共享同一份最新分钟响应，按证券日分别归档完成状态，避免重复下载滚动窗口。
-
-BaoStock 新按日接口通过单连接批量取 A 股日线和因子，每日最多 48,000 次发送、至少间隔 1 秒；同机本入口使用互斥锁。免费节点失败会保留失败状态。日线第一次成功采集时按固定优先顺序选择，默认为 BaoStock、搜狐，可用 `--daily-sources` 显式选择；已完成证券日的选择冻结，迟到来源不替换它，也不逐字段拼成行情。新浪分钟每主机每秒最多一次请求，窗口 1970 条只是已观测支持的请求参数，不保证固定历史天数。401/403/429 会持久停止该主机，后续运行不会绕过；普通传输失败有限重试并冷却。
-
-`jobs` 记录是否取回来源窗口，`coverage` 记录实际证券日的标签/字段覆盖，两者不能混作“全市场完整”。分钟保留 09:30、竞价及稀疏标签，单独列出常规 240 标签的缺项；少两条不自动补数或认定停牌。完整游标只越过已知交易日的完整数据，不跳过失败证券。零量、空响应、过期窗口、尚未更新、结构异常分别保留，未确认的历史 PIT 不开放为已证实事实。
-
-BaoStock 当日交易状态作为独立来源证据保存，后续空价格响应不会抹掉它。来源明确停牌且没有可接纳价格行时，覆盖记为 `suspended`；原价格/量额仍保留在回执或隔离记录中，不制造零量行情。已有分钟响应可以在补齐状态证据后离线重判，跨日也无需重新下载。任务全部结束仍可能存在稀疏分钟或不支持的因子，报告分别列明。
-
-首个单日候选可用 `python scripts/accept_daily_update.py --root "$INCREMENT_ROOT" --date 2026-10-22 --candidate "$INCREMENT_ROOT/candidates/market"` 做有界全键/值核验；它验证原回执、状态、原生因子、隔离记录与候选落盘值，不联网。若存在额外修订版本或候选未采用的规范观察，会明确阻断这项首轮验收，不能把总行数相同当成完整对账。
-
-候选沿用冻结 CMES 身份和每证券历史终日，只追加此后的原价日线/分钟；冲突隔离，旧发布继续复现。历史对象以同卷硬链接复用，不复制全库；不同卷会明确拒绝。查询仍用 `ReleasedDailyProduct` / `minute_prices` / `MarketRelease.sql`，来源过滤严格，不会回退到其他源。候选保存字段映射、来源原文摘要、证券日限制及按键值往返校验结果。来源因子另存 `increment_factors` 原始观察；在与 CMES 累计因子的方向、基准和事件日期衔接验证前，不自动连乘、不把因子空集造为 1。该首版不是财报、公司行动或逐笔采集服务。
-
-## 查询与来源选择
+`LocalDailyStore` 管理本地 SQLite/Parquet 混合存储的日线、复权因子、证券目录与来源回执，支持从历史底库初始化并按交易日增量更新。
 
 ```python
-from ashare_data.storage.local_daily import LocalDailyStore
+from ashare_data import LocalDailyStore
 
-store = LocalDailyStore("data/local-daily", readonly=True)
-try:
-    result = store.get_price("600000.XSHG", start="2020-01-02", end="2020-01-10")
-    print(result)
-finally:
-    store.close()
+store = LocalDailyStore("/path/to/ashare-data-local")
+status = store.status()
+df = store.query(
+    symbol="600000.XSHG",
+    start_date="2024-01-02",
+    end_date="2024-03-29",
+)
 ```
 
-日线原价、股数、人民币元、源前收及累计因子分别保留；数值与缺失原因按来源返回。默认 auto 为整个请求范围选择观测天数最多的一份来源，平局按金额覆盖；它不是逐字段多数票或质量认证。source 显式选择不意味着其他来源被删除。相同来源修订另存，不覆盖旧观察。
+### CLI 常用命令
 
-主范围为上交所主板与深交所 00xxxx，包含区间内已退出证券。universe 默认在 2021-04-06 前排除原中小板 002/003；main_board_only=False/--include-sme-history 可查其谱系。显示名称是本次资料的名称，name_is_historical=False，不回填成历史名称。
+```sh
+# 查看主库状态与覆盖报告
+ashare-data local-daily status --root /path/to/ashare-data-local
+ashare-data local-daily report --root /path/to/ashare-data-local
 
-覆盖分母依赖交易日历、上市/代码有效区间，不能用 bar 数倒推日历。unique_security_days 与多来源 bar_rows 分开；未请求缺口为 awaiting_collection，已请求无记录为 missing_unknown_not_proven_suspended。零量和缺行都不自动证明停牌；原件超范围仍保留，但不进入当前覆盖。
+# 按证券或日期查询日线与代码变更别名
+ashare-data local-daily query --root /path/to/ashare-data-local --symbol 600000.XSHG --start 2024-01-01 --end 2024-01-31
+ashare-data local-daily query-alias --root /path/to/ashare-data-local --symbol 601313.XSHG
 
-## 显式兼容补字段
+# 执行增量更新或断点续跑
+ashare-data local-daily update --root /path/to/ashare-data-local
+ashare-data local-daily resume --root /path/to/ashare-data-local
+```
 
-跨源补齐必须选择 `get_price(...,mode="compatible")` 或 `query --mode compatible`；它不会修改原库行或覆盖表。基础来源依次考虑 baostock、eastmoney、sina、sohu、tencent，再考虑已验证别名；显式 source 是优先选择，不是无条件跳过验证。
+### 多源日线对账与增量策略
 
-- 候选必须同证券/同日/原价和已知单位，OHLC 及所有共同非空字段 Decimal **精确相等**。不按容差抹平差异。
-- 只补缺失 volume/amount/preclose/tradestatus/is_st，不覆盖已有值。未知仍 None；不得用收盘价乘量造金额。
-- amount 的合理性还需正量与 high/low 的分位展示界限；它不是允许其他字段误差的容差。量是“股”也不证明来源逐股精度。
-- 来源明确停牌，或已核对公告与来源交易状态冲突，就阻断补值；可信身份的坏 OHLC 行仍可贡献停牌阻断，不被选择性忽略。
-- 每个补值保留 field_provenance、完整 observations/conflicts。组合行的单一 raw ID/hash/time 为 None，不能假装来自一份原子响应。
-
-返回区分 native_observed_days、returned_days、missing_days 和补字段计数；没有原生行的别名停牌占位只进入 metadata.unfilled_days，不制造交易行或增加原生覆盖。相关证据缺失、hash 不符会报错，不能静默使用更宽松规则。
+- **底库与当期增量**：历史底库提供基线数据，日常增量通过新浪、腾讯、东方财富及 BaoStock 等公开接口采集并保存原始响应回执。
+- **跨源对账（Reconciliation）**：同一证券交易日存在多个来源时，系统按预设容差核对 OHLC、成交量（股）与成交额（元），保留各来源原始记录并在元数据中标明主选来源或冲突原因。
+- **代码变更与别名映射**：吸收合并或更名上市证券（如历史代码切换）通过显式别名表维护原代码有效期与承继关系，查询时按请求日期返回对应有效阶段的行情。
 
 ## 早期历史
 
-`query-early` / `get_early_observations(security,start,end,source=None,diagnostics=False)` 默认范围为1990-12-01～2009-12-31，两端包含；单传一端不改变另一端默认。现代 query/query-alias 仍默认从2010-01-01开始。早期范围外日期拒绝，strict_usable=False。默认返回独立 HTTP 来源行；diagnostics=True 才显示未准入 BaoStock 和 HTTP 异常行。
+针对 2005 年以前或特殊板块（如早期 PT/退市整理期）的跨源历史记录，`query-early` 提供按原始来源保留的探索性查询：
 
-`python -m ashare_data.market.early_history` 的 prepare 使用已归档名单，http/plan-tencent 显式采集、优先复放固定原件；连续3项服务错误或401/403/429停止该源本段提交，未发出任务为 deferred_source。STOP_EARLY 停止后续提交。retry-invalid-sohu 仅重放可隔离异常行的旧失败，不重试身份错误。早期新值不覆盖已有同源同日观察，不加入现代公共日历；周末原观察也不因现代日历删除。
+```sh
+ashare-data local-daily query-early --root /path/to/ashare-data-local \
+  --symbol 000001.XSHE --start 1995-01-01 --end 1995-12-31 --diagnostics
+```
 
-BaoStock 早期工具用 archive_only=True，原件进入 raw/early-baostock，有限尝试完成后 --import-only 导入 early_diagnostics，不写 bars；分页结束/双解码一致仍不能解决 type96 外层未知。代理日历 gap 不是已证实漏采；成功空集保持 empty_unknown。1900-01-01因子仅是基准占位，不是公司行动。
+- **数据特征**：早期历史记录按 `(symbol, date, source)` 保留各供应商原始数值，不同来源在早年可能存在手/股单位切换或除权口径差异，因此标记 `strict_usable=False`，不自动缩放或合成总收益。
+- **缺口归因**：早年深圳市场或特殊转让阶段缺乏完整独立官方休市表时，基于上交所日历代理计算的缺失日期仅作为待核查缺口展示，附 `--diagnostics` 可查看详细归因状态。
 
-来源最早可见日只是这次获取到的起点，不是市场最早成交日。BaoStock 基本资料/逐月名单、交易所清单和发行人公告分别记录，供应商 outDate 不会自动覆盖交易所/发行人事实。已核对 issuer_exit_notice 修订保留原清单来源，例行刷新不抹除修订。
+---
 
-改代码期间必须有显式代码区间和公告证据。旧代码捕获、换算单位和有效日期校验后才能参与别名查询；不能把供应商按新名称回填的旧名单作为历史名称证明，也不能因正式退市日仍有供应商条目而重新纳入股票池。
+## 正式产品发布（`MarketRelease`）
 
-早期采集/查询入口和参数见 `scripts/collect_early_baostock.py --help` 与 LocalDailyStore 的公开方法；接口不会自动请求任意历史。别名和边界证据在调用方 reports 中，按固定原文/hash 复验，不从本机路径或旧报告结论推导资格。
-
-累计后复权因子用于价格调整，不是完整现金/股份事件账本。分红支付、法定权益日期与价格调整生效可不同；股本、配股、到账及可卖日期由 [公司行动](corporate-actions.md) 的独立事实处理。来源分歧保留原值与诊断，不自动按多数票改历史。
-
-## 查询与发布产品
-
-`LocalDailyProduct` 从显式选择的 `daily.sqlite3` 提供证券搜索、分页覆盖和原价查询。每个请求使用只读 SQLite 事务，返回 JSON 数值字符串、缺口、原始来源行 hash、响应摘要与读回执；不联网、不搬库。目录中的来源范围是公共日历内的已有观察，名称不是历史名称；实际查询还受上市和代码有效期约束。日历之外的早期原观察仍保留在主库，由早期观察接口读取，不能当作完整产品日历。
-
-### 固定 CMES 复权因子
-
-`prices(..., adjustment=None)` 保持原价默认；`adjustment="pre"/"post"` 显式传入
-`CMESFactorView` 和 `basis_date`。本地产品和 `ReleasedDailyProduct` 共用这个入口。
-它只投影查询结果，原库、正式部署选择、发布及公司行动接口不变。
+`MarketRelease` 将日线主库、分钟分块、交易日历、证券生命周期、公司行动、财务三表及原生宏观数据封装为带 `manifest_sha256` 的不可变版本化发布，供 `ashare-quant` 等消费者通过只读文件映射直接读取，无需长连接占用主库 SQLite 写锁。
 
 ```python
-from pathlib import Path
-from ashare_data import Store
-from ashare_data.product import LocalDailyProduct
-from ashare_data.providers.cmes import CMESFactorView, import_cmes_factors
+from ashare_data import MarketRelease
 
-product = LocalDailyProduct("data/local-daily")
-packages = Path("data/cmes-packages")
-factor_store = Store.init("data/research-factors")  # 独立、显式输出目录
-factor_id = import_cmes_factors(
-    factor_store,
-    hfq_path=packages / "adjustment_factors/hfq/all-market-history.zip",
-    qfq_path=packages / "adjustment_factors/qfq/all-market-history.zip",
-    members={"600000.XSHG": "SH.600000.csv"},  # 日线证券映射所有者提供；不猜别名
-    through="2026-10-21",  # 数据截止日，不是历史可见性证明
+release = MarketRelease(
+    root="/path/to/releases",
+    release_id=1,
+    expected_manifest_sha256="<64位SHA256>",
 )
-factors = CMESFactorView(factor_store, factor_id)  # 保存完整 factor_id；禁止 latest
-print(factors.factor_at("600000.XSHG", "2024-07-18"))
-adjusted = product.prices(
-    ["600000.XSHG"], "2024-07-17", "2024-07-18",
-    adjustment="pre", basis_date="2024-07-18", factors=factors,
-)
+
+# 读取日线与覆盖检查
+prices = release.prices(["600000.XSHG"], start_date="2024-01-02", end_date="2024-01-31")
+coverage = release.coverage(["600000.XSHG"], start_date="2024-01-02", end_date="2024-01-31")
+
+# 读取原生宏观序列
+macro = release.native_macro()
 ```
 
-CMES 两列采用同一解析/匹配流程，但方向不同：`hfq_factor` 乘价格，
-`qfq_factor` 除价格。每只证券的两列事件日期必须一致，`hfq*qfq` 在整份源历史中
-相对误差不超过 `1e-10`；冲突直接报错。计算始终使用冻结的 HFQ 累计因子：
+### 发布构建、备份与增量应用
 
-| 查询 | OHLC 换算 | 价格基准 |
-|---|---|---|
-| 原价 `None` | 不变，不读取因子 | 原价 |
-| 前复权 `pre` | `raw(t) * H(t) / H(basis_date)` | 显式 `basis_date` |
-| 后复权 `post` | `raw(t) * H(t) / H(first_anchor)` | 固定版本中最早源锚点；通常 1900-01-01、H=1 |
-
-与已有日频研究约定一致，两种复权的 `basis_date` 都是显式因子截止日，必须覆盖
-所有请求日期且不超过导入的 `through`。后复权另在 `price_anchor_dates` 报告其价格锚点，
-不会用查询窗口第一天重新定基。前复权可等价理解为 `raw(t)*Q(basis_date)/Q(t)`，
-**不能直接乘 Q(t)，也不能直接除以今天归一化的 Q(t) 来表示历史基准日**。
-
-按证券精确匹配；日期选择最后一个 `effective_date <= date` 的事件，除权当日即生效，
-周末基准日沿用之前的因子。第一条事件之前不回填，缺证券/锚点、重复日期、非正/非有限
-数值、超过固定截止日均报错。导入不推导上市、停牌或交易日历；1900 锚点不是上市日。
-Decimal 34 位、ROUND_HALF_EVEN，保留结果字符串，不按分位截断。仅调整 OHLC；
-volume/amount/money、源 preclose 及状态字段保持原价语义，详见 `adjustment.unadjusted_fields`。
-不要把未调整的源 preclose 与复权 OHLC 混用为收益公式。
-
-最小跨模块契约：日线导入方提供现有原价 envelope：`price_basis="raw"`、`rows` 中
-`security/date/open/high/low/close`（明确缺失可为 `None`）及原价 `receipt`；若提供
-`receipt.rows_sha256` 则必须与行一致。可直接调用
-`factors.adjust_prices(raw_result, adjustment="pre", basis_date="2024-07-18")`，
-无需复制日线解析或因子流程。结果保留 gaps、calendar、原来源字段，新增每行
-`adjustment_factor/factor_effective_date`，新 receipt 绑定原价 receipt、输入/输出行摘要、
-因子版本、算法策略和基准日；原价对象不被修改。
-
-固定版本封存所选原始 CSV 内容、成员 SHA256、两个 ZIP 的 SHA256、显式证券映射与策略。
-重开验证完整哈希；追加/修订只生成新 id，不更新旧版本或默认指针。旧回测还须固定
-原价 market release 或原价输入/receipt，同时固定 ashare-data 版本/提交；
-可变本地库加固定因子并不冻结原价。
-当前快照是事后研究观察，不能证明过去已知这些值。现金分红支付日、股份到账/可卖日、
-现金和持仓账务继续由公司行动事实及账户模型负责，因子不替代这些证据。
-
-### 原价查询与发布
-
-```python
-from ashare_data.product import LocalDailyProduct
-from ashare_data import Store
-
-product = LocalDailyProduct.from_deployment("data/deployment.json")
-print(product.catalogue(query="600519", limit=20, offset=0))
-print(product.prices(["600519.XSHG", "000858.XSHE"], "2024-02-19", "2024-02-28"))
-selection = (["000651.XSHE", "000858.XSHE"], "2022-04-01", "2022-04-15")
-print(product.coverage(*selection))  # 只读检查，不创建 Store 或账户
-release = product.publish("data/releases", *selection)  # 默认 covered_research
-view = Store("data/releases").local_daily_product(release["dataset_id"])
-print(view.describe())
-portfolio_input = view.read()
-schedule = view.read_corporate_schedule()
-coverage = view.read_coverage()
-# AQ 产品入口验证这份发布，再用现有 corporate_export.attach 附加账户模型后导入。
-```
-
-日期是调用示例，必须在所选库和证据包中确实覆盖；没有数据就报缺口。`source="auto"` 在用户选定窗口内为每个证券选择一整份行情来源，发布固定这些来源后再读取预热；某来源预热不足就拒绝，不用其他来源拼补或静默替换。可显式指定来源重新查询。证券选择仅要求非空、唯一及合法标识，不再有100只门槛；已移除查询行数、证券交易日数和单份输入64 MiB的测试门槛；请求完整范围必须有真实覆盖，仍核对 BUY/SELL、路径和冻结哈希。资源错误按实际内存或存储失败报告，不静默截断。
-
-发布必须具备窗口之前完整的 120 个源日历交易日、窗口所有真实行情与后继日历。缺行情、非法 OHLC、无来源回执或上市范围之外会返回 `PRODUCT_DATA_GAPS` 和具体字段/日期；起止须是实际交易日。缺日历/预热返回 `PRODUCT_SESSION_UNAVAILABLE` / `PRODUCT_WARMUP_UNAVAILABLE`。主库目录不能作为发布输出目录，失败的输入不初始化 Store。
-
-普通发布 `covered_research` 通过指定参考集合的 `DailyResearchView + DailyExecutionView` 或 `HistoricalMarketView` 公共接口验证所选证券日，并从 `CorporateHistoryView.export_aq` 冻结完整公司行动响应。主库原始行情始终作为价格来源；参考包快照不替代行情。主库与参考的日历、停牌、ST、preclose，以及原始 OHLC 与限幅不兼容时给出具体缺口。已知停牌保留 true；未知字段、上市/退市边界、源冲突和当前不支持的无限价状态不会准入。参考缺口返回 `PRODUCT_COVERAGE_GAPS`，不会自动改用其他集合或诊断。
-
-普通基底保留结构化 `reference_evidence`：原始状态行、规则与 assumption_ids、一次批量准入响应、绑定身份和读取回执。`derived` 限幅继续标为规则模型，不能变成交易所直接源限价。公司行动独立存放于 `corporate-schedule.json`，AD 不计算账户资金/股份。AQ 附加自己的税前、日期级到账模型；源的 PIT、执行许可和全类型完备性 false 标记仍保留。合法空窗口仅是来源范围无事件，不等于全市场不存在行动。
-
-**价格诊断**仍可显式选择 `mode="price_only_no_limits"`：排除公司行动现金/股份和价限，不能解释为总收益或完整经济回测。该模式保留源 `tradestatus`；缺标记时正成交量只支持“事后已发生交易”模型，零量不推断停牌。未配置参考包仍可查价格和主动选择诊断，但不能得到普通发布。
-
-同一 `ashare-deployment.v1` 清单可同时供 AD/AQ/web 选库。AD 独立入口的优先级为 `--deployment` > `ASHARE_DEPLOYMENT` > `ASHARE_DATA_ROOT/deployment.json` > `$XDG_CONFIG_HOME/ashare/deployment.json`（默认 `~/.config/ashare/deployment.json`），显式 `--root` 则直接选择主库。`data_root` 相对清单目录解析，资产相对 `data_root` 解析；正式主库可登记为原位绝对路径，无须复制。维护 CLI 与产品 CLI 共享发现规则，损坏清单不会回退旧库；直接构造 `LocalDailyStore()` 的 SDK 默认目录保持不变。
-
-```json
-{
-  "schema": "ashare-deployment.v1",
-  "data_root": ".",
-  "assets": {
-    "main": {"kind": "local_daily", "path": "ad/market/local-daily", "role": "market", "retention": "preserve"},
-    "releases": {"kind": "store", "path": "ad/releases", "role": "publication", "retention": "preserve"},
-    "research": {"kind": "daily_research", "path": "ad/reference/research", "binding": "binding.json", "binding_sha256": "<固定64位SHA>", "role": "market_reference"},
-    "execution": {"kind": "daily_execution", "path": "ad/reference/execution", "binding_sha256": "<固定64位SHA>", "role": "market_reference"},
-    "corporate": {"kind": "corporate_history", "path": "ad/reference/corporate", "binding_sha256": "<固定64位SHA>", "role": "corporate_source"}
-  },
-  "profiles": {
-    "product": {
-      "kind": "product", "daily_asset": "main", "release_store_asset": "releases",
-      "control_db": "aq/product/control.sqlite3", "paper_root": "aq/product/paper",
-      "api_port": 18839, "paper_port": 18818, "web_port": 41839, "default_dataset_id": null,
-      "reference_sets": {"daily-evidence": {"kind": "daily_execution", "research_asset": "research", "execution_asset": "execution", "corporate_history_asset": "corporate"}},
-      "default_reference_set": "daily-evidence"
-    }
-  }
-}
-```
+通过 `ashare_data.product.release_cli` 管理发布生命周期：
 
 ```sh
-python -m ashare_data.product --deployment "$DEPLOYMENT" catalogue --query 600519
-python -m ashare_data.product --deployment "$DEPLOYMENT" prices \
-  --security 600519.XSHG --start 2024-02-19 --end 2024-02-28
-python -m ashare_data.product --deployment "$DEPLOYMENT" coverage \
-  --security 000651.XSHE --start 2022-04-01 --end 2022-04-15
-python -m ashare_data.product --deployment "$DEPLOYMENT" publish \
-  --security 000651.XSHE --start 2022-04-01 --end 2022-04-15
-python -m ashare_data.product --deployment "$DEPLOYMENT" publish --mode price_only_no_limits \
-  --security 600519.XSHG --start 2024-02-19 --end 2024-02-28
+# 备份与恢复已提交的正式发布闭包
+python -m ashare_data.product.release_cli backup --root /path/to/releases --output /path/to/backup
+python -m ashare_data.product.release_cli restore --backup /path/to/backup --target /path/to/new-releases
+
+# 按冻结计划增量替换受影响的证券分块并发布新版本
+python -m ashare_data.product.release_cli apply --root /path/to/releases --plan /path/to/plan.json
 ```
 
-SHA 占位符须替换为经过核对的绑定身份。另一类集合为 `{"kind":"historical_market","market_asset":"market","corporate_history_asset":"corporate"}`，对应 `historical_market` 资产。`--reference-set` 或 `from_deployment(..., reference_set=...)` 只使用明确选择的集合；未指定时使用配置默认值。直接 Python 调用可传 `references={name,kind,research?/execution?/market?/corporate:{binding_path,binding_sha256}}`，各 binding_path 是包内入口文件。
+- **单写入者与原子发布**：发布写入通过 `ReleaseWriter` 与目录锁串行推进，先写入不可变 Parquet/JSON 数据块，校验完整父版本摘要后再原子更新版本清单。
+- **补充源合并**：主发布支持将主历史观测与无重叠的 `free-stockdb` 补充记录合并；分钟补充仅按整只证券整日缺失补齐，不做盘中插值。
 
-发布追加到独立 Store 的 `catalog.sqlite` 和内容寻址目录；普通目录内为 `input.json`、`corporate-schedule.json`、`coverage.json`、`manifest.json`。manifest 分别绑定路径、字节 SHA 和大小；`coverage_sha256` 是完整 coverage 去掉该字段后的规范 JSON 语义摘要，`coverage_file_sha256` 是文件字节摘要。`source_bindings` 按 research/execution/market/corporate 角色保存 kind 和 binding_sha256，不把机器绝对路径用作源身份。Store 重读校验文件、模式、范围、参考集合、逐日源字段投影和 schedule；并发相同发布会串行校验并重用同一内容身份。
+---
 
-复制 Store 后，读取冻结输入和恢复已有任务均不要求原 PDF 在线。任务恢复还需要 AQ 控制状态、策略、日志、账户、native 检查点、未结权益和回执，不能只备份 SQLite。要在恢复环境进行新发布，需要保留所选参考包的 binding 及全部被绑定文件，以及正式行情库；小型参考包应随能力备份保存。主库原始响应压缩正文继续原位保留，发布回执引用 SHA；完整主库源备份须另外保存一致 SQLite 快照、raw、采集状态和库外证据。
+## 本地分钟产品读取（`LocalMinuteProduct`）
 
-来源协议和解码依赖见 [提供者](providers.md)、[开发工具职责](development.md)。行情/可见性保证见 [行情查询](market-data.md)，历史股票池严格接口见 [历史市场](historical-market.md)。
+`LocalMinuteProduct` 为部署清单中登记的多种分钟数据源提供统一的只读查询入口：
 
-## 行情发布与恢复
+| 来源标识（`source`） | 数据特征与用途 |
+| --- | --- |
+| `tdx` | 默认来源；基于本地已校验的通达信 1m/5m 分钟柱捕获 |
+| `canonical` | 主发布合并分钟序列；仅在 `default_minute_source: canonical` 时作为 `auto` 默认源 |
+| `free_stockdb` | 已发布的整日补充分钟数据 |
+| `neigezhu` | 经外部清单与质量覆盖层（`quality_overlay.json`）审查的原生高频分钟归档，保留 09:30 开盘观察与行级准入诊断 |
 
-正式行情采用两个逻辑事实表：`market.bars_1d`、`market.bars_1m`。底层是按证券、系列排序的不可变 Parquet 分块，由固定文件清单定义一个 release。DuckDB 1.4.3 负责查询；SQLite 继续保存小型元数据和既有账户账本。读者打开时固定 release 和元数据摘要，构建下一版不会改变正在运行的查询或回测。
-
-### 选择依据
-
-同一有界真实样本包含全市场一个月与少量证券多年历史，共 32,860,481 行。证券优先 DuckDB 原生文件 1,166,028,800 字节，日期优先 1,223,438,336 字节，Parquet 361,699,364 字节。单股多年查询首次/暖查询分别约 0.009/0.005 秒、0.331/0.057 秒、0.023/0.019 秒；全市场日扫描分别约 0.102/0.059 秒、0.011/0.010 秒、0.282 秒。首次查询使用新进程，但没有清空操作系统缓存，不能称为物理冷盘测试。
-
-Parquet 查询进程峰值约 86 MB，两个原生布局约 821/858 MB。试验验证了逐键逐值双向对账、分块替换、旧清单读取与恢复。原生 DuckDB 写进程会阻止独立进程同时打开该库；不可变文件允许导入、API、回测各自打开只读查询连接。基于容量与进程访问方式选择 Parquet，不增加数据库服务。同一已排序样本的补充写入测试为原生库加载并 checkpoint 6.214 秒、Parquet 写出 4.824 秒；原生单行修改并 checkpoint 0.017 秒，Parquet 改一行并重写该证券 971,041 行分块为 0.175 秒、12,423,812 字节。该测量不含首次解析/排序，过程峰值内存约 1.934 GB，试验目录峰值约 4.312 GB。完整实测报告随首轮发布证据冻结，不能把样本秒数外推成全库性能承诺。
-
-全量 R1 的清单摘要为 `99f0ed21634408c7b325f851518f9db5ed596484c1b0a143dc11c79e6c543391`。事实文件 44,946,435,908 字节，证据 1,578,062,169 字节，元数据 44,462,080 字节；导入批次峰值 RSS 为 4,025,466,880 字节。全分钟 SQL 视图首次验证所有对象摘要并建立视图耗时 25.105 秒，其后全市场 2024-07-01 日查询为 2.864/2.812 秒、7 月查询为 3.069/3.051 秒，查询进程峰值 RSS 为 1,051,951,104 字节。该实测与独立恢复/回测同时进行，未清空操作系统缓存。
-
-两个真实原生回测窗口（2020-02-03 至 02-07、2024-01-02 至 01-05）在原始库与 R1 分别执行，价格逐值、持仓、订单、成交、费用、净值与决策信号均一致，重启结果一致。范围为明确选择的 `price_only_no_limits_not_total_return` 研究诊断，普通回测所缺的交易参考不会因此被视为齐全。
-
-### 目录与正式入口
-
-部署文件的 `assets` 登记一个 `kind: market_release` 的受控目录，产品 profile 的 `market_release` 必须同时固定 `asset`、正整数 `release_id` 和 `manifest_sha256`。`default_minute_source: canonical` 选择主分钟系列；`auto` 只表示这个冻结默认选择，不会因空结果或来源故障转用另一来源。
-
-资产目录仅包含：
-
-- `objects/`：内容摘要命名的事实分块、元数据及证据。
-- `releases/00000001.json`：不可变完整文件清单，含上一版清单摘要。
-- `CURRENT.json`：串行发布后的原子指针。未完成对象不会成为默认可见数据。
-- `work/`：可恢复批次日志与明确受控的暂存。
-
-首轮构建预算 200 GiB，保留至少 150 GiB 磁盘空闲；查询/导入限制线程、内存和溢写空间。达到预算停止新分块，已完成分块可续跑。源 SQLite、HF、free-stockdb、TDX 原件保持原位。不要删除原件、已发布对象或旧清单；备份只复制清单引用的正式对象，不产生第二套全量 raw 库。
-
-### 数据解释与输入去向
-
-日线采用冻结的全行来源顺序 baostock、eastmoney、sina、sohu、tencent。同键冲突是明确研究选择，不是交易所真值认证；不按查询窗口重新排序，不跨源填字段。每条原始输入保留互斥的去向：采用、同值重复、已裁决未用、未决隔离、格式拒绝。目标唯一键数另计。
-
-首轮日线 38,736,814 条输入：采用 10,736,431，同值重复 13,057，已裁决未用 20,638,484，隔离 7,348,842，格式拒绝 0。旧 14,394,671 是原始证券日键统计，既不是输入行数，也不是已验证目标键数。四条历史代码链汇合 3,694 个重复身份日后，共 14,390,977 个稳定身份日键；其中采用 10,736,431，未决 3,654,381，已裁决未用 165。2010 年以前单位/复权尚未证实的记录及无依据修复的异常保留在原件与精确去向清单中。
-
-日线价格与金额采用无隐式舍入的 `DECIMAL(38,12)`，成交股数仅在整数无损时转 BIGINT。HF 保持原始 DOUBLE 二进制值和 BIGINT 股数，包括 FLOAT32 提升后的小数尾数；时区转换保留同一时刻，不移动 09:30 标签。来源时区、倍率、原字段解释放在冻结来源/映射契约中。目标系列只定义目标语义。TDX 十进制源另属系列 3，不与 HF 系列 2 混为已验证同区间行情。
-
-`MarketRelease.read` 返回各系列本来的 float 或 Decimal。通用 SQL 分钟视图的价格/金额使用 `UNION(binary_value DOUBLE, fixed_value DECIMAL(38,12))`，防止混合查询悄悄把十进制舍入为浮点。算术应先限定系列，再用 `union_extract(close_price, 'binary_value')` 或 `fixed_value` 提取对应类型。
-
-证券 ID 在后续发布中不复用。四条有保留发行人证据的历史代码链汇合到稳定 ID；源文件以新代码回填历史的别名与交易所代码有效期分表。其他身份保持 provisional，不把未知历史代码复用说成已核实。元数据、日历、来源契约及质量规则随发布冻结。
-
-首轮 HF 的 5,795 个文件共 3,475,824,481 条输入，采用 3,475,793,900 条、隔离 30,581 条；没有同值重复、已裁决未用或格式拒绝。TDX 独立系列采用 960 条，因此两张正式逻辑表分别有 10,736,431 个日线键和 3,475,794,860 个分钟键。全部四类来源合计 4,085,305,933 条范围内输入，每条均有互斥去向。
-
-HF 最后观察日 2026-08-07 仅到 10:21，不能当作完整日。09:30、午间、收盘边界与区间开闭仍有未决语义。零量不证明停牌，缺行不补成零量。覆盖检查包含整个交易日无行和全部缺失证券；来源已声明分母、完全缺失与分母未知分别统计，分钟预期行数保持未知，不硬套 240/241。
-
-HF 覆盖分母按来源冻结：14,502,748 个预期证券日中，14,427,205 个有采用行情、75,543 个全日无采用行情；69,928 个来源确认停牌日为不预期存在，另有 263,414 个证券日的预期状态未知。该分母不是独立交易所历史全市场认证，不能从“有行”推导日内完整。
-
-free-stockdb 在冻结的 5,890 个权益代码范围内完成原始键审计：日线 17,429,373 行、分钟 553,314,305 行均保留隔离状态；基金等未纳入该权益范围，不能把范围计数称为整个 LevelDB 的独立全市场覆盖。与现有源同代码同标签重叠的日线为 13,219,692 行、分钟为 495,157,676 行；分钟中 56,504,126 行的六个原生数值相同。日线十进制文本与二进制浮点没有被武断标成相等或不等。这些重叠统计是诊断，稳定身份别名另行冻结；单位/区间未证实的记录不进入目标去重选择。财务、交易参考、因子本轮不导入；未来财务的来源修订版本和解析版本必须分开，context 绑定报告及抽取版本。
-
-### 查询
-
-```python
-from ashare_data.storage.market_release import MarketRelease
-
-market = MarketRelease("/controlled/market", release_id=1,
-                       expected_manifest_sha256="<frozen manifest SHA256>")
-rows = market.read("bars_1d", "600036.XSHG", "2024-01-02", "2024-01-05", series_id=1)
-with market.sql(tables=("bars_1d",), securities=["600036.XSHG"]) as db:
-    values = db.execute("SELECT trade_date, close_price FROM market.bars_1d ORDER BY trade_date").fetchall()
-```
-
-`quality.bar_day_checks`、`reference.instruments`、`reference.instrument_identifiers` 和小型 `meta` 登记由同一清单加载。日线产品、分钟产品和研究发布通过 `LocalDailyProduct.from_deployment`、`LocalMinuteProduct` 实际读取这些分块。回执和研究输入含 release 摘要；账户运行时不随行情读者变更。
-
-### 构建、增量与恢复
-
-在选定受控目录运行首轮构建；重复命令从已验证的批次日志恢复，不增加重复事实。
-
-```sh
-python -m ashare_data.product.release_cli --root "$MARKET" verify
-python -m ashare_data.product.release_cli --root "$MARKET" --release-id 1 backup --destination "$BACKUP"
-python -m ashare_data.product.release_cli --root "$BACKUP" restore --destination "$RESTORE"
-```
-
-首轮脚本只针对已经冻结的来源清单；原件改变会阻断恢复，不能在相同 source version 下静默接着读。备份目标带来源清单标记，可用相同命令继续未完成复制。恢复先校验全部对象，再原子发布目标指针；旧 release 和当前值都保留。原始来源另按登记的保留策略保存；正式备份不声称复制了外部原件。
-
-全量恢复演练校验 27,931 个正式对象、46,568,960,157 字节，在同一隔离目标复制两个对象后主动中断，再续跑完成。随后仅对一条真实行作明确标记的合成修订，验证旧 R1、新 R2 与重复提交无变化；正式 R1 未变。整个演练约 159.103 秒，演练副本在验收后清理，报告保留。合成修订没有写回正式行情。
-
-后续增量使用 `release_cli apply --plan plan.json`。计划 schema 为 `ad-market-replacement-plan.v1`，必须包含父清单摘要、变更原因、来源证据文件及其 SHA256、新元数据文件及其 SHA256、互斥输入去向和 `chunks`。每个 chunk 明确 table/series_id/instrument_id，以及完整替换 Parquet 路径和 SHA256，或显式 `delete: true`。只重写受影响证券分块。旧来源/批次登记不可改；变更值使用属于下一 release 的新批次，未变化值保留原批次。全行相同的重复输入为无变化操作。 同一计划不得重复指定一个逻辑分块。增量会重算受影响证券日的观察数，并保留上版冻结的预期；新增日期的预期仍标为 unknown，删除行情不会删除其缺失记录。覆盖正文同步写入新元数据，容量与创建时间重新记录。发布候选在切换指针前持久化，同一计划中断后重跑可继续提交完全相同的候选，旧 release 的覆盖和数值不变。
-
-文件清单保留被替换块，从而重现旧版本；本实现没有混用稀疏行历史后删除旧文件。发布时检查重复逻辑键、引用、输入去向、逐值回转和父版本 CAS。这是受控管道保证，事实文件没有数据库物理 PK/FK 索引。局部修订会保留旧块，有明确容量代价。
-
-本地 release 重现不等于严格市场 PIT。修订公开可知时间未知时保持未知，不能拿本地导入时间或 bar 结束时间代替。
-## CMES 离线文件候选
-
-`ashare-data cmes import` 将显式选择的 ZIP/CSV 转成标准 `MarketRelease`，复用
-`ReleaseWriter` 的不可变对象、校验与发布。输出必须是新候选目录；它不发现或修改部署配置。
-ZIP 在原位置流式读取，不解压或复制原包进代码仓库。目录参数只查看直接子文件，不递归跟随下载目录。
-
-```sh
-# RAW_ROOT 和 CANDIDATE 均由调用方显式选择；CANDIDATE 位于源码和原始包目录之外。
-ashare-data cmes import --root "$CANDIDATE" \
-  --daily "$RAW_ROOT/split_daily" \
-  --calendar "$RAW_ROOT/trading_references/trade_calendar/SSE.zip" \
-             "$RAW_ROOT/trading_references/trade_calendar/SZSE.zip" \
-  --st "$RAW_ROOT/trading_references/st_list/ST股票列表.zip" \
-  --security SH.600000 SZ.000001 BJ.920000
-ashare-data cmes query --root "$CANDIDATE" --security 600000.XSHG \
-  --start 2024-01-02 --end 2024-01-05
-```
-
-省略 `--security` 会处理所有显式文件内的证券；选择证券时，具名 ZIP/CSV 成员在解压前过滤。
-CSV 默认 UTF-8（支持 BOM），其他编码需显式 `--encoding gb18030`。证券要求明确交易所：
-`SH.600000 → 600000.XSHG`、`SZ.000001 → 000001.XSHE`、`BJ.920000 → BJ.920000`。
-不根据裸代码猜交易所，也不根据新旧代码猜同一发行人；`instrument_id` 仅在该发布中有意义。
-
-| 配置 | 原始量/额 | 标准量/额 | 用途 |
-|---|---|---|---|
-| `daily-lots-kcny` | 手 / 千元 | 股 / 元，分别乘 100 / 1000 | `--daily` 的日线配置 |
-| `daily-index-points` | 不声明量额单位 | 量额为 null，原字段仍可按源定位读取 | 指数点位、只读价格比较 |
-| `minute-shares-cny` | 股 / 元 | 不缩放 | 全市场日包分钟配置 |
-| `minute-lots-cny` | 手 / 元 | 量乘 100 | 另一种单股分钟导出配置 |
-
-分钟复用同一读取、转换、发布流程，须显式传入 `--minute FILE --minute-profile PROFILE`。
-不能仅由频率判断单位。分钟标签按 `Asia/Shanghai` 解析，保留源分钟，不重采样或补齐网格。
-日线为 `bars_1d` / series 1，分钟为 `bars_1m` / series 7。价格及金额采用精确 Decimal，
-成交量必须是整数股；缺失量额仍为 null。源昨收保留为 `preclose`，不计算复权。
-
-已下载的指数日线可以用 `--daily-profile daily-index-points` 进入同一发布器。
-该配置显式登记 `asset_class=index` 和 `price_unit=index_point`，不能混合股票分钟或 ST 输入。
-它保留原始 OHLC 点位和源定位，不把指数当股票，也不猜测量额单位、历史成分或上市区间。
-`ReleasedDailyProduct.prices` 依据冻结证券身份读取这些代码；实时股票采集器的范围不因此扩大。
-缺少某日行情仍返回缺口，指数发布不授予股票撮合权限，也不自动替换任何部署中的交易发布。
-
-```python
-from ashare_data.storage.market_release import MarketRelease
-from ashare_data.product.market_release import ReleasedDailyProduct
-
-release = MarketRelease(candidate_root, release_id=1, expected_manifest_sha256=manifest_sha256)
-rows = release.read("bars_1d", "600000.XSHG", "2024-01-02", "2024-01-05")
-product = ReleasedDailyProduct({"market_release": {
-    "root": str(release.root), "release_id": release.release_id,
-    "manifest_sha256": release.sha256,
-}})
-prices = product.prices(["600000.XSHG"], "2024-01-02", "2024-01-05", source="cmes")
-```
-
-公共文件协议位于 `providers.cmes`：`normalize_security`、`normalize_date`、`source_asset`、
-`csv_members`、`csv_rows` 可供因子等非 K 线类别复用。`source_version` 为原 ZIP/CSV 的 SHA256，
-`mapping_version` 为 `cmes-files.v2`，`mapping_sha256` 固定本次转换代码。
-每条行情保留来源对象 ID、CSV 成员名、从表头之后的第 2 条开始编号的 CSV 记录号。
-`observed_at` 记录本候选首次完成源文件哈希校验时的实际 UTC 时间，绑定源 SHA256，
-同一源文件的日线和分钟投影沿用该时间。候选记录先冻结这一观察，重复导入及中断恢复
-沿用首次时间，不按重试时钟重置。它不是下载时间、文件修改时间、行情历史发布时间或
-历史可见性证明；`historical_available_at` 仍为 null，历史 PIT 仍为 false。
-旧候选保持原样，缺失的观察时间不会事后补写；新转换版本需要新候选目录。
-
-原始日历按交易所完整保存在元数据 `cmes_calendar`；旧公共日历表只投影沪深共同确认的交易日，
-不把沪深日历套给北交所。ST 正向记录在 `cmes_st`，日线命中日期时 `is_st='1'`，未命中为未知。
-不由首尾行情推断上市日期，不由零量推断停牌。参考记录的成员、记录号、源版本均保留。
-可通过 `release.metadata()` 查询这两个表以及 `source_assets`。
-
-同源重复键数值相同只保留一条，数值冲突拒绝发布；无效价格、非整数股等记录保存在
-`cmes_rejections`，并计入 manifest 的 `input_dispositions`。异常不由其他供应商补齐。
-重复执行完全相同的文件、范围与转换版本返回 `unchanged=true`，不增加发布或行数；
-改动输入、范围或转换代码须选新候选目录。中断可用相同输入重建未发布候选。
-本入口不把分笔、盘口、财务或复权因子塞进 K 线表，也不提供正式数据切换。
-
-## 冻结发布中的日期证券目录
-
-`ReleasedDailyProduct(config).catalogue(as_of="2024-03-04", limit=500, offset=0)`
-使用与 `prices()` 相同的已记录上市、退市、代码有效区间筛选证券。调用只读发布的元数据，
-不会扫描行情文件、补采数据或推进发布版本。省略 `as_of` 时原有目录接口保持不变。
-
-响应保留 `receipt` 中的发布身份、分页参数、`total` 和 `securities`。每行包含
-`security`、`start_date`、当前记录的名称和 `name_is_historical=False`。
-无法确认上市区间的证券列入 `unknown_listing_securities`，不默认为当日上市。
-退市边界是否包含当日，沿用既有 `listing_facts.body.out_inclusive` 规则。
-
-这是基于固定发布记录的回溯目录，不保证历史名称、当时可知的公告时间、完整历史证券集合，
-也不表示指数历史成分。`historical_pit_verified` 明确为 `False`。
-策略消费者须自行约束查询日期不晚于其模拟时钟，并保留上述覆盖说明。
-行情查询仍使用 `prices` / `minute_prices`；目录成员资格不要求已有完整行情，也不授予执行权限。
+查询接受单只证券与带时区、精确到整分钟的闭区间 `[start, end]`，原样返回 `source`、`binding`、`rows` 与质量诊断报告 `report`。

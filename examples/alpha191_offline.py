@@ -1,7 +1,7 @@
 """Run the versioned API offline with synthetic inputs or a hash-pinned local panel.
 
 Synthetic inputs demonstrate the API; they are not market evidence. The optional
-JSON panel format is documented in docs/alpha191.md and never fetched by this script.
+JSON panel format is documented in docs/factors.md and never fetched by this script.
 """
 
 import argparse

@@ -1,112 +1,77 @@
-# A数达（ashare-data）
+# A数达 · ashare-data
 
 ## 项目简介
 
-A数达提供 A 股行情查询、来源核验和固定版本的离线研究数据，也提供命令行工具。可以直接查询少量行情，保存原文和版本，再检查覆盖、单位、时间及缺失字段。
+A数达（`ashare-data`）是面向 A 股量化研究的数据基础设施库，提供统一的聚宽风格行情查询、本地日线与分钟主库（`LocalDailyStore` / `MarketRelease`）、多源数据采集（新浪、BaoStock、通达信、免费公开源增量）、参考数据与公司行动、财务三表及因子计算能力。
 
-当前开发版本为 **0.10.0.dev98**，按行情、参考数据、公司行动、财务、因子、存储和提供者组织接口。历史重构映射见 [新版接口与身份迁移](docs/migration.md)，正式财务与参考表见 [财务和交易参考正式表](docs/financial-tables.md)，代码职责见 [目录说明](docs/development.md#目录与依赖)。
-
-默认行情使用新浪公开源。BaoStock、TDX、zzshare 和已有 JQ 观测需显式选择。原价、成交量股、成交额元分别保留来源，失败不会自动换源或补造记录。
+系统与下游回测引擎（如 `ashare-quant`）解耦：A数达负责原始回执留存、结构化校验、不可变快照发布与点位查询；账户、撮合与策略时钟由消费端独立维护。
 
 ## 安装指南
 
-需要 Python 3.11～3.13 和支持 `fcntl` 的 Unix 环境。当前验证平台为 macOS arm64 / Python 3.12；其他平台需另行验证。使用 [uv](https://docs.astral.sh/uv/getting-started/installation/) 在独立项目环境安装：
+运行环境要求 Python 3.11–3.13（推荐 Python 3.12）与 [`uv`](https://docs.astral.sh/uv/)。
 
 ```sh
-git clone https://github.com/ashare-labs/ashare-data.git
-cd ashare-data
-# 切换到已经核对的候选提交后记录身份
-git rev-parse HEAD
-uv sync --locked --no-config --python 3.12
-.venv/bin/ashare-data --version
-.venv/bin/ashare-data --help
+# 核心安装（含 DuckDB、pandas、numpy）
+uv sync --locked --no-dev
+
+# 安装全部可选依赖（AKShare 免费增量、BaoStock/OpenPyXL/QuickJS 本地数据、Alphalens 因子评价）
+uv sync --locked --extra free-updates --extra local-data --extra factor-evaluation
 ```
 
-首次安装需要联网。依赖按 `uv.lock` 固定，不修改全局 Python；需要本地批量采集或 BaoStock 时，使用 `uv sync --locked --no-config --extra local-data` 安装可选依赖。源码、wheel 和 sdist 均不携带实际行情、公告全文、数据库或账户材料。
+构建并校验发行包：
 
-开发版应固定到已验证的完整提交或 wheel 摘要，不能把旧 wheel 与新文档混用。历史版本请查看对应 Git 标签和说明；当前候选尚未发布或合并。
+```sh
+uv build
+uv run python scripts/verify_wheel.py dist/ashare_data-0.10.0.dev98-py3-none-any.whl --full
+```
 
 ## 快速开始
 
-查询最近三条日线会发起真实网络请求，无需账号或密钥：
+### 在线近期行情查询
+
+默认 `Client` 直连新浪公开接口，支持带本地缓存的日线与 1m/5m 行情读取：
 
 ```python
-from ashare_data import get_price
+from ashare_data import Client
 
-prices = get_price("600000.XSHG", count=3)
-print(prices)
-print(prices.attrs)  # 来源、单位和实际观察时间
+client = Client(cache_dir="./cache")
+df = client.get_price(
+    "600000.XSHG",
+    count=5,
+    frequency="daily",
+    fields=["open", "close", "high", "low", "volume"],
+)
+print(df)
 ```
 
-```sh
-.venv/bin/ashare-data price 600000.XSHG --count 3
+### 读取正式本地发布（`MarketRelease`）
+
+当本地已配置 `deployment.json` 或 `LocalDailyStore` 发布目录时，可通过 `MarketRelease` 读取不可变日线、分钟、参考与财务数据：
+
+```python
+from ashare_data import MarketRelease
+
+release = MarketRelease("/path/to/releases", release_id=1, expected_manifest_sha256="...")
+daily = release.daily("600000.XSHG", start_date="2024-01-02", end_date="2024-01-31")
 ```
-
-返回 pandas DataFrame，默认列为 open、close、high、low、volume。条数只代表源返回的记录，不代表完整交易日历史。网络、限流和源格式错误明确报错。
-
-无需联网的最小示例：
-
-```sh
-.venv/bin/python examples/golden.py --store /tmp/ashare-data-example
-```
-
-该示例使用合成数据演示导入、校验、发布及读取，不提供生产准入。输出目录需尚不存在。
 
 ## 使用指南
 
-### 按功能选择入口
+文档按功能域划分为 8 篇指南：
 
-| 读者任务 | 指南与入口 |
-|---|---|
-| 少量行情、缓存、覆盖及可见性 | [行情查询](docs/market-data.md)；Client / get_price |
-| 维护长期本地日线及早期观察 | [本地日线](docs/local-daily.md)；LocalDailyStore |
-| 搜索已有大库、查看行情、发布回测输入 | [日线产品](docs/local-daily.md#查询与发布产品)；LocalDailyProduct |
-| 固定全量行情版本、增量及恢复 | [行情发布](docs/local-daily.md#行情发布与恢复)；MarketRelease |
-| CMES ZIP/CSV 原价日线、参考数据与候选发布 | [CMES 文件接入](docs/local-daily.md#cmes-离线文件候选)；cmes import / query |
-| 读取停牌/ST、前收、日历、上市事实 | [参考数据](docs/reference-data.md) |
-| 历史状态、股票池及分钟证据 | [历史市场](docs/historical-market.md) |
-| 公司行动、历史股份及事件身份 | [公司行动](docs/corporate-actions.md)；CorporateHistoryView |
-| 财报版本、截止、单季和 TTM | [财务](docs/financials.md)；FinancialPIT |
-| 具名因子与 Alpha191 公式 | [因子目录](docs/factors.md)、[Alpha191](docs/alpha191.md) |
-| 显式选择 BaoStock、TDX、zzshare | [提供者](docs/providers.md) |
-| 固定研究数据和独立归档查询 | [研究数据](docs/research-data.md) |
-| 日频研究、执行字段和输入预检 | [输入准备](docs/execution-inputs.md) |
-| 导入、验证、发布不可变数据 | [快照](docs/snapshots.md)；Store |
-| 读取有限事实和条件投影 | [有限研究](docs/finite-research.md) |
-| 生产与消费可移植研究输入 | [组件生产](docs/portable-components.md)、[消费契约](docs/portable-research.md) |
-| 当前时钟观察和已有 JQ 响应 | [观察数据](docs/observations.md) |
-| 免费源当期增量、成分页留存和第二批换日更新 | [当期增量](docs/observations.md#免费源当期增量) |
-| 修改、构建、升级或分发 | [开发与工具](docs/development.md)、[迁移](docs/migration.md)、[来源与许可](docs/sources-and-licensing.md) |
-
-### 缓存与固定版本
-
-```python
-from ashare_data import Client, Store
-
-client = Client(cache="data/sina")
-prices = client.get_price("600000.XSHG", count=3)
-replay = Client(cache="data/sina", cache_mode="only").get_price("600000.XSHG", count=3)
-
-store = Store.init("data/research")  # 新目录；已有目录用 Store(path)
-dataset_id = store.fetch_price("600000.XSHG", frequency="daily", count=3)
-result = Store("data/research").research(dataset_id).get_price("600000.XSHG", count=3)
-print(dataset_id, result.report)
-```
-
-保存完整 dataset_id。`cache_mode="only"` 和固定版本读取不联网，缺失或损坏会报错。保存成功不等于来源真实、完整或历史可见。
-
-### 本地维护与开发
-
-`ashare-data local-daily --help` 是维护入口，采集命令会写库并联网。显式 --root 优先；否则与产品入口共用 --deployment、ASHARE_DEPLOYMENT、ASHARE_DATA_ROOT/deployment.json，最后发现 $XDG_CONFIG_HOME/ashare/deployment.json（未设置时为 ~/.config/ashare/deployment.json）。已有清单损坏或断链会报错；只有完全未配置时才使用 ~/.local/share/ashare-data。发现配置不会初始化、搬移或修改数据。
-
-开发工具统一在 `scripts/`。`python scripts/check_structure.py` 检查目录、内部导入和文档链接；完整流程见 [贡献约定](CONTRIBUTING.md)。测试只使用合成或最小协议输入，源采集需另行显式执行。
-
-正式产品可用 `python -m ashare_data.product --deployment "$DEPLOYMENT" catalogue --query 600519` 搜索已登记的大库。该入口只读现有库；发布到单独 Store 后由 AQ 导入组合回测，缺配置或数据会明确失败，不回退固定评测。共享清单与发布调用见 [日线产品](docs/local-daily.md#查询与发布产品)。
+- [在线行情与不可变快照](docs/market-data.md)：`Client` 近期行情与缓存管理、`Store` / `DataView` 不可变快照导入发布、`export_minute_research` 分钟研究导出。
+- [本地日线与分钟主库](docs/local-daily.md)：`LocalDailyStore` 建库与增量更新、`MarketRelease` 统一发布与读取、早期历史及分钟覆盖规范。
+- [数据源与免费增量采集](docs/providers.md)：新浪、BaoStock、TDX、zzshare 适配器，聚宽观察录制导入，以及 198+19 项免费公开源增量采集与宏观发布。
+- [参考数据与公司行动](docs/reference-and-actions.md)：交易日历、停牌/ST 状态、源前收、上市事实、历史市场状态视图及分红送转复权计算。
+- [财务数据与质量台账](docs/financials.md)：三大财务报表 schema、披露日可见性过滤、`LocalFinancialStore` 质量分类与跨源修复。
+- [因子库与因子评价](docs/factors.md)：因子目录检索、聚宽 19 项研究因子、GTJA Alpha191、Qlib Alpha158 与 Alphalens 离线评价。
+- [研究数据包与可移植组件](docs/research-packages.md)：`ResearchView`、`IndependentQueryView`、`NeigezhuMinuteView`、日频执行输入预检与 Portable 组件生产消费契约。
+- [开发验证、来源边界与许可](docs/development.md)：代码结构、验证脚本、内部资源锚点、第三方数据源使用边界与软件许可说明。
 
 ## 限制与说明
 
-- 不保证全市场、完整历史、分钟闭合网格、完整公司行动或最终定稿；未知字段保留缺失，不自动补零、拼接或推断停牌。
-- 源 preclose、前一日实际 close、复权前收与交易所参考价不同。公司行动日期、到账和可售时点分别检查，不替代账户结算。
-- 收到数据的时间不等于历史发布时间。计算、哈希或离线测试通过不认证 PIT、来源真实性、供应商因子等价或可执行准入。
-- 有限事实、条件策略及观察政策仍有限定证券/日期，改名不会扩展覆盖。旧冻结账户和证据需留在原固定环境，新运行记录新代码与输入身份。
-- 本库不提供回测引擎、交易系统、HTTP 服务或 UI，不是 jqdatasdk 的完整替代。参阅 [接口差异](docs/market-data.md#风格适配)、[数据来源](docs/sources-and-licensing.md#来源边界)与[许可说明](docs/sources-and-licensing.md#许可与分发)。自有源码的许可状态和第三方资源许可分别说明。
+以下全局约定适用于本库所有模块，各分册不再重复声明：
+
+1. **知识时点（PIT）与时间字段**：系统严格区分行情有效标签（`source_label`）、本地实际接收时刻（`observed_at` / `received_at`）与历史首次公开可得时刻（`available_at`）。除非输入具备经核实的披露/发布时间戳，否则事后采集或回填数据的 `historical_pit` 均为 `False`，接收时间不会倒填为历史可见时间。
+2. **代码包与私有数据分离**：Git 仓库、源码包（sdist）与安装包（wheel）仅包含软件代码、公式定义与合成测试夹具（`synthetic`），不包含真实历史行情库、发行人公告原件或账户状态。
+3. **职责边界**：所有数据源适配器与视图仅提供带来源摘要的数据读取与质量诊断（`execution_permission=False`），不内置交易策略、账户账本、撮合引擎或自动重试换源逻辑。

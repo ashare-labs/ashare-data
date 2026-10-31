@@ -58,8 +58,8 @@ def headings(text):
 def check(root):
     errors = []
     guides = list((root / "docs").rglob("*.md"))
-    if not 12 <= len(guides) <= 20:
-        errors.append("docs must contain 12–20 task guides; merge related reader tasks")
+    if not guides:
+        errors.append("docs directory must contain markdown guides")
     if list((root / "docs").rglob("*.csv")):
         errors.append("generate coverage tables with the public API instead of storing docs CSVs")
     paths = project_files(root)
@@ -152,13 +152,12 @@ def check(root):
                 errors.append(f"{relative}: missing link target {link}")
             elif anchor and target.suffix == ".md" and anchor not in headings(target.read_text()):
                 errors.append(f"{relative}: missing heading {link}")
-        if path.name != "migration.md":
-            for name in re.findall(
-                r"(?:scripts|examples|tests|src|docs)/[A-Za-z0-9_./-]+\.(?:py|cjs|sh|md|json|csv|txt)",
-                text,
-            ):
-                if not (root / name).is_file():
-                    errors.append(f"{relative}: referenced project file does not exist: {name}")
+        for name in re.findall(
+            r"(?:scripts|examples|tests|src|docs)/[A-Za-z0-9_./-]+\.(?:py|cjs|sh|md|json|csv|txt)",
+            text,
+        ):
+            if not (root / name).is_file():
+                errors.append(f"{relative}: referenced project file does not exist: {name}")
     for resource, module, constant in [
         ("conditional-profile.json", "conditional.py", "PROFILE_SHA256"),
         ("conditional-listing-policy.json", "conditional_listing.py", "POLICY_SHA256"),

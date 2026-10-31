@@ -17,7 +17,7 @@ Changes by ashare-data, 2026:
   per-ID provenance and assumptions. Alpha146 requires the caller's missing SMA
   parameter. Alpha165/183 use a documented rolling cumulative-path interpretation,
   not the source's rowMax/rowMin implementation or a claim of unique report intent.
-See the per-factor notes, sources.json, and docs/alpha191.md.
+See the per-factor notes, sources.json, and docs/factors.md.
 
 No DolphinDB server, SDK, executable, binary, or hosted service is required,
 installed, bundled, or invoked. No GPL or unlicensed candidate code was copied.

@@ -124,7 +124,7 @@ def catalog(library=None, *, alpha191_version=ALPHA191_VERSION):
         )
         alpha["api_fields"] = alpha["factor"].map(lambda name: (name,))
         alpha["entrypoint"] = "ashare_data.factors.alpha191.Alpha191.compute"
-        alpha["documentation"] = "docs/alpha191.md"
+        alpha["documentation"] = "docs/factors.md"
         alpha["historical_comparison"] = (
             "No JQ equality claim; see formula provenance and validation"
         )
