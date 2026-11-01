@@ -76,11 +76,11 @@ res = pit.query(
 | `ashare_data.product.financial_release` | `FinancialTables` 正式发布读取、单点查询（`point` / `source_point`）、常用财务比率（`common_indicator`）及参考覆盖查询（`reference_coverage` / `reference_point`） |
 | `ashare_data.financials.pit` | `FinancialPIT` 版本归档加载（`from_file`）与 YTD / 单季 / TTM 推导查询（`query`） |
 | `ashare_data.financials.ledger` | `FinancialLedger` 版本台账、报告期链条完整性校验与可见性模式定义 |
-| `ashare_data.financials.tables` / `schema` | 财务与参考表规范化 schema、上下文哈希与字段定义 |
+| `ashare_data.financials.tables` / `ashare_data.financials.table_official` | 财务与参考表规范化 schema、官方三表结构、上下文哈希与字段定义 |
 | `ashare_data.financials.official_daily` | 官方披露日对齐、跨期填充规则与扩展访问接口 |
 | `ashare_data.financials.tushare_reference` | Tushare 凭据管理（macOS Keychain / 环境变量）、三大报表与分红参考采集 |
 | `ashare_data.financials.expansion` | 多源扩展采集与 HTTP 退避限流控制 |
-| `ashare_data.financials.source_repair` / `quality_repair` / `unit_resolution` | 针对缺失报告期、跨源冲突或源单位的定向补采、质量修复与单位解析 |
+| `ashare_data.financials.source_repair` / `ashare_data.financials.unit_resolution` / `ashare_data.financials.share_resolution` | 针对缺失报告期、跨源冲突或源单位/股本口径的定向补采、修复与单位解析 |
 
 ### 覆盖分类状态
 

@@ -37,7 +37,7 @@ print(minute.attrs["query_status"])
 | 方法 / 参数 | 说明 |
 | --- | --- |
 | `Client(*, cache=None, cache_mode="prefer", cache_ttl=300, timeout=15, coverage_contract=None, query_limits=None)` | 初始化客户端；指定 `cache` 目录时自动记录原始响应与接收时间 |
-| `get_price(security, start_date=None, end_date=None, frequency="daily", fields=None, skip_paused=False, fq=None, count=None, panel=False, fill_paused=False, round=False, *, as_of=None, visibility="verified", strict=True, require_complete=False, require_fresh=False, require_final=False, require_tradable=False, allow_partial=False)` | 返回 `pandas.DataFrame`（单标的以 `time` 为索引，多标的返回 `time`、`code` 列），并在 `df.attrs` 中附带 `provenance`、`query_status` 与覆盖诊断 |
+| `get_price(security, start_date=None, end_date=None, frequency="daily", fields=None, skip_paused=False, fq=None, count=None, panel=False, fill_paused=False, round=False, *, as_of=None, visibility="verified", strict=False, require_complete=False, require_fresh=False, require_final=False, require_tradable=False, allow_partial=False)` | 返回 `pandas.DataFrame`（单标的以 `time` 为索引，多标的返回 `time`、`code` 列），并在 `df.attrs` 中附带 `provenance`、`query_status` 与覆盖诊断 |
 | `coverage(security, start_date, end_date, *, frequency="1m")` / `trading_status(security, *, as_of=None)` | 基于显式 `coverage_contract` 评估窗口覆盖完整性与时段/交易状态准入 |
 | `at(as_of, *, visibility="verified", require_complete=False, require_fresh=False, require_final=False, require_tradable=False)` | 返回绑定查询截止时钟的离线视图；`visibility` 可选 `"verified"`、`"received"`（按本机接收时间过滤）或 `"assumed"` |
 | `save_research(store)` | 将当前缓存中的合格新浪观测封存至 `Store`，返回不可变 `dataset_id` |

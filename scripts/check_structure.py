@@ -162,6 +162,18 @@ def check(root):
             target = root / "src" / module.replace(".", "/")
             if not target.with_suffix(".py").is_file() and not (target / "__init__.py").is_file():
                 errors.append(f"{relative}: missing documented CLI module {module}")
+        for module in re.findall(r"`(ashare_data(?:\.[a-z0-9_]+)+)`", text):
+            target = root / "src" / module.replace(".", "/")
+            if target.with_suffix(".py").is_file() or (target / "__init__.py").is_file():
+                continue
+            parent_file = (
+                target.parent.with_suffix(".py")
+                if target.parent.with_suffix(".py").is_file()
+                else target.parent / "__init__.py"
+            )
+            if parent_file.is_file() and re.search(rf"\b{re.escape(target.name)}\b", parent_file.read_text("utf-8")):
+                continue
+            errors.append(f"{relative}: missing documented module {module}")
         for block in re.findall(r"```python\n(.*?)```", text, re.S):
             try:
                 doc_tree = ast.parse(block, filename=str(relative))
