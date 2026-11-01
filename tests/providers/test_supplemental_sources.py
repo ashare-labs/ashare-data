@@ -47,6 +47,7 @@ def test_zero_trade_quote_is_retained_without_fabricating_price_or_suspension():
 
 
 def test_cni_current_file_header_and_actual_date_not_monthly_weight_file():
+    pytest.importorskip("openpyxl", reason="free-updates extra required for Excel contracts")
     import pandas as pd
     data = pd.DataFrame([["2026-10-29", "300750", "宁德时代", "工业", "13.64"]],
                         columns=["日期", "样本代码", "样本简称", "所属行业", "权重（%）"])

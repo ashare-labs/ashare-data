@@ -20,7 +20,7 @@ qlib_factors = catalog("qlib_alpha158")
 
 | 命名空间（`library`） | 条目数 | 默认定义版本 | 核心入口 |
 | --- | --- | --- | --- |
-| `joinquant` | 19 | `jq.factor_research.v1` / `jq.batch_research.v1` | `ashare_data.factors.joinquant.compute_panel` / `FactorResearchView.query` |
+| `joinquant` | 19 | `joinquant_factor_panel.research.v1` / `factor_research_six_representative_factors.research.v1` | `ashare_data.factors.joinquant.compute_panel` / `FactorResearchView.query` |
 | `alpha191` | 191 | `gtja191.public.v1`（可选 `gtja191.explicit.v1`） | `ashare_data.factors.alpha191.Alpha191.compute` |
 | `qlib_alpha158` | 158 | `qlib.alpha158.v0.9.7` | `ashare_data.factors.qlib_alpha158.Alpha158.compute` |
 
@@ -28,18 +28,40 @@ qlib_factors = catalog("qlib_alpha158")
 
 ## 聚宽 19 项命名研究因子（`joinquant`）
 
-覆盖常用量价、动量、波动、换手与财务增长率研究因子（如 `ATR6`、`ATR14`、`TVMA6`、`VROC6`、市值与净利润增长率等）：
+覆盖常用量价、动量、波动、换手与财务增长率研究因子（13 项批量面板因子如 `ATR6`、`ATR14`、`TVMA6`、`VROC6`、市值与净利润增长率等，以及 6 项独立研究快照因子 `BIAS5`、`CCI20`、`PSY`、`quick_ratio`、`debt_to_asset_ratio`、`net_operating_cash_flow_coverage`）：
 
 ```python
 from ashare_data import FactorResearchView
-from ashare_data.factors.joinquant import compute_panel
+from ashare_data.factors.joinquant import (
+    BATCH_RESEARCH_DEFINITION,
+    BATCH_RESEARCH_MODE,
+    compute_panel,
+)
+from ashare_data.factors.joinquant.research_view import DEFINITION, MODE
 
-# 1. 基于批量输入面板（ad.factor-panel-batch-inputs.v1）计算
-panel_result = compute_panel(panel_inputs)
+# 1. 基于批量输入面板（ad.factor-panel-batch-inputs.v1）计算 13 项面板因子
+panel_result = compute_panel(
+    panel_inputs,
+    ["2024-06-14"],
+    definition=BATCH_RESEARCH_DEFINITION,
+    mode=BATCH_RESEARCH_MODE,
+    provider="sina",
+)
 
-# 2. 基于独立研究快照（ad.factor-research-independent-inputs.v1）按证券与时点查询
-view = FactorResearchView("inputs.json", expected_sha256="<64位SHA256>")
-res = view.query(factor="ATR14", securities=["000001.XSHE"], as_of="2024-06-14")
+# 2. 基于独立研究快照（ad.factor-research-independent-inputs.v1）按证券与时点查询 6 项代表性因子
+view = FactorResearchView.from_file(
+    "inputs.json",
+    evidence_root=".",
+    expected_sha256="<64位SHA256>",
+)
+res = view.query(
+    ["000001.XSHE"],
+    ["BIAS5", "quick_ratio"],
+    dates=["2024-06-14"],
+    definition=DEFINITION,
+    mode=MODE,
+    provider="sina",
+)
 ```
 
 - 财务类与股本市值类因子严格核对报告期链条（如同比所需的连续季度报告）与披露日可见性；复权价格输入须显式绑定同快照的复权因子。
@@ -102,18 +124,25 @@ res158 = Alpha158(
 安装 `factor-evaluation` extra（`alphalens-reloaded==0.5.0`）后，`evaluate` 对因子面板与远期收益进行横截面统计评价：
 
 ```python
-from ashare_data.factors.evaluation import evaluate
+from ashare_data.factors.evaluation import EvaluationConfig, evaluate
 
-eval_report = evaluate(
-    factor_values=factor_df,
-    prices=adjusted_close_df,
-    horizons=[1, 5, 10, 20],
+config = EvaluationConfig(
+    input_id="alpha191.panel.v1",
+    universe_label="hs300_sample",
+    price_basis="adjusted:v1",
+    horizons=(1, 5, 10, 20),
     quantiles=5,
     lag=1,
     direction=1,
     min_assets=10,
-    cost_bps=[0, 10, 20],
+    cost_bps=(0, 10, 20),
     rolling_window=20,
+)
+eval_report = evaluate(
+    factor_df,
+    adjusted_close_df,
+    membership=membership_bool_df,
+    config=config,
 )
 ```
 

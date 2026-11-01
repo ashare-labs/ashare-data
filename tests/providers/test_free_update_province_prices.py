@@ -19,6 +19,7 @@ DATA = {"res": "1", "regionlist": [{"name": "北京市", "value": 12, "diff": "+
 
 
 def parsed(body=None, page=PAGE):
+    pytest.importorskip("bs4", reason="free-updates extra required for HTML contracts")
     capture = SimpleNamespace()
     rows = prices.parse(capture, page, json.dumps(DATA if body is None else body))
     return rows, capture.dataset_metadata

@@ -7,14 +7,13 @@ from urllib.parse import urljoin, urlsplit
 from urllib.request import Request
 from zoneinfo import ZoneInfo
 
-from bs4 import BeautifulSoup
-
 NBS_RELEASES = "https://www.stats.gov.cn/sj/zxfb/"
 SGE_ENDPOINTS = {"gold": "DayilyJzj", "silver": "DayilyShsilverJzj"}
 GDP_TITLE = r"(\d{4})年([一二三四])季度(?:和全年)?国内生产总值初步核算结果"
 
 
 def parse_gdp(body, url):
+    from bs4 import BeautifulSoup
     soup = BeautifulSoup(body, "lxml")
     title = soup.select_one('meta[name="ArticleTitle"]')
     published = soup.select_one('meta[name="PubDate"]')
@@ -60,6 +59,7 @@ def parse_gdp(body, url):
 
 
 def collect_gdp(capture):
+    from bs4 import BeautifulSoup
     # NBS's published createPageHTML uses index_N.html; never execute its JS.
     for page in range(4):
         url = NBS_RELEASES if page == 0 else NBS_RELEASES+f"index_{page}.html"

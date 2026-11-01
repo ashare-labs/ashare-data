@@ -22,7 +22,10 @@ uv sync --locked --extra free-updates --extra local-data --extra factor-evaluati
 
 ```sh
 uv build
+# 核心依赖隔离验证
 uv run python scripts/verify_wheel.py dist/ashare_data-0.10.0.dev98-py3-none-any.whl --full
+# 含全部可选依赖的完整隔离验证
+uv run python scripts/verify_wheel.py dist/ashare_data-0.10.0.dev98-py3-none-any.whl --full --extra free-updates --extra local-data --extra factor-evaluation
 ```
 
 ## 快速开始
@@ -34,7 +37,7 @@ uv run python scripts/verify_wheel.py dist/ashare_data-0.10.0.dev98-py3-none-any
 ```python
 from ashare_data import Client
 
-client = Client(cache_dir="./cache")
+client = Client(cache="./cache")
 df = client.get_price(
     "600000.XSHG",
     count=5,
@@ -46,13 +49,13 @@ print(df)
 
 ### 读取正式本地发布（`MarketRelease`）
 
-当本地已配置 `deployment.json` 或 `LocalDailyStore` 发布目录时，可通过 `MarketRelease` 读取不可变日线、分钟、参考与财务数据：
+当本地已配置 `deployment.json` 或 `MarketRelease` 发布目录时，可通过 `MarketRelease` 读取不可变日线、分钟、参考与财务数据：
 
 ```python
-from ashare_data import MarketRelease
+from ashare_data.storage.market_release import MarketRelease
 
 release = MarketRelease("/path/to/releases", release_id=1, expected_manifest_sha256="...")
-daily = release.daily("600000.XSHG", start_date="2024-01-02", end_date="2024-01-31")
+daily = release.read("bars_1d", "600000.XSHG", "2024-01-02", "2024-01-31")
 ```
 
 ## 使用指南
@@ -63,7 +66,7 @@ daily = release.daily("600000.XSHG", start_date="2024-01-02", end_date="2024-01-
 - [本地日线与分钟主库](docs/local-daily.md)：`LocalDailyStore` 建库与增量更新、`MarketRelease` 统一发布与读取、早期历史及分钟覆盖规范。
 - [数据源与免费增量采集](docs/providers.md)：新浪、BaoStock、TDX、zzshare 适配器，聚宽观察录制导入，以及 198+19 项免费公开源增量采集与宏观发布。
 - [参考数据与公司行动](docs/reference-and-actions.md)：交易日历、停牌/ST 状态、源前收、上市事实、历史市场状态视图及分红送转复权计算。
-- [财务数据与质量台账](docs/financials.md)：三大财务报表 schema、披露日可见性过滤、`LocalFinancialStore` 质量分类与跨源修复。
+- [财务数据与质量台账](docs/financials.md)：三大财务报表 schema、披露日可见性过滤、`FinancialTables` / `FinancialPIT` 点位查询与跨源质量分类台账。
 - [因子库与因子评价](docs/factors.md)：因子目录检索、聚宽 19 项研究因子、GTJA Alpha191、Qlib Alpha158 与 Alphalens 离线评价。
 - [研究数据包与可移植组件](docs/research-packages.md)：`ResearchView`、`IndependentQueryView`、`NeigezhuMinuteView`、日频执行输入预检与 Portable 组件生产消费契约。
 - [开发验证、来源边界与许可](docs/development.md)：代码结构、验证脚本、内部资源锚点、第三方数据源使用边界与软件许可说明。

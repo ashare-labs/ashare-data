@@ -76,6 +76,7 @@ def qh_fixture():
 
 
 def qh_parse(page, body):
+    pytest.importorskip("bs4", reason="free-updates extra required for HTML contracts")
     return commodity.qh_parse('<script id="__NEXT_DATA__">'+json.dumps(page)+'</script>', json.dumps(body))
 
 
@@ -130,6 +131,7 @@ def industry_page(page=1, total=1, code="881121", rank=1):
 
 
 def test_industry_native_headers_codes_and_rounded_fund_flows():
+    pytest.importorskip("bs4", reason="free-updates extra required for HTML contracts")
     class Capture:
         def __init__(self): self.urls = []
         def get(self, url):
@@ -147,6 +149,7 @@ def test_industry_native_headers_codes_and_rounded_fund_flows():
 
 
 def test_industry_headers_challenge_and_pagination_identity_not_guessed():
+    pytest.importorskip("bs4", reason="free-updates extra required for HTML contracts")
     with pytest.raises(ValueError, match="missing"):
         industry.parse(b'<html>captcha</html>')
     with pytest.raises(ValueError, match="headers"):

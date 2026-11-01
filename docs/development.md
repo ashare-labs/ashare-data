@@ -12,14 +12,14 @@
 | `market` | 在线行情客户端 `Client`、统一查询路由与分钟/日线量额对账诊断 |
 | `reference` | 交易日历、逐日停牌/ST 状态、源前收、盘前参考价、上市事实与历史市场状态视图 |
 | `corporate_actions` | 分红送转配股历史台账（`CorporateHistoryView`）与事件范围校验 |
-| `financials` | 三大财务报表与分红存储（`LocalFinancialStore`）、官方披露日对齐、分类台账与跨源补采修复 |
+| `financials` | 财务版本归档查询（`FinancialPIT`）、版本台账（`FinancialLedger`）、官方披露日对齐、Tushare 参考采集与跨源补采修复 |
 | `factors` | 因子目录（`catalog`）、聚宽 19 因子（`joinquant/`）、GTJA Alpha191（`alpha191/`）、Qlib Alpha158（`qlib_alpha158/`）与 Alphalens 评价（`evaluation/`） |
-| `storage` | 不可变快照存储（`Store` / `DataView`）、Parquet/DuckDB 读写与 `native_macro_release` |
-| `providers` | 新浪、BaoStock（`baostock_receipt/`）、TDX（`tdx/`）、聚宽输入（`joinquant/`）、zzshare、CMES 因子及免费公开源增量采集（`free_updates/`） |
+| `storage` | 不可变快照存储（`Store` / `DataView`）、本地日线主库（`LocalDailyStore`）、正式市场发布（`MarketRelease`）与 `native_macro_release` |
+| `providers` | 新浪、BaoStock（`baostock_receipt/`）、TDX（`tdx/`）、聚宽输入（`joinquant/`）、zzshare、CMES 因子、高频分钟（`neigezhu`）及免费公开源增量采集（`free_updates/`） |
 | `observations` | 盘前准备、开盘、盘中刷新、收盘确认与响应重放模块 |
 | `research` | `ResearchView`、`IndependentQueryView`、日频研究/执行视图与 Portable 组件生产消费实现 |
-| `product` | `LocalDailyStore`、`MarketRelease`、`LocalMinuteProduct`、`NeigezhuMinuteView` 与发布 CLI |
-| `cli` | `ashare-data` 命令行总入口及 `local_daily`、`free_updates`、`native_macro` 子命令 |
+| `product` | `LocalDailyProduct`、`LocalMinuteProduct`、`FinancialTables`、`NativeMacro` 与发布管理 CLI（`release_cli`） |
+| `cli` | `ashare-data` 命令行总入口及 `local_daily`、`free_updates`、`native_macro`、`corporate_actions` 子命令 |
 
 ---
 
@@ -46,7 +46,10 @@ uv run pytest -q
 
 ```sh
 uv build
+# 核心依赖隔离验证
 uv run python scripts/verify_wheel.py dist/ashare_data-0.10.0.dev98-py3-none-any.whl --full
+# 含全部可选依赖的完整隔离验证
+uv run python scripts/verify_wheel.py dist/ashare_data-0.10.0.dev98-py3-none-any.whl --full --extra free-updates --extra local-data --extra factor-evaluation
 ```
 
 如需在离线环境复用本地已缓存的平台 wheel，可附加 `--offline --cache <uv-cache-dir> --wheelhouse <wheel-dir>`（脚本仍强制校验每个本地 wheel 与 `uv.lock` 的字节大小和 SHA-256）。

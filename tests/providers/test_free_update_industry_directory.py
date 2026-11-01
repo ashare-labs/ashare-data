@@ -24,6 +24,7 @@ def page(*, parent='农业', values=None):
 
 
 def test_complete_directory_reconciles_levels_and_named_measures():
+    pytest.importorskip("bs4", reason="free-updates extra required for HTML contracts")
     rows, coverage = parse(page(), 'sw_index_second_info')
     assert rows == [{'行业代码': '801016.SI', '行业名称': '种植业', '成份个数': 8, '上级行业': '农业',
                      '静态市盈率': 10.5, 'TTM(滚动)市盈率': 11.0, '市净率': 1.2, '静态股息率': None}]
@@ -41,6 +42,7 @@ def test_complete_directory_reconciles_levels_and_named_measures():
     (lambda p: p.replace('>10.5<', '>NaN<'), 'finite'),
 ])
 def test_partial_changed_or_misidentified_directory_is_not_complete(transform, error):
+    pytest.importorskip("bs4", reason="free-updates extra required for HTML contracts")
     with pytest.raises(ValueError, match=error):
         parse(transform(page()), 'sw_index_first_info')
 

@@ -4,8 +4,6 @@ import re
 from math import ceil
 from urllib.parse import urlencode
 
-from bs4 import BeautifulSoup
-
 from ashare_data.providers.free_updates.free_update_dates import reviewed_date
 
 HB_URL = "https://www.hbets.cn/"
@@ -92,6 +90,7 @@ def collect_housing(capture, params):
 
 
 def parse_hubei(body):
+    from bs4 import BeautifulSoup
     soup = BeautifulSoup(body.decode("utf-8"), "lxml")
     area = soup.select_one("div.threeLeft")
     if area is None:

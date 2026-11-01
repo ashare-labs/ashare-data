@@ -15,6 +15,7 @@ class Capture:
 
 
 def test_szse_current_etfs_exclude_other_funds_keep_native_share_units():
+    pytest.importorskip("openpyxl", reason="free-updates extra required for Excel contracts")
     rows = [{'基金代码':code,'基金简称':code,'基金类别':kind,'投资类别':'股票','上市日期':'2020-01-01',
              '当前规模(份)':'1,200','基金管理人':'管理人','基金发起人':'发起人','基金托管人':'托管人','净值':1.2}
             for code,kind in [('159001','ETF'),('160001','LOF'),('180001','不动产基金')]]
@@ -39,6 +40,7 @@ def page(code='850111.SI'):
 
 
 def test_current_industry_members_bind_request_and_retain_unknown_fields():
+    pytest.importorskip("bs4", reason="free-updates extra required for HTML contracts")
     capture=Capture(page())
     result=sw_members(capture,{'symbol':'850111.SI'})
     assert result[0]['股票代码']=='000001.SZ'
@@ -80,6 +82,7 @@ def test_one_missing_exchange_does_not_claim_two_market_completion(tmp_path,monk
 
 @pytest.mark.parametrize('level,code,label', [(1,'801010.SI','申万1级'),(2,'801016.SI','申万2级')])
 def test_current_member_levels_are_explicit_not_inferred(level,code,label):
+    pytest.importorskip("bs4", reason="free-updates extra required for HTML contracts")
     body=page(code).replace('申万3级'.encode(),label.encode())
     capture=Capture(body)
     rows=sw_members(capture,{'symbol':code},level=level)

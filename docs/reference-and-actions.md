@@ -34,7 +34,7 @@
 from ashare_data import HistoricalMarketView
 
 view = HistoricalMarketView("binding.json", expected_binding_sha256="<64位SHA256>")
-state = view.read_daily_state("600000.XSHG", "2024-01-03", role="historical_market_retrospective_research")
+state = view.state("600000.XSHG", "2024-01-03", visibility="posthoc")
 ```
 
 - **证券池与退市/吸收合并追踪**：结合上交所/深交所与巨潮目录，显式记录首次上市日、退市日及吸收合并承继关系（如原代码注销与新代码承继的有效期边界）。
@@ -56,11 +56,17 @@ state = view.read_daily_state("600000.XSHG", "2024-01-03", role="historical_mark
 from ashare_data import CorporateHistoryView
 
 corp = CorporateHistoryView("binding.json", expected_binding_sha256="<64位SHA256>")
-actions = corp.read_actions("600000.XSHG", start_date="2020-01-01", end_date="2024-12-31")
+actions = corp.events(
+    ["600000.XSHG"],
+    start="2020-01-01",
+    end="2024-12-31",
+    date_role="any",
+    visibility="posthoc",
+)
 ```
 
-- 每条事件记录完整保留公告日（`notice_date`）、股权登记日（`record_date`）、除权除息日（`ex_date`）、派息日（`pay_date`）与新增股份上市日，区分普通现金分红、送股、转增股本、配股与特殊重组事件。
-- CLI 入口：`python -m ashare_data.corporate_actions.corporate_history_cli --help`。
+- 每条事件记录完整保留公告日（`announcement_date`）、股权登记日（`record_date`）、除权除息日（`ex_date`）、派息日（`payment_date`）与新增股份上市日（`new_shares_tradable_date`），区分分红送转（`distribution`）、配股（`rights_issue`）、代码变更（`security_change`）与特殊重组事件（`reorganization`）。
+- CLI 入口：`ashare-data corporate-history --help`（实现位于 `ashare_data.cli.corporate_actions`）。
 
 ### 复权价格计算
 

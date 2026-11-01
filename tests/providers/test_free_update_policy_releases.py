@@ -7,6 +7,11 @@ from ashare_data.providers.free_updates import free_update_policy_releases as po
 from ashare_data.providers.free_updates.free_update_semantics import validate_semantics
 
 
+@pytest.fixture(autouse=True)
+def _require_bs4():
+    pytest.importorskip("bs4", reason="free-updates extra required for HTML contracts")
+
+
 def checked(rows, name):
     return validate_semantics(rows, {"function": name, "parameters": {}}, "2026-10-29")
 

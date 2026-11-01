@@ -10,8 +10,6 @@ import json
 import re
 from urllib.parse import urlencode
 
-from bs4 import BeautifulSoup
-
 
 def amount(text):
     text = text.strip().replace(",", "")
@@ -25,6 +23,7 @@ def amount(text):
 
 
 def parse_fund_flow(body, page):
+    from bs4 import BeautifulSoup
     soup = BeautifulSoup(body.decode("gb18030"), "lxml")
     table = soup.select_one("table.J-ajax-table")
     info = soup.select_one("span.page_info")
@@ -59,6 +58,7 @@ def parse_fund_flow(body, page):
 
 
 def parse_carbon(body, page):
+    from bs4 import BeautifulSoup
     soup = BeautifulSoup(body.decode("utf-8"), "lxml")
     table = soup.select_one("table.jyhq_tab")
     if table is None:

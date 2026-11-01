@@ -4,17 +4,18 @@
 
 ## 本地日线主库（`LocalDailyStore`）
 
-`LocalDailyStore` 管理本地 SQLite/Parquet 混合存储的日线、复权因子、证券目录与来源回执，支持从历史底库初始化并按交易日增量更新。
+`LocalDailyStore` 管理本地 SQLite/Parquet 混合存储的日线、复权因子、证券目录与来源回执，支持从历史底库初始化并按交易日增量更新；只读部署入口也可通过 `ashare_data.product.LocalDailyProduct` 访问。
 
 ```python
-from ashare_data import LocalDailyStore
+from ashare_data.storage.local_daily import LocalDailyStore
 
 store = LocalDailyStore("/path/to/ashare-data-local")
-status = store.status()
-df = store.query(
-    symbol="600000.XSHG",
-    start_date="2024-01-02",
-    end_date="2024-03-29",
+status = store.summary()
+df = store.get_price(
+    "600000.XSHG",
+    start="2024-01-02",
+    end="2024-03-29",
+    source="auto",
 )
 ```
 
@@ -59,7 +60,7 @@ ashare-data local-daily query-early --root /path/to/ashare-data-local \
 `MarketRelease` 将日线主库、分钟分块、交易日历、证券生命周期、公司行动、财务三表及原生宏观数据封装为带 `manifest_sha256` 的不可变版本化发布，供 `ashare-quant` 等消费者通过只读文件映射直接读取，无需长连接占用主库 SQLite 写锁。
 
 ```python
-from ashare_data import MarketRelease
+from ashare_data.storage.market_release import MarketRelease
 
 release = MarketRelease(
     root="/path/to/releases",
@@ -67,25 +68,26 @@ release = MarketRelease(
     expected_manifest_sha256="<64位SHA256>",
 )
 
-# 读取日线与覆盖检查
-prices = release.prices(["600000.XSHG"], start_date="2024-01-02", end_date="2024-01-31")
-coverage = release.coverage(["600000.XSHG"], start_date="2024-01-02", end_date="2024-01-31")
+# 读取日线（bars_1d）或分钟线（bars_1m）及发布回执
+bars = release.read("bars_1d", "600000.XSHG", "2024-01-02", "2024-01-31")
+receipt = release.receipt()
 
-# 读取原生宏观序列
+# 读取财务与原生宏观绑定视图
+fin = release.financial()
 macro = release.native_macro()
 ```
 
 ### 发布构建、备份与增量应用
 
-通过 `ashare_data.product.release_cli` 管理发布生命周期：
+通过 `ashare_data.product.release_cli` 管理发布生命周期（全局参数 `--root` 须置于子命令之前）：
 
 ```sh
 # 备份与恢复已提交的正式发布闭包
-python -m ashare_data.product.release_cli backup --root /path/to/releases --output /path/to/backup
-python -m ashare_data.product.release_cli restore --backup /path/to/backup --target /path/to/new-releases
+python -m ashare_data.product.release_cli --root /path/to/releases backup --destination /path/to/backup
+python -m ashare_data.product.release_cli --root /path/to/backup restore --destination /path/to/new-releases
 
 # 按冻结计划增量替换受影响的证券分块并发布新版本
-python -m ashare_data.product.release_cli apply --root /path/to/releases --plan /path/to/plan.json
+python -m ashare_data.product.release_cli --root /path/to/releases apply --plan /path/to/plan.json
 ```
 
 - **单写入者与原子发布**：发布写入通过 `ReleaseWriter` 与目录锁串行推进，先写入不可变 Parquet/JSON 数据块，校验完整父版本摘要后再原子更新版本清单。

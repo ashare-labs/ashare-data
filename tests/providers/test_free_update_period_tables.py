@@ -112,6 +112,7 @@ def test_financing_current_month_and_missing_component_preserved():
 
 
 def test_financing_future_row_quarantined_without_losing_valid_months_or_raw_fields():
+    pytest.importorskip("bs4", reason="free-updates extra required for HTML contracts")
     rows, coverage = parse_ths(finance_html(), "macro_stock_finance")
     future = dict(rows[0], 月份="2026-11")
     native = [future, *rows]
@@ -127,6 +128,7 @@ def test_financing_future_row_quarantined_without_losing_valid_months_or_raw_fie
 
 
 def test_financing_replay_keeps_original_cutoff_but_new_receipt_can_admit_new_month():
+    pytest.importorskip("bs4", reason="free-updates extra required for HTML contracts")
     body = finance_html().replace(b"<tbody>", b"<tbody>" + b"<tr><td>2026-11</td><td>30</td><td>10</td><td>20</td><td>--</td></tr>")
     class Capture:
         receipts = [{"received_at": "2026-10-28T20:00:00+00:00"}]
@@ -145,6 +147,7 @@ def test_financing_replay_keeps_original_cutoff_but_new_receipt_can_admit_new_mo
 
 @pytest.mark.parametrize("change", ["duplicate", "invalid", "all_future", "naive"])
 def test_financing_quarantine_never_hides_malformed_or_duplicate_dates(change):
+    pytest.importorskip("bs4", reason="free-updates extra required for HTML contracts")
     rows, coverage = parse_ths(finance_html(), "macro_stock_finance")
     received = "2026-10-28T20:00:00+00:00"
     if change == "duplicate":

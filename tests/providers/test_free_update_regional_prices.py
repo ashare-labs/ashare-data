@@ -23,6 +23,7 @@ def hb_validate(rows):
 
 
 def test_carbon_thousands_and_absent_chart_cells_retain_both_raw_and_nulls():
+    pytest.importorskip("bs4", reason="free-updates extra required for HTML contracts")
     raw = carbon()
     rows = regional.parse_hubei(chart([{"value": ""}, raw], ["2026-10-22", "2026-10-23"]))
     result = hb_validate(rows)
@@ -35,18 +36,21 @@ def test_carbon_thousands_and_absent_chart_cells_retain_both_raw_and_nulls():
 
 @pytest.mark.parametrize("change", [{"cjl": "1,71"}, {"value": "91"}, {"riqi": "2026-10-22"}, {"surprise": 1}])
 def test_chart_grouping_axis_and_price_projection_are_strict(change):
+    pytest.importorskip("bs4", reason="free-updates extra required for HTML contracts")
     with pytest.raises(ValueError):
         regional.parse_hubei(chart([carbon(**change)], ["2026-10-23"]))
 
 
 @pytest.mark.parametrize("change", [{"成交量": "1714"}, {"涨跌": "10"}, {"最新": "5"}, {"日期": "2027-10-23"}, {"market": "全国"}])
 def test_native_projection_date_market_cannot_be_reinterpreted(change):
+    pytest.importorskip("bs4", reason="free-updates extra required for HTML contracts")
     rows = regional.parse_hubei(chart([carbon()], ["2026-10-23"]))
     with pytest.raises(ValueError):
         hb_validate([rows[0] | change])
 
 
 def test_missing_chart_is_not_a_zero_trade_or_duplicate_valid_price():
+    pytest.importorskip("bs4", reason="free-updates extra required for HTML contracts")
     rows = regional.parse_hubei(chart([{"value": ""}], ["2026-10-23"]))
     with pytest.raises(ValueError):
         hb_validate(rows)

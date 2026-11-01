@@ -4,8 +4,6 @@ import re
 from urllib.parse import urljoin, urlsplit
 from zoneinfo import ZoneInfo
 
-from bs4 import BeautifulSoup
-
 PBC_DIRECTORY = "https://www.pbc.gov.cn/diaochatongjisi/116219/116319/{year}ntjsj/shrzgm/index.html"
 NDRC_DIRECTORY = "https://www.ndrc.gov.cn/xwdt/xwfb/"
 SH_DIRECTORY = "https://fgw.sh.gov.cn/fgw_jggl/index.html"
@@ -39,6 +37,7 @@ def link(url, href, host, prefix):
 
 
 def parse_flow(body, year, url):
+    from bs4 import BeautifulSoup
     soup = BeautifulSoup(body, "lxml")
     if "社会融资规模增量统计表" not in text(soup) or "单位：亿元人民币" not in text(soup):
         raise ValueError("PBOC flow identity or unit changed")
@@ -84,6 +83,7 @@ def effective(text_value, announcement):
 
 
 def parse_ndrc(body, url):
+    from bs4 import BeautifulSoup
     soup = BeautifulSoup(body, "lxml")
     title = soup.find("h2") or soup.find("h1")
     title_value = text(title) if title else text(soup.title) if soup.title else ""
@@ -119,6 +119,7 @@ def parse_ndrc(body, url):
 
 
 def parse_shanghai(body, url):
+    from bs4 import BeautifulSoup
     soup = BeautifulSoup(body, "lxml")
     meta = soup.select_one('meta[name="ArticleTitle"]')
     title = meta["content"] if meta else ""
@@ -160,6 +161,7 @@ def parse_shanghai(body, url):
 
 
 def collect(capture, name, params):
+    from bs4 import BeautifulSoup
     if name == "pbc_social_financing_flow":
         if set(params) != {"year"} or not re.fullmatch(r"20\d{2}", str(params["year"])):
             raise ValueError("PBOC flow needs an explicit calendar year")

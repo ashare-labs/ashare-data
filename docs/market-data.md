@@ -9,7 +9,7 @@
 ```python
 from ashare_data import Client
 
-client = Client(cache_dir="./cache")
+client = Client(cache="./cache")
 
 # 查询近期日线
 daily = client.get_price(
@@ -20,26 +20,26 @@ daily = client.get_price(
     fields=["open", "close", "high", "low", "volume"],
 )
 
-# 带详细覆盖与谱系报告的查询
-result = client.query_price(
+# 查询分钟线并读取 df.attrs 中的谱系与查询状态报告
+minute = client.get_price(
     "600000.XSHG",
     count=10,
     frequency="1m",
     fields=["open", "close", "high", "low", "volume", "money"],
     allow_partial=True,
 )
-print(result.data)
-print(result.report["query_status"])
+print(minute)
+print(minute.attrs["query_status"])
 ```
 
 ### 查询与缓存参数
 
 | 方法 / 参数 | 说明 |
 | --- | --- |
-| `Client(cache_dir=None, timeout=15)` | 初始化客户端；指定 `cache_dir` 时自动记录原始响应与接收时间 |
-| `get_price(security, start_date=None, end_date=None, frequency="daily", fields=None, count=None, fq=None, allow_partial=False, query_limits=None)` | 返回 `pandas.DataFrame`；单标的以 `time` 为索引，多标的返回 `time`、`code` 列 |
-| `query_price(...)` | 参数与 `get_price` 相同，返回 `QueryResult(data, report)`，包含逐行来源哈希与覆盖诊断 |
-| `at(as_of, visibility="verified")` | 返回绑定查询截止时钟的视图；`visibility` 可选 `"verified"`、`"received"`（按本机接收时间过滤）或 `"assumed"` |
+| `Client(*, cache=None, cache_mode="prefer", cache_ttl=300, timeout=15, coverage_contract=None, query_limits=None)` | 初始化客户端；指定 `cache` 目录时自动记录原始响应与接收时间 |
+| `get_price(security, start_date=None, end_date=None, frequency="daily", fields=None, skip_paused=False, fq=None, count=None, panel=False, fill_paused=False, round=False, *, as_of=None, visibility="verified", strict=True, require_complete=False, require_fresh=False, require_final=False, require_tradable=False, allow_partial=False)` | 返回 `pandas.DataFrame`（单标的以 `time` 为索引，多标的返回 `time`、`code` 列），并在 `df.attrs` 中附带 `provenance`、`query_status` 与覆盖诊断 |
+| `coverage(security, start_date, end_date, *, frequency="1m")` / `trading_status(security, *, as_of=None)` | 基于显式 `coverage_contract` 评估窗口覆盖完整性与时段/交易状态准入 |
+| `at(as_of, *, visibility="verified", require_complete=False, require_fresh=False, require_final=False, require_tradable=False)` | 返回绑定查询截止时钟的离线视图；`visibility` 可选 `"verified"`、`"received"`（按本机接收时间过滤）或 `"assumed"` |
 | `save_research(store)` | 将当前缓存中的合格新浪观测封存至 `Store`，返回不可变 `dataset_id` |
 
 - **字段与单位**：价格为未复权人民币元/股，成交量（`volume`）为整数股，分钟成交额（`money` / `amount`）为人民币元。新浪日线接口不含成交额字段，请求日线 `money` 会返回 `UNSUPPORTED_FIELD`。

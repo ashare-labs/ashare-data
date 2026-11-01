@@ -102,7 +102,8 @@ def test_financial_guard_does_not_change_normalizer_or_existing_fetch(tmp_path, 
 
 def test_requests_reads_bounded_body_and_preserves_source_refusal(tmp_path, monkeypatch):
     import io
-    import requests
+    requests = pytest.importorskip("requests", reason="free-updates extra required for requests contract")
+    pytest.importorskip("curl_cffi", reason="free-updates extra required for curl_cffi contract")
     from urllib3.response import HTTPResponse
     from unittest.mock import patch
     from ashare_data.providers.free_updates.free_update_worker import Capture, SourceBlocked
@@ -129,6 +130,8 @@ def test_requests_reads_bounded_body_and_preserves_source_refusal(tmp_path, monk
 def test_curl_callback_bounded_and_budgeted(tmp_path, monkeypatch):
     from types import SimpleNamespace
     from unittest.mock import patch
+    pytest.importorskip("requests", reason="free-updates extra required for requests contract")
+    pytest.importorskip("curl_cffi", reason="free-updates extra required for curl_cffi contract")
     from curl_cffi import requests as curl_requests
     from ashare_data.providers.free_updates.free_update_worker import Capture
     b = configured(tmp_path, monkeypatch)

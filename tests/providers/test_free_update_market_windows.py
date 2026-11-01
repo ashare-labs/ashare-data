@@ -42,6 +42,7 @@ def curve_page(day='2026-10-28'):
 
 
 def test_curve_keeps_only_named_government_series_and_exact_bounds():
+    pytest.importorskip("lxml", reason="free-updates extra required for HTML table contracts")
     params = {'start_date': '20261014', 'end_date': '20261028'}
     cap = Capture(curve_page())
     rows = windows.collect(cap, 'china_government_yield', params)

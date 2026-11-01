@@ -158,6 +158,28 @@ def check(root):
         ):
             if not (root / name).is_file():
                 errors.append(f"{relative}: referenced project file does not exist: {name}")
+        for module in re.findall(r"python -m (ashare_data(?:\.[A-Za-z0-9_]+)+)", text):
+            target = root / "src" / module.replace(".", "/")
+            if not target.with_suffix(".py").is_file() and not (target / "__init__.py").is_file():
+                errors.append(f"{relative}: missing documented CLI module {module}")
+        for block in re.findall(r"```python\n(.*?)```", text, re.S):
+            try:
+                doc_tree = ast.parse(block, filename=str(relative))
+            except SyntaxError as exc:
+                errors.append(f"{relative}: invalid python snippet: {exc}")
+                continue
+            for node in ast.walk(doc_tree):
+                if (
+                    isinstance(node, ast.ImportFrom)
+                    and node.module
+                    and (node.module == "ashare_data" or node.module.startswith("ashare_data."))
+                ):
+                    target = root / "src" / node.module.replace(".", "/")
+                    if (
+                        not target.with_suffix(".py").is_file()
+                        and not (target / "__init__.py").is_file()
+                    ):
+                        errors.append(f"{relative}: missing documented module {node.module}")
     for resource, module, constant in [
         ("conditional-profile.json", "conditional.py", "PROFILE_SHA256"),
         ("conditional-listing-policy.json", "conditional_listing.py", "POLICY_SHA256"),
