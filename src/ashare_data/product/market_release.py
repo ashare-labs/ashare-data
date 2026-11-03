@@ -481,6 +481,21 @@ def released_minute_sources(release):
     return sources, canonical_series
 
 
+def minute_dispositions(release, raw):
+    """Return request source dispositions, not a copy of the entire CMES import ledger."""
+    dispositions = release.manifest["input_dispositions"]
+    if not release.manifest.get("cmes"):
+        return {"input_dispositions": dispositions}
+    selected = sorted({row["source_asset_id"] for row in raw if row.get("source_asset_id")})
+    return {"input_dispositions": {key: dispositions[key] for key in selected if key in dispositions},
+            "input_disposition_scope": {
+                "basis": "requested observations only; full ledger retained in immutable manifest",
+                "release_id": release.release_id, "manifest_sha256": release.sha256,
+                "published_source_assets": len(dispositions), "requested_source_assets": len(selected),
+                "unmatched_requested_source_assets": [key for key in selected if key not in dispositions],
+            }}
+
+
 def minute_prices(config, security, start, end, source="canonical", *, release=None):
     release = open_release(config, release=release)
     sources, canonical_series = released_minute_sources(release)
@@ -532,6 +547,9 @@ def minute_prices(config, security, start, end, source="canonical", *, release=N
         }
         for field, column in zip(("open", "high", "low", "close", "volume", "amount"), FIELDS):
             value[field] = str(row[column]) if isinstance(row[column], Decimal) else row[column]
+        for field in ("source_asset_id", "source_member", "source_row"):
+            if field in row:
+                value[field] = row[field]
         restriction = restrictions.get((row["series_id"], row["label_at"].isoformat()))
         value["diagnostics"] = []
         if restriction:
@@ -585,6 +603,9 @@ def minute_prices(config, security, start, end, source="canonical", *, release=N
             "strict_execution_admitted": False,
             "historical_pit": False,
             "limits": LIMITATIONS,
-            "input_dispositions": release.manifest["input_dispositions"],
+            "observation_status": "observations_returned" if raw else "no_observations",
+            "complete": None,
+            "completeness": "unknown; missing observations never imply suspension or zero prices",
+            **minute_dispositions(release, raw),
         },
     }

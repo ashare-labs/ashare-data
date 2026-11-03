@@ -103,3 +103,18 @@ def test_shared_parquet_is_scoped_and_never_counted_twice(tmp_path):
     c = release.sql(tables=("bars_1d",), securities=["000001.XSHE"])
     assert c.execute("select instrument_id,count(*) from market.bars_1d group by 1").fetchall() == [(1, 1)]
     c.close()
+
+
+def test_minute_dispositions_do_not_embed_unrelated_import_ledger():
+    from types import SimpleNamespace
+    from ashare_data.product.market_release import minute_dispositions
+
+    ledger = {str(i): {"input_rows": 1, "adopted": 1} for i in range(10000)}
+    release = SimpleNamespace(manifest={"cmes": {}, "input_dispositions": ledger},
+                              release_id=1, sha256="a" * 64)
+    release.manifest["cmes"] = {"source": "cmes"}
+    value = minute_dispositions(release, [{"source_asset_id": "1"}])
+    assert value["input_dispositions"] == {"1": ledger["1"]}
+    assert value["input_disposition_scope"]["published_source_assets"] == 10000
+    assert len(json.dumps(value)) < 1000
+    assert minute_dispositions(release, [])["input_dispositions"] == {}
