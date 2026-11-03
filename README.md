@@ -23,9 +23,9 @@ uv sync --locked --extra free-updates --extra local-data --extra factor-evaluati
 ```sh
 uv build
 # 核心依赖隔离验证
-uv run python scripts/verify_wheel.py dist/ashare_data-0.10.0.dev98-py3-none-any.whl --full
+uv run python scripts/verify_wheel.py dist/ashare_data-0.10.0.dev99-py3-none-any.whl --full
 # 含全部可选依赖的完整隔离验证
-uv run python scripts/verify_wheel.py dist/ashare_data-0.10.0.dev98-py3-none-any.whl --full --extra free-updates --extra local-data --extra factor-evaluation
+uv run python scripts/verify_wheel.py dist/ashare_data-0.10.0.dev99-py3-none-any.whl --full --extra free-updates --extra local-data --extra factor-evaluation
 ```
 
 ## 快速开始
@@ -59,6 +59,8 @@ daily = release.read("bars_1d", "600000.XSHG", "2024-01-02", "2024-01-31")
 ```
 
 ## 使用指南
+
+正式本地部署的增量可见性、快照冻结及验证缓存见[跟随正式市场发布](docs/current-release.md)。
 
 文档按功能域划分为 8 篇指南：
 

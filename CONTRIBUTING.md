@@ -30,6 +30,6 @@ uv run pytest -q
 
 ```sh
 uv build
-uv run python scripts/verify_wheel.py dist/ashare_data-0.10.0.dev98-py3-none-any.whl --full
-uv run python scripts/verify_wheel.py dist/ashare_data-0.10.0.dev98-py3-none-any.whl --full --extra free-updates --extra local-data --extra factor-evaluation
+uv run python scripts/verify_wheel.py dist/ashare_data-0.10.0.dev99-py3-none-any.whl --full
+uv run python scripts/verify_wheel.py dist/ashare_data-0.10.0.dev99-py3-none-any.whl --full --extra free-updates --extra local-data --extra factor-evaluation
 ```
