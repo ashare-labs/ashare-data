@@ -59,6 +59,9 @@ class LocalDailyProduct:
     _native_security = staticmethod(_native_security)
 
     def __init__(self, root, *, references=None):
+        from ashare_data.core.consumer_policy import reject_legacy
+
+        reject_legacy("local-daily SQLite")
         self.root = Path(root).expanduser().resolve()
         self.references = references
         require(

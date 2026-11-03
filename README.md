@@ -80,3 +80,12 @@ daily = release.read("bars_1d", "600000.XSHG", "2024-01-02", "2024-01-31")
 1. **知识时点（PIT）与时间字段**：系统严格区分行情有效标签（`source_label`）、本地实际接收时刻（`observed_at` / `received_at`）与历史首次公开可得时刻（`available_at`）。除非输入具备经核实的披露/发布时间戳，否则事后采集或回填数据的 `historical_pit` 均为 `False`，接收时间不会倒填为历史可见时间。
 2. **代码包与私有数据分离**：Git 仓库、源码包（sdist）与安装包（wheel）仅包含软件代码、公式定义与合成测试夹具（`synthetic`），不包含真实历史行情库、发行人公告原件或账户状态。
 3. **职责边界**：所有数据源适配器与视图仅提供带来源摘要的数据读取与质量诊断（`execution_permission=False`），不内置交易策略、账户账本、撮合引擎或自动重试换源逻辑。
+
+A deployment may set `profiles.product.consumer_policy` to `committed_market_only`
+and select a `market_release` without `daily_asset`. In that explicit consumer
+mode, use `LocalDailyProduct.from_deployment()`, `LocalMinuteProduct`, or
+`ashare-data product`: legacy online `Client`/top-level quote calls and local
+SQLite reads fail with `LEGACY_SOURCE_DISABLED`. Deployment/path overrides and
+inherited AQ source registries fail closed. This selects committed publications;
+it does not make missing listing, adjustment, financial or tick evidence available.
+Legacy tools remain in the codebase for separately retained archival environments.

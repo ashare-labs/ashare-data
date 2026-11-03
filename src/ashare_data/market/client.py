@@ -168,6 +168,9 @@ class Client:
         coverage_contract=None,
         query_limits=None,
     ):
+        from ashare_data.core.consumer_policy import reject_legacy
+
+        reject_legacy("online Client")
         self.transport = Transport(
             cache=cache, cache_mode=cache_mode, cache_ttl=cache_ttl, timeout=timeout
         )
@@ -1211,6 +1214,14 @@ def _observation_time(value):
 
 def capabilities():
     from ashare_data import __version__
+    from ashare_data.core.consumer_policy import committed_deployment
+
+    if committed_deployment() is not None:
+        return {"version": __version__, "mode": "committed_market_only",
+                "source": "deployment_market_release", "online_client_enabled": False,
+                "entry": "LocalDailyProduct.from_deployment / LocalMinuteProduct",
+                "frequency": ["daily", "1m"], "adjustment": [None],
+                "automatic_source_fallback": False}
 
     return {
         "version": __version__,

@@ -27,6 +27,9 @@ def deployment_path(deployment=None):
 
 def load_profile(deployment=None, *, profile="product"):
     """Read only the common manifest envelope; consumers resolve their own assets."""
+    from ashare_data.core.consumer_policy import guard_selection
+
+    guard_selection(deployment, profile)
     selected = deployment_path(deployment)
     require(
         selected is not None,
@@ -97,10 +100,13 @@ def resolve(deployment=None, *, profile="product", reference_set=None, _loaded=N
     try:
         result = {"data_root": root, "profile": profile, "deployment": path}
         selected_assets = {}
+        result["daily_root"] = None
         for setting, key, kind in (
             ("daily_asset", "daily_root", "local_daily"),
             ("release_store_asset", "release_store_root", "store"),
         ):
+            if setting == "daily_asset" and selected_profile.get("market_release") is not None:
+                continue
             asset = value["assets"][selected_profile[setting]]
             require(
                 asset["kind"] == kind,
