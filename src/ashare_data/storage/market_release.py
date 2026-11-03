@@ -18,6 +18,7 @@ from uuid import uuid4
 import duckdb
 
 from ashare_data.core.model import require
+from ashare_data.storage.verified_objects import fingerprint, verify_cached
 
 SCHEMA = "ad-market-release.v1"
 ENGINE = "1.4.3"
@@ -43,11 +44,6 @@ def sha_file(path):
 
 def sql_literal(value):
     return "'" + str(value).replace("'", "''") + "'"
-
-
-def fingerprint(path):
-    s = Path(path).stat()
-    return [s.st_size, s.st_mtime_ns, s.st_ino]
 
 
 def atomic_write(path, body):
@@ -414,17 +410,7 @@ class MarketRelease:
         current = fingerprint(path)
         key = (self.sha256, item["sha256"], str(path))
         if self._verified.get(key) != current:
-            require(
-                current[0] == item["bytes"] and sha_file(path) == item["sha256"],
-                "MARKET_OBJECT_INTEGRITY",
-                "Immutable object changed: " + str(relative),
-            )
-            require(
-                fingerprint(path) == current,
-                "MARKET_OBJECT_INTEGRITY",
-                "Object changed during verification",
-            )
-            self._verified[key] = current
+            self._verified[key] = verify_cached(path, item["sha256"], item["bytes"], sha_file)
         return path
 
     @contextmanager
@@ -471,14 +457,15 @@ class MarketRelease:
         try:
             # Different series can retain different physical numeric representations.
             # A SQL union of DOUBLE and DECIMAL silently rounds decimal source values.
-            for item in items:
+            unique = {(item["path"], item["series_id"]): item for item in items}
+            for item in unique.values():
                 path = str(self.verify(item))
                 cursor = c.execute(
                     "SELECT * FROM read_parquet(?) WHERE "
                     + column
-                    + " BETWEEN ? AND ? ORDER BY "
+                    + " BETWEEN ? AND ? AND instrument_id=? AND series_id=? ORDER BY "
                     + column,
-                    [path, start, end],
+                    [path, start, end, instrument_id, item["series_id"]],
                 )
                 names = [r[0] for r in c.description]
                 while batch := cursor.fetchmany(4096):
@@ -512,13 +499,17 @@ class MarketRelease:
             ]
             require(bool(items), "MARKET_EMPTY_SCOPE", "No files in the requested table/scope")
             if table == "bars_1d" and len({f["series_id"] for f in items}) == 1:
-                paths = ",".join(sql_literal(self.verify(f)) for f in items)
+                paths = ",".join(sql_literal(self.verify(f))
+                                 for f in {f["path"]: f for f in items}.values())
+                selected_ids = sorted({f["instrument_id"] for f in items})
+                scope = " WHERE instrument_id IN (" + ",".join(map(str, selected_ids)) + ")"
+                scope += " AND series_id=" + str(items[0]["series_id"])
                 c.execute(
                     "CREATE VIEW market."
                     + table
                     + " AS SELECT * FROM read_parquet(["
                     + paths
-                    + "], union_by_name=true)"
+                    + "], union_by_name=true)" + scope
                 )
                 continue
             # Mixed physical series use lossless tagged numeric values. Consumers
@@ -526,7 +517,11 @@ class MarketRelease:
             parts = []
             for series_id in sorted({f["series_id"] for f in items}):
                 selected = [f for f in items if f["series_id"] == series_id]
-                paths = ",".join(sql_literal(self.verify(f)) for f in selected)
+                paths = ",".join(sql_literal(self.verify(f))
+                                 for f in {f["path"]: f for f in selected}.values())
+                selected_ids = sorted({f["instrument_id"] for f in selected})
+                scope = " WHERE instrument_id IN (" + ",".join(map(str, selected_ids)) + ")"
+                scope += " AND series_id=" + str(series_id)
                 relation = "read_parquet([" + paths + "], union_by_name=true)"
                 types = dict(
                     (r[0], r[1]) for r in c.execute("DESCRIBE SELECT * FROM " + relation).fetchall()
@@ -549,7 +544,7 @@ class MarketRelease:
                         + ") AS UNION(binary_value DOUBLE, fixed_value DECIMAL(38,12))) AS "
                         + field
                     )
-                parts.append("SELECT " + ",".join(columns) + " FROM " + relation)
+                parts.append("SELECT " + ",".join(columns) + " FROM " + relation + scope)
             c.execute("CREATE VIEW market." + table + " AS " + " UNION ALL ".join(parts))
         checks = [
             item

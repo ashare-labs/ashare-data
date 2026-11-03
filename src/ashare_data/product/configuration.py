@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 from pathlib import Path
 
 from ashare_data.core.model import DataError, digest, require
@@ -59,8 +60,40 @@ def load_profile(deployment=None, *, profile="product"):
         ) from exc
 
 
-def resolve(deployment=None, *, profile="product", reference_set=None):
-    path, root, value, selected_profile = load_profile(deployment, profile=profile)
+def resolve_market_release(market, root):
+    """Resolve CURRENT once into a pin; readers verify its committed manifest chain.
+
+    Resolution never opens mutable candidates or scans object directories. Returned
+    pins contain no live selector, so prices, references and research can share one
+    reader snapshot even while the publisher advances CURRENT.
+    """
+    require(isinstance(market, dict), "PRODUCT_CONFIGURATION", "Invalid market selection")
+    mode = market.get("mode", "pinned")
+    require(mode in {"pinned", "current"}, "PRODUCT_CONFIGURATION", "Unknown release mode")
+    target = Path(root).expanduser().resolve()
+    if mode == "current":
+        require(not ({"release_id", "manifest_sha256"} & market.keys()),
+                "PRODUCT_CONFIGURATION", "CURRENT mode cannot also declare a frozen pin")
+        pointer = target / "CURRENT.json"
+        require(pointer.stat().st_size <= 16384, "PRODUCT_CONFIGURATION", "CURRENT exceeds 16 KiB")
+        current = json.loads(pointer.read_bytes())
+        release_id, sha = current["release_id"], current["sha256"]
+        require(current.get("schema") == "ad-market-release.v1"
+                and type(release_id) is int and release_id > 0
+                and current.get("manifest") == f"releases/{release_id:08d}.json",
+                "PRODUCT_CONFIGURATION", "Invalid committed CURRENT pointer")
+    else:
+        release_id, sha = market["release_id"], market["manifest_sha256"]
+    require(type(release_id) is int and release_id > 0,
+            "PRODUCT_CONFIGURATION", "A committed release ID is required")
+    require(isinstance(sha, str) and re.fullmatch(r"[a-f0-9]{64}", sha),
+            "PRODUCT_CONFIGURATION", "A manifest SHA256 is required")
+    return {"root": str(target), "release_id": release_id, "manifest_sha256": sha}
+
+
+def resolve(deployment=None, *, profile="product", reference_set=None, _loaded=None):
+    path, root, value, selected_profile = (_loaded if _loaded is not None
+                                           else load_profile(deployment, profile=profile))
     try:
         result = {"data_root": root, "profile": profile, "deployment": path}
         selected_assets = {}
@@ -84,10 +117,7 @@ def resolve(deployment=None, *, profile="product", reference_set=None):
             require(asset["kind"] == "market_release", "PRODUCT_CONFIGURATION", "Select a market_release asset")
             target = Path(asset["path"]).expanduser()
             target = (target if target.is_absolute() else root / target).resolve()
-            require(type(market["release_id"]) is int and market["release_id"] > 0,
-                    "PRODUCT_CONFIGURATION", "A committed release ID is required")
-            result["market_release"] = {"root": str(target), "release_id": market["release_id"],
-                                        "manifest_sha256": market["manifest_sha256"]}
+            result["market_release"] = resolve_market_release(market, target)
             selected_assets[market["asset"]] = {**asset, "path": str(target)}
         sets = selected_profile.get("reference_sets", {})
         require(isinstance(sets, dict), "PRODUCT_CONFIGURATION", "reference_sets must be a mapping")

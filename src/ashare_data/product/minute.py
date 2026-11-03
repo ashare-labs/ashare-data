@@ -21,15 +21,17 @@ class LocalMinuteProduct:
         if self.market_release is not None:
             from ashare_data.product.configuration import resolve
 
-            self.frozen_market_config = resolve(self.entry, profile=profile)
-            require(
-                self.frozen_market_config["market_release"]["release_id"]
-                == self.market_release["release_id"]
-                and self.frozen_market_config["market_release"]["manifest_sha256"]
-                == self.market_release["manifest_sha256"],
-                "PRODUCT_CONFIGURATION_CHANGED",
-                "Deployment changed while opening minute reader",
+            # Resolve prices and references from the same loaded deployment.
+            # A second file read could observe a different profile during cutover.
+            self.frozen_market_config = resolve(
+                self.entry, profile=profile,
+                _loaded=(self.entry, self.root, self.document, selected),
             )
+            self.market_release = {
+                **self.market_release,
+                **{key: self.frozen_market_config["market_release"][key]
+                   for key in ("release_id", "manifest_sha256")},
+            }
         self.default_source = selected.get("default_minute_source", "tdx")
         self.registry = selected.get("minute_sources", {})
         if self.frozen_market_config is not None:

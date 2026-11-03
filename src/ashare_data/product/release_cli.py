@@ -413,12 +413,50 @@ def apply(release, plan):
         )
 
 
+def published_coverage(release):
+    """Describe committed descriptors, never collectors or unpublished work files."""
+    tables = {}
+    for item in [*release.files, *release.manifest.get("evidence", [])]:
+        table = item.get("table")
+        if not table:
+            continue
+        summary = tables.setdefault(table, {"objects": {}, "rows": 0, "first": [], "last": []})
+        summary["objects"][item["path"]] = item["bytes"]
+        summary["rows"] += item.get("rows", 0)
+        for key, field in (("first", "first_date"), ("last", "last_date")):
+            if item.get(field):
+                summary[key].append(item[field])
+    rows = []
+    for table, summary in sorted(tables.items()):
+        rows.append({"table": table, "files": len(summary["objects"]),
+                     "rows": summary["rows"], "bytes": sum(summary["objects"].values()),
+                     "first_date": min(summary["first"], default=None),
+                     "last_date": max(summary["last"], default=None),
+                     "standard_price_reader": table in {"bars_1d", "bars_1m"},
+                     "completeness": "not_certified"})
+    auction = [r["table"] for r in rows if "auction" in r["table"]]
+    tick = [r["table"] for r in rows if "tick" in r["table"]]
+    return {"schema": "ad-published-market-coverage.v1", "release": release.receipt(),
+            "basis": "committed immutable manifest descriptors; not exhaustive value validation",
+            "tables": rows,
+            "auction": {"status": "published_partial" if auction else "not_published",
+                        "tables": auction, "standard_reader": False},
+            "tick": {"status": "published_partial" if tick else "not_published",
+                     "tables": tick, "standard_reader": False},
+            "limits": ["Downloaded and in-progress imports are not part of this coverage.",
+                       "Only daily and one-minute prices have the standard market query interface.",
+                       "Published files do not certify value quality or complete securities/dates.",
+                       "Calendar horizons are provider observations, not future price coverage.",
+                       "Unknown listing history, adjustments and historical PIT remain unknown."]}
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--root", type=Path, required=True)
     p.add_argument("--release-id", type=int)
     sub = p.add_subparsers(dest="command", required=True)
     sub.add_parser("describe")
+    sub.add_parser("coverage")
     sub.add_parser("verify")
     q = sub.add_parser("query")
     q.add_argument("--table", choices=["bars_1d", "bars_1m"], required=True)
@@ -435,6 +473,8 @@ def main(argv=None):
     release = MarketRelease(a.root, a.release_id)
     if a.command == "describe":
         result = release.manifest
+    elif a.command == "coverage":
+        result = published_coverage(release)
     elif a.command == "verify":
         result = verify(release)
     elif a.command in ("backup", "restore"):
