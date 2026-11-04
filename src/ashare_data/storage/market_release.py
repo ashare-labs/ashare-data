@@ -5,25 +5,151 @@ there is no glob, mutable current/history join, shared writable DuckDB, or servi
 Changed chunks produce new objects. Every earlier manifest and object is retained.
 """
 
+from collections import OrderedDict
 from contextlib import closing, contextmanager
 import fcntl
 import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import sqlite3
+from threading import Lock
 from uuid import uuid4
 
 import duckdb
 
 from ashare_data.core.model import require
+from ashare_data.storage.read_replicas import consumer_metadata_replica, read_replica
 from ashare_data.storage.verified_objects import fingerprint, verify_cached
 
 SCHEMA = "ad-market-release.v1"
 ENGINE = "1.4.3"
 DISPOSITIONS = ("adopted", "equal_duplicate", "resolved_unused", "quarantined", "format_rejected")
 FIELDS = ("open_price", "high_price", "low_price", "close_price", "volume_shares", "turnover_cny")
+
+# Reuse only immutable bytes, never the caller-mutable parsed manifest/files.
+# The existing opt-in verification-cache trust model also covers this process-local
+# cache. One entry avoids retaining every release in a long-running consumer.
+# Larger manifests still read normally; this is a retention cap, not a data limit.
+_MANIFEST_CACHE_BYTES = 512 * 1024**2
+_manifest_cache = None
+_manifest_lock = Lock()
+# Non-target ancestors need only their immutable link, not another giant raw
+# manifest or parsed dict. Keep the selected manifest's one-entry byte cache.
+_PARENT_CACHE_ENTRIES = 128
+_parent_link_cache = OrderedDict()
+
+
+def _verified_manifest_bytes(path, expected, before=None, *, replica=None):
+    identity = replica.fingerprint if replica else lambda: fingerprint(path)
+    before = tuple(identity()) if before is None else before
+    raw = path.read_bytes()
+    actual = hashlib.sha256(raw).hexdigest()
+    require(len(raw) == before[0] and actual == expected,
+            "MARKET_RELEASE_INTEGRITY", "Published manifest chain changed")
+    require(tuple(identity()) == before, "MARKET_RELEASE_INTEGRITY",
+            "Published manifest changed during verification")
+    return raw, actual
+
+
+def _manifest_bytes(path, expected):
+    """Keep CURRENT/chain selection fresh while reusing a verified file identity.
+
+    A hit requires path, expected SHA and the same size/mtime/ctime/inode/device
+    before and after access. Changed files always undergo a new full-content
+    check. Disabling ASHARE_MARKET_VERIFY_CACHE retains uncached verification.
+    """
+    global _manifest_cache
+    replica = read_replica(expected, ".json")
+    if replica:
+        path = replica.path
+    identity = replica.fingerprint if replica else lambda: fingerprint(path)
+    if not os.environ.get("ASHARE_MARKET_VERIFY_CACHE"):
+        with _manifest_lock:
+            _manifest_cache = None
+            _parent_link_cache.clear()
+        return _verified_manifest_bytes(path, expected, replica=replica)
+    # Serialize cache misses so simultaneous discovery requests do not each read
+    # and retain the same potentially large manifest. Parsing happens outside.
+    with _manifest_lock:
+        before = tuple(identity())
+        key = (path, expected, before)
+        if _manifest_cache is not None and _manifest_cache[0] == key:
+            if tuple(identity()) != before:
+                _manifest_cache = None
+                require(False, "MARKET_RELEASE_INTEGRITY",
+                        "Published manifest changed during cache access")
+            return _manifest_cache[1], expected
+        _manifest_cache = None
+        raw, actual = _verified_manifest_bytes(path, expected, before, replica=replica)
+        if len(raw) <= _MANIFEST_CACHE_BYTES:
+            _manifest_cache = (key, raw)
+        return raw, actual
+
+
+def _checked_parent_link(link, current_id):
+    parent_id, parent_sha = link
+    # Only non-target ancestors are traversed. A selected root terminates the
+    # constructor before this helper, so its null terminal link remains valid.
+    require(type(current_id) is int and type(parent_id) is int
+            and 0 < parent_id < current_id
+            and isinstance(parent_sha, str) and re.fullmatch(r"[0-9a-f]{64}", parent_sha),
+            "MARKET_RELEASE_INTEGRITY", "Invalid linear release chain")
+    return link
+
+
+def _read_parent_link(path, expected, current_id, before=None, *, replica=None):
+    raw, _ = _verified_manifest_bytes(path, expected, before, replica=replica)
+    parent = json.loads(raw)
+    require(isinstance(parent, dict) and parent.get("schema") == SCHEMA
+            and type(parent.get("release_id")) is int and parent["release_id"] == current_id,
+            "MARKET_RELEASE_INTEGRITY", "Unexpected parent release identity")
+    return _checked_parent_link((parent.get("parent_release_id"), parent.get("parent_manifest_sha256")),
+                                current_id)
+
+
+def _parent_link(path, expected, current_id):
+    """Verify one ancestor and retain only a bounded, immutable parent link.
+
+    This deliberately does not call _manifest_bytes: an ancestor would evict the
+    selected manifest, and reacquiring the same lock would deadlock. Cold readers
+    share one complete check/parse while CURRENT and all link fingerprints stay
+    fresh. A cache entry never owns raw bytes or a mutable parsed manifest.
+    """
+    global _manifest_cache
+    replica = read_replica(expected, ".json")
+    if replica:
+        path = replica.path
+    identity = replica.fingerprint if replica else lambda: fingerprint(path)
+    if not os.environ.get("ASHARE_MARKET_VERIFY_CACHE"):
+        with _manifest_lock:
+            _manifest_cache = None
+            _parent_link_cache.clear()
+        return _read_parent_link(path, expected, current_id, replica=replica)
+    with _manifest_lock:
+        before = tuple(identity())
+        # A SHA-named replica may be selected under a different CURRENT id;
+        # only the id whose self-identity was validated may reuse this link.
+        key = (path, expected, before, current_id)
+        if key in _parent_link_cache:
+            if tuple(identity()) != before:
+                _parent_link_cache.pop(key)
+                require(False, "MARKET_RELEASE_INTEGRITY",
+                        "Published parent manifest changed during cache access")
+            _parent_link_cache.move_to_end(key)
+            return _checked_parent_link(_parent_link_cache[key], current_id)
+        link = _read_parent_link(path, expected, current_id, before, replica=replica)
+        # Parsing can itself take time for a large manifest; check again before
+        # publishing the small derived link to other readers.
+        require(tuple(identity()) == before, "MARKET_RELEASE_INTEGRITY",
+                "Published parent manifest changed during parsing")
+        if _PARENT_CACHE_ENTRIES > 0:
+            _parent_link_cache[key] = link
+            while len(_parent_link_cache) > _PARENT_CACHE_ENTRIES:
+                _parent_link_cache.popitem(last=False)
+        return link
 
 
 def canonical(value):
@@ -357,21 +483,10 @@ class MarketRelease:
         current_id, expected = pointer["release_id"], pointer["sha256"]
         while True:
             path = self.root / "releases" / f"{current_id:08d}.json"
-            raw = path.read_bytes()
-            actual = hashlib.sha256(raw).hexdigest()
-            require(
-                actual == expected, "MARKET_RELEASE_INTEGRITY", "Published manifest chain changed"
-            )
             if current_id == release_id:
+                raw, actual = _manifest_bytes(path, expected)
                 break
-            parent = json.loads(raw)
-            require(
-                type(parent["parent_release_id"]) is int
-                and parent["parent_release_id"] < current_id,
-                "MARKET_RELEASE_INTEGRITY",
-                "Invalid linear release chain",
-            )
-            current_id, expected = parent["parent_release_id"], parent["parent_manifest_sha256"]
+            current_id, expected = _parent_link(path, expected, current_id)
         self.sha256 = actual
         if expected_manifest_sha256:
             require(
@@ -401,22 +516,58 @@ class MarketRelease:
     def verify(self, item):
         relative = Path(item["path"])
         require(
-            not relative.is_absolute() and ".." not in relative.parts,
+            bool(relative.parts) and not relative.is_absolute() and ".." not in relative.parts,
             "MARKET_OBJECT_PATH",
             "Object must be within the selected asset",
         )
-        path = (self.root / relative).resolve()
-        require(path.is_relative_to(self.root), "MARKET_OBJECT_PATH", "Object escaped asset root")
-        current = fingerprint(path)
-        key = (self.sha256, item["sha256"], str(path))
+        replica = None
+        if item == self.manifest["metadata"]:
+            if not hasattr(self, "_metadata_replica"):
+                self._metadata_replica = read_replica(item["sha256"], ".sqlite3")
+                if self._metadata_replica is None and "cmes_catalog" in self.manifest:
+                    source_path = (self.root / relative).resolve()
+                    require(
+                        source_path.is_relative_to(self.root),
+                        "MARKET_OBJECT_PATH",
+                        "Object escaped asset root",
+                    )
+                    self._metadata_replica = consumer_metadata_replica(
+                        source_path, item, hash_file=sha_file
+                    )
+            replica = self._metadata_replica
+        if replica:
+            # The exact published content or verified consumer projection, on a
+            # different physical filesystem.
+            path = replica.path
+            current = replica.fingerprint()
+            expected_bytes = replica.projection_bytes or item["bytes"]
+            expected_sha = replica.projection_sha256 or item["sha256"]
+            require(current[0] == expected_bytes, "MARKET_OBJECT_INTEGRITY",
+                    "Immutable replica size changed")
+        else:
+            path = (self.root / relative).resolve()
+            require(path.is_relative_to(self.root), "MARKET_OBJECT_PATH", "Object escaped asset root")
+            current = fingerprint(path)
+            expected_bytes = item["bytes"]
+            expected_sha = item["sha256"]
+        key = (self.sha256, expected_sha, str(path))
         if self._verified.get(key) != current:
-            self._verified[key] = verify_cached(path, item["sha256"], item["bytes"], sha_file)
+            verified = verify_cached(path, expected_sha, expected_bytes, sha_file)
+            if replica:
+                require(replica.fingerprint() == verified == current,
+                        "MARKET_OBJECT_INTEGRITY", "Replica changed during verification")
+            self._verified[key] = verified
+        elif replica:
+            require(replica.fingerprint() == current, "MARKET_OBJECT_INTEGRITY",
+                    "Replica changed during cache access")
         return path
 
     @contextmanager
     def metadata(self):
         self.verify(self.manifest["metadata"])
-        before = fingerprint(self.metadata_path)
+        identity = (self._metadata_replica.fingerprint if self._metadata_replica
+                    else lambda: fingerprint(self.metadata_path))
+        before = identity()
         db = sqlite3.connect(self.metadata_path.as_uri() + "?mode=ro&immutable=1", uri=True)
         db.row_factory = sqlite3.Row
         try:
@@ -424,7 +575,7 @@ class MarketRelease:
         finally:
             db.close()
             require(
-                fingerprint(self.metadata_path) == before,
+                identity() == before,
                 "MARKET_OBJECT_INTEGRITY",
                 "Metadata changed during read",
             )

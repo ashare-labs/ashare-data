@@ -352,7 +352,7 @@ class ReleasedDailyProduct(LocalDailyProduct):
                 ("CMES history with an explicitly frozen free-source continuation; per-row provenance and no field filling."
                  if self.release.manifest.get("free_daily_updates") else
                  "CMES raw prices with explicit file unit profiles; no fallback or field filling."),
-                "ST membership is positive evidence only; absence, suspension and listing history remain unknown.",
+                "Raw price rows retain missing ST fields; separate source-scoped daily ST facts do not establish suspension or historical listing eligibility.",
                 "Calendar flags are provider observations; common sessions require SH/SZ agreement; BJ is not inferred.",
                 "Historical code changes and publication times are unverified; file retrieval is not historical PIT.",
             ]
