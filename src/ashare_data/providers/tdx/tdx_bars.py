@@ -12,6 +12,7 @@ import sys
 
 import pandas as pd
 
+from ashare_data.core.consumer_policy import reject_legacy
 from ashare_data.core.model import DataError, require, timestamp
 from ashare_data.research.datasets import ResearchResult
 from ashare_data.providers.tdx.tdx_collection import (
@@ -89,6 +90,7 @@ class TDXBarSource:
     """One explicitly named node and existing SDK. Instantiation does not connect."""
 
     def __init__(self, *, host, python_executable=None, timeout=6, min_interval=1):
+        reject_legacy("TDXBarSource")
         try:
             request("600000.XSHG", host, "1m", 0, 1, 1, 1, timeout, min_interval)
         except (ValueError, TypeError) as exc:
@@ -126,6 +128,7 @@ class TDXBarSource:
         max_pages=4,
     ):
         """Capture <=32 pages. A fresh directory is mandatory; failures are retained."""
+        reject_legacy("TDXBarSource.fetch")
         try:
             config = request(
                 security,

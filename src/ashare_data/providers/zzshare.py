@@ -15,6 +15,7 @@ from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation, localcontext
 from pathlib import Path
 
+from ashare_data.core.consumer_policy import reject_legacy
 from ashare_data.core.model import DataError, canonical, day, require, symbol, timestamp
 from ashare_data.storage.immutable import identifier, immutable_write, now
 from ashare_data.research.fact_types import Projection
@@ -690,6 +691,7 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 class ZzshareSource:
     def __init__(self, *, enabled=False, timeout=15):
+        reject_legacy("ZzshareSource")
         require(type(enabled) is bool, "INVALID_ARGUMENT", "enabled必须是bool")
         require(
             type(timeout) in (int, float) and math.isfinite(timeout) and 0 < timeout <= 30,
@@ -722,6 +724,7 @@ class ZzshareSource:
         }
 
     def fetch(self, store, *, security, start_date, end_date):
+        reject_legacy("ZzshareSource.fetch")
         _enabled(self._enabled)
         code, a, b = _scope(security, start_date, end_date)
         url = (

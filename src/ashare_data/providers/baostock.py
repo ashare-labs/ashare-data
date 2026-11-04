@@ -16,6 +16,7 @@ import tempfile
 
 import pandas as pd
 
+from ashare_data.core.consumer_policy import reject_legacy
 from ashare_data.providers.baostock_receipt.capture import bh, sh, stored_locally_visible, utc_now
 from ashare_data.providers.baostock_receipt.protocol import (
     check_identity,
@@ -131,6 +132,7 @@ def request(kind, security=None, start_date=None, end_date=None, frequency=None)
 
 class BaoStockSource:
     def __init__(self, *, sdk_path=None, timeout=15):
+        reject_legacy("BaoStockSource")
         require(
             type(timeout) in {int, float} and 1 <= timeout <= 30,
             "INVALID_ARGUMENT",
@@ -247,6 +249,7 @@ class BaoStockSource:
         return result
 
     def fetch(self, store, *, kind, security=None, start_date=None, end_date=None, frequency=None):
+        reject_legacy("BaoStockSource.fetch")
         req = request(kind, security, start_date, end_date, frequency)
         # A per-user machine lock spans every store created by this library.
         lock = Path(tempfile.gettempdir()) / f"ashare-baostock-{os.getuid()}.lock"
