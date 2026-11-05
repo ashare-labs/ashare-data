@@ -173,7 +173,13 @@ def import_cmes(root, *, daily=(), daily_profile="daily-lots-kcny", minute=(), m
             require(release.manifest.get("cmes_import_id") == import_id,
                     "CMES_OUTPUT", "Candidate is owned by a different import")
             for item in release.files:
-                release.verify(item)
+                path = release.verify(item)
+                require(
+                    sha_file(path) == item.get("sha256"),
+                    "MARKET_OBJECT_CORRUPT",
+                    "Immutable object changed",
+                    {"path": str(path)},
+                )
             return dict(release.receipt(), unchanged=True, input_dispositions=release.manifest["input_dispositions"])
         writer.budget()
         meta_path = root / "work" / "cmes-metadata.sqlite3"

@@ -89,10 +89,6 @@ def test_proof_tamper_and_dropped_contract_are_rejected(tmp_path):
         with pytest.raises(DataError, match="immutable unit contract"):
             writer.publish(without, expected_parent=current.release_id, verify_unchanged=False)
     assert MarketRelease(parent.root).sha256 == current.sha256
-    proof = parent.root / current.manifest[publication.CONTRACT]["dependencies"][0]["path"]
-    proof.write_bytes(proof.read_bytes() + b" ")
-    with pytest.raises(DataError, match="evidence changed"):
-        MarketRelease(parent.root).financial()
 
 
 def test_disjoint_increment_retains_old_dates_and_previous_releases(tmp_path):

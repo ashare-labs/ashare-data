@@ -81,9 +81,9 @@ def day(value) -> str:
 
 def symbol(value) -> str:
     require(
-        isinstance(value, str) and re.fullmatch(r"\d{6}\.(XSHG|XSHE)", value),
+        isinstance(value, str) and re.fullmatch(r"\d{6}\.(XSHG|XSHE|XBEI|BJ|XBSE)|BJ\.\d{6}", value),
         "INVALID_SYMBOL",
-        "证券代码须为 6 位数字加 .XSHG/.XSHE",
+        "证券代码须为 6 位数字加 .XSHG/.XSHE/.XBEI/.BJ 或 BJ.xxxxxx",
     )
     return value
 

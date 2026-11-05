@@ -30,6 +30,8 @@ def _sid(symbol):
 def _native_security(security):
     if isinstance(security, str) and re.fullmatch(r"BJ\.[0-9]{6}", security):
         return "bj" + security[3:]
+    if isinstance(security, str) and re.fullmatch(r"[0-9]{6}\.(XBEI|BJ|XBSE)", security):
+        return "bj" + security[:6]
     return _security(security)
 
 
@@ -156,7 +158,15 @@ class LocalDailyProduct:
             "Use limit 1..500 and nonnegative offset",
         )
         query = query.strip()
-        needle = query.replace(".XSHG", "").replace(".XSHE", "")
+        needle = re.sub(
+            r"^BJ\.(?=\d)",
+            "",
+            query.replace(".XSHG", "")
+            .replace(".XSHE", "")
+            .replace(".XBEI", "")
+            .replace(".BJ", "")
+            .replace(".XBSE", ""),
+        )
         escaped = needle.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         where = " WHERE symbol LIKE ? ESCAPE '\\' OR name LIKE ? ESCAPE '\\'"
         args = ("%" + escaped + "%",) * 2

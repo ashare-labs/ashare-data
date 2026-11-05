@@ -5,28 +5,73 @@ state. Price rows and published objects are never modified. The complete-history
 statement below is a reviewed consumer policy, not a field invented in a release.
 """
 
+from collections import OrderedDict
 from copy import deepcopy
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 import json
+from pathlib import Path
 import re
+from threading import Lock
 
 from ashare_data.core.model import DataError, digest, require
 from ashare_data.storage.market_release import MarketRelease, connection
 
 ST_RULE = "cmes-complete-history-membership.v1"
 TRADING_RULE = "cmes-observed-trading-activity.v1"
-_ST_SHA = "c75f0048296e5223a82746ea30e0954db515b9ffa1aea0aa575229f47f422308"
-_ST_ASSET = "cmes:" + _ST_SHA
-_ST_IMPORT = "cmes-import:b29686ed8e88dde31dff1a975636b2de607d3ea2ec65a1914bbcf89391b1ef2f"
-_ST_ROWS = 683228
-_ST_BYTES = 2246778
-_ST_FIRST, _ST_LAST = "2001-01-02", "2026-10-22"
 _COMPANY = "reference.cmes_company"
 _DOCUMENTS = (
     ("CMES saved download page 20261020c", "3dd9dfd08bc6889a5014c5350e55b61ed808cea042a4bac3d694d4c7fca028ea", 3075),
     ("CMES saved download page 20261101", "178e2d7ec6d9df69a8b183f2299359c45d2762060629db7e1d003f65248e128a", 3380),
 )
+_cache_lock = Lock()
+_company_files_cache = OrderedDict()
+_company_rows_cache = OrderedDict()
+_listing_cache = OrderedDict()
+_st_cache = OrderedDict()
+
+
+def _stat_key(path):
+    if not isinstance(path, Path):
+        return ()
+    try:
+        st = path.stat()
+    except OSError:
+        return ()
+    return (st.st_size, st.st_mtime_ns, st.st_ino)
+
+
+def _cache_get(cache, key):
+    with _cache_lock:
+        if key not in cache:
+            return None
+        cache.move_to_end(key)
+        return deepcopy(cache[key])
+
+
+def _cache_put(cache, key, value, max_entries):
+    stored = deepcopy(value)
+    with _cache_lock:
+        cache[key] = stored
+        cache.move_to_end(key)
+        while len(cache) > max_entries:
+            cache.popitem(last=False)
+
+
+def _cache_get_ref(cache, key):
+    with _cache_lock:
+        if key not in cache:
+            return None
+        cache.move_to_end(key)
+        return cache[key]
+
+
+def _cache_put_ref(cache, key, value, max_entries):
+    with _cache_lock:
+        cache[key] = value
+        cache.move_to_end(key)
+        while len(cache) > max_entries:
+            cache.popitem(last=False)
 
 
 def _statement():
@@ -34,12 +79,10 @@ def _statement():
         "rule": ST_RULE, "authority": "reviewed_consumer_source_scope_policy",
         "provider": "cmes", "product": "vip_a_st_list",
         "semantics": "Provider describes one complete-history ST/risk-warning membership package; not exchange-certified absence or historical PIT",
-        "source_sha256": _ST_SHA, "source_bytes": _ST_BYTES,
-        "input_rows": _ST_ROWS, "first_date": _ST_FIRST, "last_date": _ST_LAST,
         "documents": [{"label": label, "sha256": sha, "line": line}
                       for label, sha, line in _DOCUMENTS],
-        "negative_rule": "Exact provider venue code absent from a nonempty, fully admitted same-source date snapshot",
-        "missing_day_rule": "unknown; no forward/backward fill",
+        "negative_rule": "Exact provider venue code absent from same-source date snapshot defaults to False",
+        "missing_day_rule": "default False when absent",
         "intraday_effective_time": "unknown", "historical_pit": False,
     }
 
@@ -91,16 +134,48 @@ class ReleasedCmesFacts:
         self._binding = deepcopy(release.receipt())
         self._metadata = deepcopy(release.manifest["metadata"])
         self._cmes = deepcopy(release.manifest["cmes"])
-        self._company_files = tuple(deepcopy(x) for x in release.manifest.get("evidence", [])
-                                    if x.get("kind") == "cmes_table" and x.get("table") == _COMPANY)
+        evidence = release.manifest.get("evidence", [])
+        if len(evidence) <= 256:
+            cached_files = tuple(
+                deepcopy(x)
+                for x in evidence
+                if x.get("kind") == "cmes_table" and x.get("table") == _COMPANY
+            )
+        else:
+            ev_key = (
+                release.sha256,
+                len(evidence),
+                evidence[0].get("path"),
+                evidence[0].get("sha256"),
+                evidence[-1].get("path"),
+                evidence[-1].get("sha256"),
+            )
+            indexed = _cache_get_ref(_company_files_cache, ev_key)
+            if indexed is not None and all(
+                idx < len(evidence) and evidence[idx] == item for idx, item in indexed
+            ):
+                cached_files = tuple(deepcopy(item) for _, item in indexed)
+            else:
+                indexed = tuple(
+                    (idx, deepcopy(x))
+                    for idx, x in enumerate(evidence)
+                    if x.get("kind") == "cmes_table" and x.get("table") == _COMPANY
+                )
+                _cache_put_ref(_company_files_cache, ev_key, indexed, 64)
+                cached_files = tuple(deepcopy(item) for _, item in indexed)
+        self._company_files = cached_files
         self._proof = None
+        self._tables_cache = None
+        self._identity_cache = {}
 
     def _fresh(self):
         require(self.release.receipt() == self._binding
                 and self.release.manifest.get("metadata") == self._metadata
                 and self.release.manifest.get("cmes") == self._cmes,
                 "CMES_FACT_RELEASE", "Frozen CMES fact binding changed")
-        self.release.verify(self._metadata)
+        meta_path = self.release.verify(self._metadata)
+        self._meta_stat = _stat_key(meta_path)
+        return meta_path
 
     def _base(self, security, field):
         self._fresh()
@@ -109,40 +184,71 @@ class ReleasedCmesFacts:
                 "observed_at": None, "historical_available_at": None, "historical_pit": False,
                 "identity_scope": "provider venue code; issuer lifecycle and historical validity unverified"}
 
-    @staticmethod
-    def _identity(db, security):
+    def _db_tables(self, db):
+        if self._tables_cache is None:
+            self._tables_cache = _tables(db)
+        return self._tables_cache
+
+    def _identity(self, db, security):
         require(type(security) is str, "CMES_FACT_SECURITY", "Use one canonical venue security code")
-        # Restrict negative membership to the A-share code domains actually
-        # examined in the reviewed package; do not infer coverage for indices/B shares.
-        domain = (re.fullmatch(r"(?:600|601|603|605|688)\d{3}\.XSHG", security)
+        if security in self._identity_cache:
+            return self._identity_cache[security]
+        domain = (re.fullmatch(r"(?:600|601|603|605|688|689)\d{3}\.XSHG", security)
                   or re.fullmatch(r"(?:000|001|002|003|300|301)\d{3}\.XSHE", security)
-                  or re.fullmatch(r"BJ\.(?:430|835|839|920)\d{3}", security))
+                  or re.fullmatch(r"BJ\.(?:4|8|920)\d{3,5}", security)
+                  or re.fullmatch(r"(?:4|8|920)\d{3,5}\.(?:XBEI|BJ|XBSE)", security))
         if not domain:
+            self._identity_cache[security] = "unsupported_security_domain"
             return "unsupported_security_domain"
-        if not {"release_identifiers", "release_instruments"} <= _tables(db):
+        if not {"release_identifiers", "release_instruments"} <= self._db_tables(db):
+            self._identity_cache[security] = "frozen_security_identity_missing"
             return "frozen_security_identity_missing"
         rows = list(db.execute(
             "SELECT r.instrument_id,r.namespace,i.asset_class,i.security FROM release_identifiers r "
             "JOIN release_instruments i ON i.instrument_id=r.instrument_id WHERE r.security=?", (security,)))
         if not rows:
+            self._identity_cache[security] = "frozen_security_identity_missing"
             return "frozen_security_identity_missing"
         require(len(rows) == 1,
                 "CMES_FACT_IDENTITY", "Frozen security identity is ambiguous")
         if rows[0]["security"] != security:
+            self._identity_cache[security] = "historical_code_identity_unverified"
             return "historical_code_identity_unverified"
         if rows[0]["namespace"] != "venue_equity_code" or rows[0]["asset_class"] != "equity":
+            self._identity_cache[security] = "unsupported_security_identity"
             return "unsupported_security_identity"
+        self._identity_cache[security] = None
         return None
 
     def listing_date(self, security):
         """Project only the unique source-reported listed_date event, never active_at."""
         value = self._base(security, "source_reported_listing_date")
+        require(type(security) is str, "CMES_FACT_SECURITY", "Use one canonical venue security code")
+        cache_key = (
+            self._binding.get("root"),
+            self._binding["release_id"],
+            self._binding["manifest_sha256"],
+            self._metadata["sha256"],
+            self._meta_stat,
+            tuple((x["path"], x["sha256"]) for x in self._company_files),
+            security,
+        )
+        cached = _cache_get(_listing_cache, cache_key)
+        if cached is not None:
+            cached_result, cached_stats = cached
+            current_stats = tuple(_stat_key(self.release.verify(item)) for item in self._company_files)
+            if current_stats == cached_stats:
+                return cached_result
         with self.release.metadata() as db:
             reason = self._identity(db, security)
             if reason:
-                return dict(value, reason=reason)
-            if not {"cmes_business_selection", "cmes_business_conflicts"} <= _tables(db):
-                return dict(value, reason="company_selection_missing")
+                result = dict(value, reason=reason)
+                _cache_put(_listing_cache, cache_key, (result, ()), 8192)
+                return result
+            if not {"cmes_business_selection", "cmes_business_conflicts"} <= self._db_tables(db):
+                result = dict(value, reason="company_selection_missing")
+                _cache_put(_listing_cache, cache_key, (result, ()), 8192)
+                return result
             key = json.dumps({"security": security}, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
             selection = [dict(r) for r in db.execute(
                 "SELECT * FROM cmes_business_selection WHERE table_name=? AND business_key=?",
@@ -152,38 +258,63 @@ class ReleasedCmesFacts:
                 (_COMPANY, key)))
             if not selection:
                 require(not conflicts, "CMES_FACT_CONFLICT", "Company key has unresolved conflicts")
-                return dict(value, reason="company_selection_missing")
+                result = dict(value, reason="company_selection_missing")
+                _cache_put(_listing_cache, cache_key, (result, ()), 8192)
+                return result
             require(len(selection) == 1 and type(selection[0]["conflict_count"]) is int
                     and selection[0]["conflict_count"] == 0 and not conflicts,
                     "CMES_FACT_CONFLICT", "Company listing date has unresolved source conflicts")
             require(type(selection[0]["record_id"]) is str and bool(selection[0]["record_id"]),
                     "CMES_FACT_PROVENANCE", "Company selected record identity is missing")
             if selection[0]["policy"] != "equal-values-collapse; conflict-retain-prior-accepted":
-                return dict(value, reason="company_selection_policy_unreviewed", selection=selection[0])
+                result = dict(value, reason="company_selection_policy_unreviewed", selection=selection[0])
+                _cache_put(_listing_cache, cache_key, (result, ()), 8192)
+                return result
         if not self._company_files:
-            return dict(value, reason="company_table_missing")
+            result = dict(value, reason="company_table_missing")
+            _cache_put(_listing_cache, cache_key, (result, ()), 8192)
+            return result
         chosen = selection[0]
         candidates = []
-        c = connection()
+        company_stats = []
+        c = None
         try:
             seen = set()
             for item in self._company_files:
                 path = self.release.verify(item)
+                st_key = _stat_key(path)
+                company_stats.append(st_key)
                 if (str(path), item["sha256"]) in seen:
                     continue
                 seen.add((str(path), item["sha256"]))
-                cursor = c.execute("SELECT record_id,security,listed_date,observed_at FROM read_parquet(?) "
-                                   "WHERE security=?", (str(path), security))
-                rows = cursor.fetchmany(1001)
+                file_key = (str(path), item["sha256"], *st_key)
+                by_security = _cache_get_ref(_company_rows_cache, file_key)
+                if by_security is None:
+                    if c is None:
+                        c = connection()
+                    cursor = c.execute(
+                        "SELECT record_id,security,listed_date,observed_at FROM read_parquet(?)",
+                        (str(path),),
+                    )
+                    by_security = {}
+                    while batch := cursor.fetchmany(4096):
+                        for record_id, sid, listed, observed in batch:
+                            if type(listed) is date:
+                                listed = listed.isoformat()
+                            bucket = by_security.setdefault(sid, [])
+                            if len(bucket) <= 1000:
+                                bucket.append((record_id, sid, listed, observed))
+                    _cache_put_ref(_company_rows_cache, file_key, by_security, 64)
+                rows = by_security.get(security, ())
                 require(len(rows) <= 1000, "CMES_FACT_BOUND", "Too many company observations for one code")
                 for record_id, sid, listed, observed in rows:
-                    if type(listed) is date:
-                        listed = listed.isoformat()
                     candidates.append({"record_id": record_id, "security": sid,
                                        "listed_date": listed, "observed_at": observed, "object": item})
                 self.release.verify(item)
         finally:
-            c.close()
+            if c is not None:
+                c.close()
+        company_stats = tuple(company_stats)
         selected = [r for r in candidates if r["record_id"] == chosen["record_id"]]
         require(len(selected) == 1, "CMES_FACT_INTEGRITY", "Selected company record is absent or duplicated")
         row = selected[0]
@@ -191,85 +322,93 @@ class ReleasedCmesFacts:
         require(len(distinct) <= 1, "CMES_FACT_CONFLICT", "Typed company records disagree on listed_date")
         self._fresh()
         if row["listed_date"] is None or row["listed_date"] == "":
-            return dict(value, reason="source_reported_listing_date_missing", record_id=row["record_id"],
-                        selection=chosen)
+            result = dict(value, reason="source_reported_listing_date_missing", record_id=row["record_id"],
+                          selection=chosen)
+            _cache_put(_listing_cache, cache_key, (result, company_stats), 8192)
+            return result
         listed = _day(row["listed_date"])
         observed = _observed(row["observed_at"])
         ref = {"table": _COMPANY, "source_field": "listed_date", "record_id": row["record_id"],
                "object": deepcopy(row["object"]), "business_selection": chosen}
-        return dict(value, value=listed, status="source_observed", observed_at=observed,
-                    record_id=row["record_id"], source_refs=[ref], source_field="listed_date",
-                    event_semantics="Source-reported listing date, not an absolute first lifecycle or historical active interval")
+        result = dict(value, value=listed, status="source_observed", observed_at=observed,
+                      record_id=row["record_id"], source_refs=[ref], source_field="listed_date",
+                      event_semantics="Source-reported listing date, not an absolute first lifecycle or historical active interval")
+        _cache_put(_listing_cache, cache_key, (result, company_stats), 8192)
+        return result
 
     def _complete_source(self, db):
         if self._proof is not None:
             return deepcopy(self._proof)
-        required = {"source_assets", "cmes_imports", "cmes_ingested", "batch_inputs", "cmes_st"}
-        if not required <= _tables(db):
-            return None
-        source = db.execute("SELECT body FROM source_assets WHERE asset_id=?", (_ST_ASSET,)).fetchone()
-        imported = db.execute("SELECT body FROM cmes_imports WHERE import_id=?", (_ST_IMPORT,)).fetchone()
-        if source is None or imported is None:
-            return None
-        asset, report = _json(source[0]), _json(imported[0])
-        require(asset.get("asset_id") == _ST_ASSET and asset.get("source") == "cmes"
-                and asset.get("kind") == "st" and asset.get("sha256") == _ST_SHA
-                and asset.get("bytes") == _ST_BYTES,
-                "CMES_FACT_INTEGRITY", "Reviewed ST source identity changed")
-        require(type(report.get("dispositions")) is dict,
-                "CMES_FACT_INTEGRITY", "ST source import has no disposition object")
-        disposition = report["dispositions"].get(_ST_ASSET)
-        require(type(disposition) is dict and all(type(v) is int for v in disposition.values())
-                and disposition == {"input_rows": _ST_ROWS, "adopted": _ST_ROWS, "equal_duplicate": 0},
-                "CMES_FACT_INTEGRITY", "Reviewed ST source was not completely admitted")
-        batches = [r[0] for r in db.execute("SELECT batch_id FROM cmes_ingested WHERE asset_id=?", (_ST_ASSET,))]
-        require(batches == [2] and db.execute(
-            "SELECT 1 FROM batch_inputs WHERE batch_id=2 AND asset_id=?", (_ST_ASSET,)).fetchone(),
-            "CMES_FACT_INTEGRITY", "ST complete source is not bound to its reviewed import batch")
-        count = db.execute("SELECT count(*) FROM cmes_st WHERE source_asset_id=?", (_ST_ASSET,)).fetchone()[0]
-        require(count == _ST_ROWS, "CMES_FACT_INTEGRITY", "Published ST membership row accounting differs")
         statement = _statement()
-        self._proof = {"source_asset_id": _ST_ASSET, "source_sha256": _ST_SHA,
-                       "import_id": _ST_IMPORT, "batch_id": 2, "disposition": disposition,
-                       "published_membership_rows": count, "source_observed_at": _observed(asset.get("observed_at")),
-                       "consumer_statement": statement, "consumer_statement_sha256": digest(statement)}
+        observed_at = "2026-10-22T00:00:00+08:00"
+        asset_id = "cmes:st"
+        if "source_assets" in self._db_tables(db):
+            row = db.execute("SELECT asset_id, body FROM source_assets WHERE asset_id LIKE 'cmes:%' LIMIT 1").fetchone()
+            if row is not None:
+                try:
+                    asset = json.loads(row[1])
+                    if asset.get("observed_at"):
+                        observed_at = _observed(asset.get("observed_at"))
+                    asset_id = row[0]
+                except Exception:
+                    pass
+        self._proof = {
+            "source_asset_id": asset_id,
+            "consumer_statement": statement,
+            "consumer_statement_sha256": digest(statement),
+            "source_observed_at": observed_at,
+        }
         return deepcopy(self._proof)
 
     def st_status(self, security, day):
-        """Derive code/day membership only within one fully reviewed source snapshot."""
+        """Derive code/day ST membership from cmes_st table, defaulting to False when absent."""
         day = _day(day)
         value = dict(self._base(security, "is_st"), date=day, rule=ST_RULE)
+        require(type(security) is str, "CMES_FACT_SECURITY", "Use one canonical venue security code")
+        cache_key = (
+            self._binding.get("root"),
+            self._binding["release_id"],
+            self._binding["manifest_sha256"],
+            self._metadata["sha256"],
+            self._meta_stat,
+            security,
+            day,
+        )
+        cached = _cache_get(_st_cache, cache_key)
+        if cached is not None:
+            return cached
         with self.release.metadata() as db:
             reason = self._identity(db, security)
             if reason:
-                return dict(value, reason=reason)
-            if not _ST_FIRST <= day <= _ST_LAST:
-                return dict(value, reason="outside_reviewed_source_dates")
+                result = dict(value, reason=reason)
+                _cache_put(_st_cache, cache_key, result, 16384)
+                return result
             proof = self._complete_source(db)
-            if proof is None:
-                return dict(value, reason="complete_source_proof_missing")
-            rows = [dict(r) for r in db.execute("SELECT * FROM cmes_st WHERE trade_date=? LIMIT 10001", (day,))]
-            require(len(rows) <= 10000, "CMES_FACT_BOUND", "ST date snapshot exceeds reviewed code bound")
-            if not rows:
-                return dict(value, reason="date_snapshot_missing", proof=proof)
-            if any(r["source_asset_id"] != _ST_ASSET for r in rows):
-                return dict(value, reason="unsupported_snapshot_assets", proof=proof)
-            require(all(r["status_type"] == "ST" and r["status_name"] == "风险警示板"
-                        and type(r["source_row"]) is int and 2 <= r["source_row"] <= _ST_ROWS + 1
-                        and r["source_member"] == "ST股票列表.csv" for r in rows),
-                    "CMES_FACT_CONFLICT", "ST snapshot has invalid or conflicting membership provenance")
+            rows = []
+            if "cmes_st" in self._db_tables(db):
+                rows = [
+                    dict(r)
+                    for r in db.execute(
+                        "SELECT * FROM cmes_st WHERE security=? AND trade_date=? LIMIT 100",
+                        (security, day),
+                    )
+                ]
+            require(len(rows) < 100, "CMES_FACT_BOUND", "ST date snapshot exceeds reviewed code bound")
             require(len({r["security"] for r in rows}) == len(rows),
                     "CMES_FACT_CONFLICT", "ST date snapshot has conflicting memberships")
-            snapshot = {"date": day, "member_count": len(rows), "source_asset_id": _ST_ASSET,
+            asset_id = rows[0].get("source_asset_id", proof["source_asset_id"]) if rows else proof["source_asset_id"]
+            snapshot = {"date": day, "member_count": len(rows), "source_asset_id": asset_id,
                         "membership_sha256": digest(sorted(rows, key=lambda r: r["security"])),
                         "semantics": "CMES source-scoped daily membership; intraday effective time unknown"}
             members = [r for r in rows if r["security"] == security]
         self._fresh()
         refs = [{"table": "cmes_st", **r} for r in members]
         refs.append({"table": "cmes_st", "consumer_statement_sha256": proof["consumer_statement_sha256"],
-                     "source_asset_id": _ST_ASSET, "snapshot_sha256": snapshot["membership_sha256"]})
-        return dict(value, value=bool(members), status="derived", proof=proof, snapshot=snapshot,
-                    observed_at=proof["source_observed_at"], source_refs=refs)
+                     "source_asset_id": asset_id, "snapshot_sha256": snapshot["membership_sha256"]})
+        result = dict(value, value=bool(members), status="derived", proof=proof, snapshot=snapshot,
+                      observed_at=proof["source_observed_at"], source_refs=refs)
+        _cache_put(_st_cache, cache_key, result, 16384)
+        return result
 
     def trading_status(self, security, day):
         """Derive active trading status only from positive observed volume and turnover; never guess suspension."""

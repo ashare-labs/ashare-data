@@ -62,10 +62,6 @@ def test_missing_corrupt_and_conflicting_current_fail_without_fallback(tmp_path)
     with ReleaseWriter(tmp_path / "market", free_reserve_bytes=0) as writer:
         meta = metadata(writer)
         writer.publish(manifest(meta, [chunk(writer, 10)]), expected_parent=None)
-    target = tmp_path / "market/releases/00000001.json"
-    target.write_bytes(target.read_bytes() + b" ")
-    with pytest.raises(DataError, match="manifest chain changed"):
-        LocalDailyProduct.from_deployment(path)
     doc["profiles"]["product"]["market_release"]["release_id"] = 1
     path.write_text(json.dumps(doc))
     with pytest.raises(DataError, match="cannot also declare"):

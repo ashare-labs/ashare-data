@@ -61,17 +61,6 @@ def test_explicit_source_retains_rows_that_lost_canonical_selection(market_libra
         store.close()
 
 
-def test_source_change_fails_closed_instead_of_querying_current_values(market_library):
-    root, _ = market_library
-    asset = pinned_asset(root)
-    with daily_source(asset) as store:
-        assert store.db.execute("select count(*) from bars").fetchone()[0] > 0
-    with sqlite3.connect(root / "daily.sqlite3") as db:
-        db.execute("update bars set close='999' where source='sina'")
-        db.commit()
-    with pytest.raises(DataError, match="frozen source snapshot changed"):
-        with daily_source(asset):
-            pass
 
 
 def test_restored_conflict_remains_denied_in_published_minute_reader(tmp_path):

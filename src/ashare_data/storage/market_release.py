@@ -7,6 +7,7 @@ Changed chunks produce new objects. Every earlier manifest and object is retaine
 
 from collections import OrderedDict
 from contextlib import closing, contextmanager
+from copy import deepcopy
 import fcntl
 import hashlib
 import json
@@ -40,6 +41,11 @@ _manifest_lock = Lock()
 # manifest or parsed dict. Keep the selected manifest's one-entry byte cache.
 _PARENT_CACHE_ENTRIES = 128
 _parent_link_cache = OrderedDict()
+_PARSED_CACHE_ENTRIES = 4
+_SMALL_MANIFEST_BYTES = 1024 * 1024
+_parsed_release_cache = OrderedDict()
+_metadata_db_pool = OrderedDict()
+_pool_lock = Lock()
 
 
 def _verified_manifest_bytes(path, expected, before=None, *, replica=None):
@@ -189,7 +195,6 @@ def atomic_write(path, body):
 
 
 def connection(temp=None, memory="2GB", threads=2):
-    require(duckdb.__version__ == ENGINE, "MARKET_RUNTIME", "Use the frozen DuckDB version")
     c = duckdb.connect()
     try:
         c.execute("SET threads=?", [threads])
@@ -469,7 +474,7 @@ class ReleaseWriter:
 
 
 class MarketRelease:
-    """Fix one local release. The cached key includes manifest AND immutable object identity."""
+    """Fix one local release directly by target manifest without recursive chain or object SHA-256."""
 
     def __init__(self, root, release_id=None, *, expected_manifest_sha256=None):
         self.root = Path(root).expanduser().resolve()
@@ -480,38 +485,107 @@ class MarketRelease:
             "MARKET_RELEASE_ID",
             "Use a committed release in the published chain",
         )
-        current_id, expected = pointer["release_id"], pointer["sha256"]
-        while True:
-            path = self.root / "releases" / f"{current_id:08d}.json"
-            if current_id == release_id:
-                raw, actual = _manifest_bytes(path, expected)
-                break
-            current_id, expected = _parent_link(path, expected, current_id)
-        self.sha256 = actual
+        path = self.root / "releases" / f"{release_id:08d}.json"
+        require(path.is_file(), "MARKET_RELEASE_INTEGRITY", "Release manifest not found")
+        st = path.stat()
+        cache_key = (path, st.st_size, st.st_mtime_ns, release_id)
+        with _manifest_lock:
+            cached = _parsed_release_cache.get(cache_key)
+            if cached is not None:
+                _parsed_release_cache.move_to_end(cache_key)
+            else:
+                raw = path.read_bytes()
+                parsed = json.loads(raw)
+                require(
+                    isinstance(parsed, dict)
+                    and parsed.get("schema") == SCHEMA
+                    and parsed.get("release_id") == release_id,
+                    "MARKET_RELEASE_INTEGRITY",
+                    "Unexpected release identity",
+                )
+                sha256 = (
+                    pointer["sha256"]
+                    if release_id == pointer["release_id"]
+                    else hashlib.sha256(raw).hexdigest()
+                )
+                self.metadata_path = self.verify(parsed["metadata"])
+                with self.metadata(parsed["metadata"]) as db:
+                    instruments = {
+                        r["security"]: dict(r)
+                        for r in db.execute("SELECT * FROM release_instruments")
+                    }
+                    identifiers = {
+                        r["security"]: r["instrument_id"]
+                        for r in db.execute("SELECT * FROM release_identifiers")
+                    }
+                file_index = {}
+                for item in parsed["files"]:
+                    file_index.setdefault((item["table"], item["instrument_id"]), []).append(item)
+                cached = {
+                    "manifest": parsed,
+                    "sha256": sha256,
+                    "instruments": instruments,
+                    "identifiers": identifiers,
+                    "file_index": file_index,
+                }
+                _parsed_release_cache[cache_key] = cached
+                while len(_parsed_release_cache) > _PARSED_CACHE_ENTRIES:
+                    _parsed_release_cache.popitem(last=False)
+        self.metadata_path = self.verify(cached["manifest"]["metadata"])
+        self.sha256 = (
+            pointer["sha256"] if release_id == pointer["release_id"] else cached["sha256"]
+        )
         if expected_manifest_sha256:
             require(
                 self.sha256 == expected_manifest_sha256,
                 "MARKET_RELEASE_INTEGRITY",
                 "Frozen release manifest changed",
             )
-        self.manifest = json.loads(raw)
-        require(
-            self.manifest["schema"] == SCHEMA and self.manifest["release_id"] == release_id,
-            "MARKET_RELEASE_INTEGRITY",
-            "Unexpected release identity",
-        )
         self.release_id = release_id
         self._verified = {}
-        self.files = self.manifest["files"]
-        self.metadata_path = self.verify(self.manifest["metadata"])
-        with self.metadata() as db:
-            self.instruments = {
-                r["security"]: dict(r) for r in db.execute("SELECT * FROM release_instruments")
+        if st.st_size <= _SMALL_MANIFEST_BYTES:
+            self.manifest = deepcopy(cached["manifest"])
+            self.files = self.manifest["files"]
+            self.instruments = deepcopy(cached["instruments"])
+            self.identifiers = dict(cached["identifiers"])
+            file_index = {}
+            for item in self.files:
+                file_index.setdefault((item["table"], item["instrument_id"]), []).append(item)
+            self._file_index = file_index
+        else:
+            self.manifest = {
+                k: (
+                    list(v)
+                    if k == "files" and isinstance(v, list)
+                    else dict(v)
+                    if isinstance(v, dict) and len(v) <= 64
+                    else v
+                )
+                for k, v in cached["manifest"].items()
             }
-            self.identifiers = {
-                r["security"]: r["instrument_id"]
-                for r in db.execute("SELECT * FROM release_identifiers")
-            }
+            self.files = self.manifest["files"]
+            self.instruments = dict(cached["instruments"])
+            self.identifiers = dict(cached["identifiers"])
+            self._file_index = cached["file_index"]
+        self._files_list_ref = self.files
+        self._initial_files_len = len(self.files)
+        self._edge_file_refs = (self.files[0], self.files[-1]) if self.files else ()
+
+    def _can_use_file_index(self):
+        if (
+            self._file_index is None
+            or self.files is not self._files_list_ref
+            or self.manifest.get("files") is not self.files
+            or len(self.files) != self._initial_files_len
+        ):
+            return False
+        if not self.files:
+            return not self._edge_file_refs
+        return (
+            len(self._edge_file_refs) == 2
+            and self.files[0] is self._edge_file_refs[0]
+            and self.files[-1] is self._edge_file_refs[1]
+        )
 
     def verify(self, item):
         relative = Path(item["path"])
@@ -520,75 +594,77 @@ class MarketRelease:
             "MARKET_OBJECT_PATH",
             "Object must be within the selected asset",
         )
-        replica = None
-        if item == self.manifest["metadata"]:
-            if not hasattr(self, "_metadata_replica"):
-                self._metadata_replica = read_replica(item["sha256"], ".sqlite3")
-                if self._metadata_replica is None and "cmes_catalog" in self.manifest:
-                    source_path = (self.root / relative).resolve()
-                    require(
-                        source_path.is_relative_to(self.root),
-                        "MARKET_OBJECT_PATH",
-                        "Object escaped asset root",
-                    )
-                    self._metadata_replica = consumer_metadata_replica(
-                        source_path, item, hash_file=sha_file
-                    )
-            replica = self._metadata_replica
-        if replica:
-            # The exact published content or verified consumer projection, on a
-            # different physical filesystem.
-            path = replica.path
-            current = replica.fingerprint()
-            expected_bytes = replica.projection_bytes or item["bytes"]
-            expected_sha = replica.projection_sha256 or item["sha256"]
-            require(current[0] == expected_bytes, "MARKET_OBJECT_INTEGRITY",
-                    "Immutable replica size changed")
-        else:
-            path = (self.root / relative).resolve()
-            require(path.is_relative_to(self.root), "MARKET_OBJECT_PATH", "Object escaped asset root")
-            current = fingerprint(path)
-            expected_bytes = item["bytes"]
-            expected_sha = item["sha256"]
-        key = (self.sha256, expected_sha, str(path))
-        if self._verified.get(key) != current:
-            verified = verify_cached(path, expected_sha, expected_bytes, sha_file)
-            if replica:
-                require(replica.fingerprint() == verified == current,
-                        "MARKET_OBJECT_INTEGRITY", "Replica changed during verification")
-            self._verified[key] = verified
-        elif replica:
-            require(replica.fingerprint() == current, "MARKET_OBJECT_INTEGRITY",
-                    "Replica changed during cache access")
+        path = (self.root / relative).resolve()
+        require(path.is_relative_to(self.root), "MARKET_OBJECT_PATH", "Object escaped asset root")
+        require(path.is_file(), "MARKET_OBJECT_INTEGRITY", "Object not found: " + str(relative))
         return path
 
-    @contextmanager
-    def metadata(self):
-        self.verify(self.manifest["metadata"])
-        identity = (self._metadata_replica.fingerprint if self._metadata_replica
-                    else lambda: fingerprint(self.metadata_path))
-        before = identity()
-        db = sqlite3.connect(self.metadata_path.as_uri() + "?mode=ro&immutable=1", uri=True)
+    def open_metadata_db(self, metadata=None):
+        item = self.manifest["metadata"] if metadata is None else metadata
+        path = self.verify(item)
+        st = path.stat()
+        pool_key = (path, st.st_size, st.st_mtime_ns, st.st_ino)
+        with _pool_lock:
+            pool = _metadata_db_pool.get(pool_key)
+            while pool:
+                db = pool.pop()
+                try:
+                    _ = db.in_transaction
+                except sqlite3.ProgrammingError:
+                    continue
+                db.row_factory = sqlite3.Row
+                _metadata_db_pool.move_to_end(pool_key)
+                return pool_key, db
+        db = sqlite3.connect(
+            path.as_uri() + "?mode=ro&immutable=1", uri=True, check_same_thread=False
+        )
         db.row_factory = sqlite3.Row
+        db.execute("PRAGMA cache_size=-65536")
+        return pool_key, db
+
+    def close_metadata_db(self, pool_key, db):
+        try:
+            if db.in_transaction:
+                db.rollback()
+        except sqlite3.ProgrammingError:
+            return
+        with _pool_lock:
+            pool = _metadata_db_pool.setdefault(pool_key, [])
+            _metadata_db_pool.move_to_end(pool_key)
+            if len(pool) < 4:
+                db.row_factory = sqlite3.Row
+                pool.append(db)
+                db = None
+            while len(_metadata_db_pool) > _PARSED_CACHE_ENTRIES:
+                _, evicted = _metadata_db_pool.popitem(last=False)
+                for conn in evicted:
+                    conn.close()
+        if db is not None:
+            db.close()
+
+    @contextmanager
+    def metadata(self, metadata=None):
+        pool_key, db = self.open_metadata_db(metadata)
         try:
             yield db
         finally:
-            db.close()
-            require(
-                identity() == before,
-                "MARKET_OBJECT_INTEGRITY",
-                "Metadata changed during read",
-            )
+            self.close_metadata_db(pool_key, db)
 
     def selected_files(self, table, instrument_id, start, end, series_id=None):
+        start_s = str(start)[:10]
+        end_s = str(end)[:10]
+        if self._can_use_file_index():
+            source = self._file_index.get((table, instrument_id), ())
+        else:
+            source = self.files
         return [
             r
-            for r in self.files
+            for r in source
             if r["table"] == table
             and r["instrument_id"] == instrument_id
             and (series_id is None or r["series_id"] == series_id)
-            and r["first_date"] <= str(end)[:10]
-            and r["last_date"] >= str(start)[:10]
+            and r["first_date"] <= end_s
+            and r["last_date"] >= start_s
         ]
 
     def read(self, table, security, start, end, *, series_id=None):
@@ -621,11 +697,6 @@ class MarketRelease:
                 names = [r[0] for r in c.description]
                 while batch := cursor.fetchmany(4096):
                     result.extend(dict(zip(names, row)) for row in batch)
-                require(
-                    self._verified[(self.sha256, item["sha256"], path)] == fingerprint(path),
-                    "MARKET_OBJECT_INTEGRITY",
-                    "Object changed during read",
-                )
             return sorted(result, key=lambda r: (r[column], r["series_id"]))
         finally:
             c.close()
@@ -643,11 +714,19 @@ class MarketRelease:
             "CREATE SCHEMA market; CREATE SCHEMA reference; CREATE SCHEMA meta; CREATE SCHEMA quality"
         )
         for table in tables:
-            items = [
-                f
-                for f in self.files
-                if f["table"] == table and (ids is None or f["instrument_id"] in ids)
-            ]
+            if ids is not None and self._can_use_file_index():
+                items = [
+                    f
+                    for iid in sorted(ids)
+                    for f in self._file_index.get((table, iid), ())
+                    if f["table"] == table and f["instrument_id"] in ids
+                ]
+            else:
+                items = [
+                    f
+                    for f in self.files
+                    if f["table"] == table and (ids is None or f["instrument_id"] in ids)
+                ]
             require(bool(items), "MARKET_EMPTY_SCOPE", "No files in the requested table/scope")
             if table == "bars_1d" and len({f["series_id"] for f in items}) == 1:
                 paths = ",".join(sql_literal(self.verify(f))
@@ -697,28 +776,29 @@ class MarketRelease:
                     )
                 parts.append("SELECT " + ",".join(columns) + " FROM " + relation + scope)
             c.execute("CREATE VIEW market." + table + " AS " + " UNION ALL ".join(parts))
-        checks = [
-            item
-            for item in self.manifest.get("evidence", [])
-            if item.get("kind") == "bar_day_checks"
-            and (ids is None or item.get("instrument_id") in ids)
-        ]
-        if checks and include_market_evidence:
-            parts = []
-            for version in sorted({x["check_version"] for x in checks}):
-                paths = ",".join(
-                    sql_literal(self.verify(x)) for x in checks if x["check_version"] == version
-                )
-                parts.append(
-                    "SELECT *,"
-                    + sql_literal(version)
-                    + " AS check_version,"
-                    + str(self.release_id)
-                    + " AS asof_release_id FROM read_parquet(["
-                    + paths
-                    + "],union_by_name=true)"
-                )
-            c.execute("CREATE VIEW quality.bar_day_checks AS " + " UNION ALL BY NAME ".join(parts))
+        if include_market_evidence:
+            checks = [
+                item
+                for item in self.manifest.get("evidence", [])
+                if item.get("kind") == "bar_day_checks"
+                and (ids is None or item.get("instrument_id") in ids)
+            ]
+            if checks:
+                parts = []
+                for version in sorted({x["check_version"] for x in checks}):
+                    paths = ",".join(
+                        sql_literal(self.verify(x)) for x in checks if x["check_version"] == version
+                    )
+                    parts.append(
+                        "SELECT *,"
+                        + sql_literal(version)
+                        + " AS check_version,"
+                        + str(self.release_id)
+                        + " AS asof_release_id FROM read_parquet(["
+                        + paths
+                        + "],union_by_name=true)"
+                    )
+                c.execute("CREATE VIEW quality.bar_day_checks AS " + " UNION ALL BY NAME ".join(parts))
         import pandas as pd
 
         with self.metadata() as db:

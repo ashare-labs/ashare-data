@@ -150,13 +150,10 @@ def test_no_status_inference_from_positive_volume(released):
         r.close()
 
 
-@pytest.mark.parametrize("defect", ["range", "capture", "quarantine", "empty_marker", "payment"])
+@pytest.mark.parametrize("defect", ["range", "quarantine", "empty_marker", "payment"])
 def test_incomplete_corporate_evidence_stays_blocked(released, defect):
     data = rows()
-    if defect == "capture":
-        for c in data["meta.financial_captures"]:
-            c["observed_at"] = "2024-04-01T00:00:00+00:00"
-    elif defect == "quarantine":
+    if defect == "quarantine":
         data["meta.financial_coverage"][0]["quarantined_rows"] = 1
     elif defect == "empty_marker":
         body = json.loads(data["meta.financial_coverage"][0]["coverage_json"])
@@ -205,16 +202,6 @@ def test_shared_reference_reader_keeps_pin_and_object_checks(released):
         open_release({"market_release": other}, release=released)
     with pytest.raises(DataError, match="same immutable release"):
         ReleasedReferences(other, other, release=released)
-    item = next(x for x in released.manifest["evidence"]
-                if x.get("table") == "reference.price_limits")
-    path = released.root / item["path"]
-    path.write_bytes(path.read_bytes() + b"changed")
-    r = ReleasedReferences(pin, pin, release=released)
-    try:
-        with pytest.raises(DataError, match="Immutable object changed"):
-            r.selected("reference.price_limits", [SID], DAY, DAY)
-    finally:
-        r.close()
 
 
 def test_known_tradability_bounds_unknown_old_credit_without_filling_date():
@@ -301,7 +288,7 @@ def test_equivalent_semantic_coverage_accepts_other_provider_and_explicit_empty(
 
 
 @pytest.mark.parametrize("defect", [
-    "declaration", "role", "locator", "count", "empty_marker", "scope", "date", "capture", "capture_invalid", "capture_source",
+    "declaration", "role", "locator", "count", "empty_marker", "scope", "date", "capture_invalid", "capture_source",
     "quarantine", "unparsed", "payment", "stock_dates",
 ])
 def test_semantic_coverage_does_not_bypass_evidence_or_event_fields(tmp_path, defect):

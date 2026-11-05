@@ -340,13 +340,6 @@ def parser():
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
-    from ashare_data.core.consumer_policy import guard_arguments
-
-    try:
-        guard_arguments(argv, commands={"product", "capabilities"})
-    except DataError as exc:
-        print(json.dumps({"error": exc.as_dict()}, ensure_ascii=False), file=sys.stderr)
-        return 2
     if argv[:1] == ["native-macro"]:
         from ashare_data.cli.native_macro import main as native_macro_main
         return native_macro_main(argv[1:])

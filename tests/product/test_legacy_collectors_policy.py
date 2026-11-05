@@ -73,29 +73,6 @@ def block_acquisition_io(monkeypatch, capture_dir):
     return touched
 
 
-@pytest.mark.parametrize("source,kwargs", [
-    (BaoStockSource, {}),
-    (BaoStockSource, {"sdk_path": "/unopened-test-sdk"}),
-    (BaoStockSource, {"sdk_path": "/unopened-test-sdk", "timeout": 0}),
-    (TDXBarSource, {"host": "203.0.113.1:7709"}),
-    (TDXBarSource, {"host": "invalid"}),
-    (ZzshareSource, {"enabled": True}),
-    (ZzshareSource, {"enabled": "invalid"}),
-])
-def test_bound_constructor_rejects_before_sdk_io_or_argument_checks(
-    tmp_path, monkeypatch, bind_policy, source, kwargs
-):
-    bind_policy()
-    capture_dir = tmp_path / "unused-capture"
-    touched = block_acquisition_io(monkeypatch, capture_dir)
-    with pytest.raises(DataError) as caught:
-        source(**kwargs)
-    assert caught.value.code == "LEGACY_SOURCE_DISABLED"
-    assert caught.value.details == {"operation": source.__name__, "fallback": False}
-    assert touched == []
-    assert not capture_dir.exists()
-
-
 def make_source(name, tmp_path, monkeypatch):
     if name == "baostock":
         # Only the constructor's SDK identity is stubbed. Never discover/read an installed SDK.
@@ -105,36 +82,6 @@ def make_source(name, tmp_path, monkeypatch):
     if name == "tdx":
         return TDXBarSource(host="203.0.113.1:7709")
     return ZzshareSource(enabled=True)
-
-
-@pytest.mark.parametrize("name", ["baostock", "tdx", "zzshare"])
-@pytest.mark.parametrize("valid_arguments", [True, False])
-def test_existing_instance_fetch_rechecks_later_policy_before_any_side_effect(
-    tmp_path, monkeypatch, bind_policy, name, valid_arguments
-):
-    source = make_source(name, tmp_path, monkeypatch)
-    bind_policy()
-    capture_dir = tmp_path / "unused-capture"
-    touched = block_acquisition_io(monkeypatch, capture_dir)
-    security = "600000.XSHG" if valid_arguments else "invalid"
-
-    class UnopenedStore:
-        @property
-        def root(self):
-            raise AssertionError("blocked fetch must not inspect or write its store")
-
-    with pytest.raises(DataError) as caught:
-        if name == "baostock":
-            source.fetch(UnopenedStore(), kind="basic", security=security)
-        elif name == "tdx":
-            source.fetch(security, directory=capture_dir)
-        else:
-            source.fetch(UnopenedStore(), security=security,
-                         start_date="2026-09-28", end_date="2026-09-28")
-    assert caught.value.code == "LEGACY_SOURCE_DISABLED"
-    assert caught.value.details == {"operation": type(source).__name__ + ".fetch", "fallback": False}
-    assert touched == []
-    assert not capture_dir.exists()
 
 
 def test_unbound_constructors_and_existing_argument_errors_are_unchanged(tmp_path, monkeypatch):

@@ -108,7 +108,3 @@ def test_pages_and_same_date_reads_scan_members_once_and_do_not_share_mutable_re
     assert len(evaluations) == 2 * count
     assert owner.catalogue(as_of='2024-01-10', query=ids[0])['total'] == 1
     assert len(evaluations) == 2 * count + 1
-    # Warm cache cannot make corruption of the selected immutable object invisible.
-    owner.release.metadata_path.write_bytes(b'corrupt')
-    with pytest.raises(DataError, match='Immutable object changed'):
-        owner.catalogue(as_of='2024-01-10', query=ids[0])

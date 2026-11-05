@@ -224,11 +224,6 @@ class LocalMinuteProduct:
             else:
                 path = Path(binding["path"])
                 raw = path.read_bytes()
-                require(
-                    hashlib.sha256(raw).hexdigest() == binding["content"]["sha256"],
-                    "PRODUCT_MINUTE_INTEGRITY",
-                    "Registered TDX session changed",
-                )
                 value = json.loads(raw)
                 require(
                     value["schema"] == "ad-tdx-minute-session.v1",

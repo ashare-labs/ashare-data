@@ -221,6 +221,15 @@ def consolidate(rows):
                 )
             fields[name] = item
         first = observations[0]
+        if first["type"] == "distribution":
+            for vname in ("cash_per_share", "bonus_share_ratio", "capitalization_share_ratio"):
+                cur = fields.get(vname)
+                if cur is None or (cur["value"] is None and cur["status"] not in {"conflict", "document_withdrawn"}):
+                    fields[vname] = dict(
+                        value="0",
+                        status="default_zero",
+                        observations=cur["observations"] if cur else [],
+                    )
         identity_issues = {}
         for row in observations:
             for issue in row.get("_identity_issues", []):
@@ -967,6 +976,12 @@ class CorporateHistoryView:
                     )
                     for f in needed
                     if fields.get(f, {}).get("value") is None
+                    and not (
+                        f == "record_date"
+                        and event["type"] == "distribution"
+                        and fields.get("ex_date", {}).get("value") is not None
+                        and fields.get(f, {}).get("status") not in {"conflict", "document_withdrawn"}
+                    )
                 ]
                 for observation in event["observations"]:
                     missing += [

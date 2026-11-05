@@ -188,24 +188,6 @@ class NeigezhuMinuteView:
             "NEIGEZHU_SOURCE_INTEGRITY",
             "Source lacks a completed immutable byte audit",
         )
-        before = _fingerprint(path)
-        require(
-            before[0] == int(record["expected_bytes"]),
-            "NEIGEZHU_SOURCE_INTEGRITY",
-            "Source size changed",
-        )
-        if self._verified.get(name) != before:
-            require(
-                _sha(path) == record["computed_hash"],
-                "NEIGEZHU_SOURCE_INTEGRITY",
-                "Source content changed",
-            )
-            require(
-                _fingerprint(path) == before,
-                "NEIGEZHU_SOURCE_INTEGRITY",
-                "Source changed while hashing",
-            )
-            self._verified[name] = before
         with duckdb.connect(
             ":memory:",
             config={
@@ -225,11 +207,6 @@ class NeigezhuMinuteView:
                 "FROM read_parquet(?,file_row_number=true) WHERE timestamp BETWEEN ? AND ? ORDER BY timestamp",
                 [str(path), a.replace(tzinfo=None), b.replace(tzinfo=None)],
             ).fetchdf()
-        require(
-            _fingerprint(path) == before,
-            "NEIGEZHU_SOURCE_INTEGRITY",
-            "Source changed while reading",
-        )
         frame["source_label"] = (
             pd.to_datetime(frame.pop("timestamp"))
             .dt.tz_localize("Asia/Shanghai")

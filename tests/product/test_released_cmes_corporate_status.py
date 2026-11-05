@@ -99,9 +99,9 @@ def test_implemented_cmes_cash_dividend_projects_zero_stock_ratios_without_mutat
         implemented=True,
         announcement_date="2026-06-27",
         implementation_announcement_date="2026-07-10",
-        record_date="2026-10-19",
+        record_date=None,
         ex_date=DAY,
-        payment_date=DAY,
+        payment_date=None,
         shares_tradable_date=None,
         gross_cash="0.42",
         bonus_ratio=None,
@@ -114,8 +114,10 @@ def test_implemented_cmes_cash_dividend_projects_zero_stock_ratios_without_mutat
     assert projected["cash_per_share"] == "0.42"
     assert projected["bonus_share_ratio"] == "0"
     assert projected["capitalization_share_ratio"] == "0"
+    assert projected["record_date"] is None
+    assert projected["payment_date"] == DAY
     assert not any(
-        x.get("field") in {"bonus_share_ratio", "capitalization_share_ratio", "share_credit_date", "new_shares_tradable_date"}
+        x.get("field") in {"record_date", "payment_date", "bonus_share_ratio", "capitalization_share_ratio", "share_credit_date", "new_shares_tradable_date"}
         for x in value["issues"]
     )
 

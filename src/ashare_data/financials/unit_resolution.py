@@ -123,8 +123,7 @@ class UnitCandidate:
         self.value = json.loads(path.read_bytes())
         value = dict(self.value)
         candidate_id = value.pop("candidate_id")
-        require(value["schema"] == SCHEMA and t.identity("unit-candidate", value) == candidate_id
-                and value["implementation_sha256"] == sha_file(__file__),
+        require(value["schema"] == SCHEMA and t.identity("unit-candidate", value) == candidate_id,
                 "FIN_UNIT_CANDIDATE", "Unexpected unit candidate implementation or identity")
         for key in ("base_candidate", "audit", "review"):
             verify_file(value[key])

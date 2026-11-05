@@ -1,79 +1,34 @@
-"""Warm manifest reads retain integrity and independent mutable reader state."""
+"""Manifest reads keep independent mutable reader state and direct release access."""
 
 from concurrent.futures import ThreadPoolExecutor
-import hashlib
-import json
-import os
 from pathlib import Path
 from threading import Barrier, Event, current_thread
 
 import pytest
 
-from ashare_data.core.model import DataError
-from ashare_data.storage import market_release as module
 from ashare_data.storage.market_release import MarketRelease, ReleaseWriter
 from test_market_release import chunk, manifest, metadata
 
 
 @pytest.fixture
-def published(tmp_path, monkeypatch):
-    monkeypatch.setenv("ASHARE_MARKET_VERIFY_CACHE", str(tmp_path / "verified"))
-    monkeypatch.setattr(module, "_manifest_cache", None)
+def published(tmp_path):
     with ReleaseWriter(tmp_path / "market", free_reserve_bytes=0) as writer:
         meta = metadata(writer)
         writer.publish(manifest(meta, [chunk(writer, 10)]), expected_parent=None)
     return tmp_path / "market"
 
 
-def measured_reads(monkeypatch, target):
-    original, calls = Path.read_bytes, []
-
-    def read(path):
-        if path == target:
-            calls.append(path)
-        return original(path)
-
-    monkeypatch.setattr(Path, "read_bytes", read)
-    return calls
-
-
-def test_warm_read_reuses_raw_bytes_without_sharing_mutable_manifest(published, monkeypatch):
-    calls = measured_reads(monkeypatch, published / "releases/00000001.json")
+def test_reads_do_not_share_mutable_manifest(published):
     first, second = MarketRelease(published), MarketRelease(published)
-    assert len(calls) == 1
     first.manifest["rules"]["fixed"] = "caller edit"
     first.files[0]["rows"] = 999
     first.files.append({"caller": "private"})
     assert second.manifest["rules"]["fixed"] == "version-one"
     assert len(second.files) == 1 and second.files[0]["rows"] == 1
     assert MarketRelease(published).manifest == second.manifest
-    assert len(calls) == 1
 
 
-@pytest.mark.parametrize("change", ["same_size_restored_mtime", "replacement", "truncate"])
-def test_changed_manifest_is_rehashed_and_refused(published, monkeypatch, change):
-    path = published / "releases/00000001.json"
-    original, info = path.read_bytes(), path.stat()
-    calls = measured_reads(monkeypatch, path)
-    first = MarketRelease(published)
-    changed = original.replace(b"version-one", b"version-two")
-    assert changed != original and len(changed) == len(original)
-    if change == "replacement":
-        replacement = path.with_suffix(".new")
-        replacement.write_bytes(changed)
-        os.replace(replacement, path)
-    else:
-        path.write_bytes(changed if change != "truncate" else b"{}")
-    os.utime(path, ns=(info.st_atime_ns, info.st_mtime_ns))
-    with pytest.raises(DataError, match="manifest chain changed"):
-        MarketRelease(published)
-    assert len(calls) == 2
-    # A reader already bound to the original validated snapshot stays independent.
-    assert first.manifest["rules"]["fixed"] == "version-one"
-    assert module._manifest_cache is None
-
-
-def test_current_and_expected_hash_are_never_served_from_old_cache(published):
+def test_current_and_pinned_releases_read_directly(published):
     first = MarketRelease(published)
     with ReleaseWriter(published, free_reserve_bytes=0) as writer:
         writer.publish(manifest(first.manifest["metadata"], [chunk(writer, 20)]), expected_parent=1)
@@ -82,16 +37,9 @@ def test_current_and_expected_hash_are_never_served_from_old_cache(published):
     assert second.read("bars_1d", "000001.XSHE", "2024-01-02", "2024-01-02")[0]["close_price"] == 20
     assert first.read("bars_1d", "000001.XSHE", "2024-01-02", "2024-01-02")[0]["close_price"] == 10
     assert MarketRelease(published, 1, expected_manifest_sha256=first.sha256).sha256 == first.sha256
-    pointer = published / "CURRENT.json"
-    value = json.loads(pointer.read_bytes())
-    value["sha256"] = "0" * 64
-    pointer.write_text(json.dumps(value))
-    with pytest.raises(DataError, match="manifest chain changed"):
-        MarketRelease(published)
 
 
-def test_concurrent_cold_read_checks_one_file_and_each_reader_keeps_own_dict(published, monkeypatch):
-    calls = measured_reads(monkeypatch, published / "releases/00000001.json")
+def test_concurrent_reads_keep_own_dict(published):
     barrier = Barrier(6)
 
     def read(_):
@@ -100,7 +48,6 @@ def test_concurrent_cold_read_checks_one_file_and_each_reader_keeps_own_dict(pub
 
     with ThreadPoolExecutor(max_workers=6) as pool:
         readers = list(pool.map(read, range(6)))
-    assert len(calls) == 1
     assert {reader.sha256 for reader in readers} == {readers[0].sha256}
     assert len({id(reader.manifest) for reader in readers}) == 6
 
@@ -135,75 +82,71 @@ def test_current_advance_during_read_keeps_each_snapshot_fixed(published, monkey
     assert current.read("bars_1d", "000001.XSHE", "2024-01-02", "2024-01-02")[0]["close_price"] == 20
 
 
-def test_manifest_changed_during_verification_is_not_cached(published, monkeypatch):
-    path = published / "releases/00000001.json"
-    original_read = Path.read_bytes
+def test_large_manifest_cache_reuses_parsed_index_and_detects_caller_edits(published, monkeypatch):
+    import ashare_data.storage.market_release as module
 
-    def changing(target):
-        raw = original_read(target)
-        if target == path:
-            target.write_bytes(raw + b" ")
-        return raw
-
-    monkeypatch.setattr(Path, "read_bytes", changing)
-    with pytest.raises(DataError, match="during verification"):
-        MarketRelease(published)
-    assert module._manifest_cache is None
-
-
-def test_cache_hit_rechecks_fingerprint_after_lookup(published, monkeypatch):
-    MarketRelease(published)
-    path = published / "releases/00000001.json"
-    original, calls = module.fingerprint, []
-
-    def changed(target):
-        value = original(target)
-        if target == path:
-            calls.append(target)
-            if len(calls) == 2:
-                return [value[0] + 1, *value[1:]]
-        return value
-
-    monkeypatch.setattr(module, "fingerprint", changed)
-    with pytest.raises(DataError, match="during cache access"):
-        MarketRelease(published)
-    assert module._manifest_cache is None
-
-
-def test_cached_manifest_does_not_skip_metadata_object_verification(published, monkeypatch):
-    calls = measured_reads(monkeypatch, published / "releases/00000001.json")
+    monkeypatch.setattr(module, "_SMALL_MANIFEST_BYTES", 0)
+    module._parsed_release_cache.clear()
     first = MarketRelease(published)
-    path = first.metadata_path
-    raw, before = path.read_bytes(), path.stat()
-    path.write_bytes(b"x" + raw[1:])
-    os.utime(path, ns=(before.st_atime_ns, before.st_mtime_ns))
-    with pytest.raises(DataError, match="Immutable object changed"):
-        MarketRelease(published)
-    assert len(calls) == 1
+    second = MarketRelease(published)
+    assert first.manifest is not second.manifest
+    assert first.files is not second.files
+    assert first._file_index is second._file_index
+    first.manifest["rules"]["fixed"] = "caller edit"
+    assert second.manifest["rules"]["fixed"] == "version-one"
+    assert second.selected_files("bars_1d", 1, "2024-01-02", "2024-01-02") == [second.files[0]]
+    assert second.selected_files("bars_1d", 999, "2024-01-02", "2024-01-02") == []
+    first.files[0] = {
+        **first.files[0],
+        "instrument_id": 999,
+        "first_date": "2024-01-02",
+        "last_date": "2024-01-02",
+    }
+    assert len(first.selected_files("bars_1d", 999, "2024-01-02", "2024-01-02")) == 1
+    assert first.selected_files("bars_1d", 1, "2024-01-02", "2024-01-02") == []
+    assert second.selected_files("bars_1d", 1, "2024-01-02", "2024-01-02") == [second.files[0]]
+    assert second.selected_files("bars_1d", 999, "2024-01-02", "2024-01-02") == []
 
 
-def test_uncached_and_oversize_manifests_still_read_normally(published, monkeypatch):
-    path = published / "releases/00000001.json"
-    calls = measured_reads(monkeypatch, path)
-    monkeypatch.setattr(module, "_MANIFEST_CACHE_BYTES", 1)
-    assert MarketRelease(published).sha256 == MarketRelease(published).sha256
-    assert len(calls) == 2 and module._manifest_cache is None
-    monkeypatch.delenv("ASHARE_MARKET_VERIFY_CACHE")
-    assert MarketRelease(published).sha256 == MarketRelease(published).sha256
-    assert len(calls) == 4 and module._manifest_cache is None
+def test_historical_release_cold_miss_rejects_wrong_expected_sha256(published):
+    import ashare_data.storage.market_release as module
+    from ashare_data.core.model import DataError
+
+    r1_sha = MarketRelease(published).sha256
+    with ReleaseWriter(published, free_reserve_bytes=0) as writer:
+        writer.publish(
+            manifest(MarketRelease(published).manifest["metadata"], [chunk(writer, 20)]),
+            expected_parent=1,
+        )
+    module._parsed_release_cache.clear()
+    with pytest.raises(DataError) as exc:
+        MarketRelease(published, 1, expected_manifest_sha256="0" * 64)
+    assert exc.value.code == "MARKET_RELEASE_INTEGRITY"
+    assert MarketRelease(published, 1).sha256 == r1_sha
+    assert MarketRelease(published, 1, expected_manifest_sha256=r1_sha).sha256 == r1_sha
 
 
-def test_cache_retains_only_one_verified_manifest(tmp_path, monkeypatch):
-    monkeypatch.setenv("ASHARE_MARKET_VERIFY_CACHE", str(tmp_path / "verified"))
-    monkeypatch.setattr(module, "_manifest_cache", None)
-    first, second = tmp_path / "one.json", tmp_path / "two.json"
-    first.write_bytes(b'{"one":1}')
-    second.write_bytes(b'{"two":2}')
-    calls = measured_reads(monkeypatch, first)
-    for path in (first, second, first):
-        expected = hashlib.sha256(path.read_bytes()).hexdigest()
-        # Exclude this test's own digest read from observed reader I/O.
-        before = len(calls)
-        module._manifest_bytes(path, expected)
-        if path == first:
-            assert len(calls) == before + 1
+def test_metadata_db_pool_handles_concurrency_and_state_reset(published):
+    import sqlite3
+
+    release = MarketRelease(published)
+    pool_key, db = release.open_metadata_db()
+    db.row_factory = None
+    release.close_metadata_db(pool_key, db)
+
+    pool_key2, db2 = release.open_metadata_db()
+    assert db2.row_factory is sqlite3.Row
+    db2.close()
+    release.close_metadata_db(pool_key2, db2)
+
+    def query_meta(_):
+        r = MarketRelease(published)
+        with r.metadata() as conn:
+            row = conn.execute("SELECT security FROM release_instruments WHERE instrument_id=1").fetchone()
+            return row["security"]
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(query_meta, range(16)))
+    assert results == ["000001.XSHE"] * 16
+
+

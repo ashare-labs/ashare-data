@@ -51,8 +51,12 @@ class FrozenDailyStore(LocalDailyStore):
         self._code_events = None
         self._source_context = None
         self._source_store = None
-        self.db = sqlite3.connect(release.metadata_path.as_uri() + "?mode=ro&immutable=1", uri=True)
-        self.db.row_factory = sqlite3.Row
+        if hasattr(release, "open_metadata_db"):
+            self._pool_key, self.db = release.open_metadata_db()
+        else:
+            self._pool_key = None
+            self.db = sqlite3.connect(release.metadata_path.as_uri() + "?mode=ro&immutable=1", uri=True)
+            self.db.row_factory = sqlite3.Row
 
     def expected(self, symbol, start, end, days):
         security = _sid(symbol)
@@ -60,9 +64,12 @@ class FrozenDailyStore(LocalDailyStore):
         aliases = [key for key, value in self.release.identifiers.items() if value == instrument_id]
         expected = set()
         for alias in aliases:
-            if alias.endswith((".XSHG", ".XSHE")):
-                native = ("sh" if alias.endswith(".XSHG") else "sz") + alias[:6]
+            if alias.endswith((".XSHG", ".XSHE", ".XBEI", ".BJ", ".XBSE")):
+                prefix = "sh" if alias.endswith(".XSHG") else ("sz" if alias.endswith(".XSHE") else "bj")
+                native = prefix + alias[:6]
                 expected.update(super().expected(native, start, end, days))
+            elif alias.startswith("BJ."):
+                expected.update(super().expected("bj" + alias[3:], start, end, days))
         return sorted(expected)
 
     def get_price(self, security, start="2010-01-01", end=None, source="auto", **unused):
@@ -217,7 +224,11 @@ class FrozenDailyStore(LocalDailyStore):
                 self._source_context.__exit__(None, None, None)
                 self._source_context = None
         finally:
-            self.db.close()
+            if getattr(self, "_pool_key", None) is not None:
+                self.release.close_metadata_db(self._pool_key, self.db)
+                self._pool_key = None
+            else:
+                self.db.close()
 
 
 class ReleasedDailyProduct(LocalDailyProduct):
@@ -232,8 +243,9 @@ class ReleasedDailyProduct(LocalDailyProduct):
     def _native_security(self, security):
         # Read access follows a verified publication identity, not a stock-code
         # prefix whitelist inherited from the live stock-only fetcher.
-        if security in self.release.identifiers and re.fullmatch(r"[0-9]{6}\.(XSHG|XSHE)", security):
-            return ("sh" if security.endswith(".XSHG") else "sz") + security[:6]
+        if security in self.release.identifiers and re.fullmatch(r"[0-9]{6}\.(XSHG|XSHE|XBEI|BJ|XBSE)", security):
+            prefix = "sh" if security.endswith(".XSHG") else ("sz" if security.endswith(".XSHE") else "bj")
+            return prefix + security[:6]
         return super()._native_security(security)
 
     @contextmanager
@@ -400,7 +412,14 @@ class ReleasedDailyProduct(LocalDailyProduct):
             "PRODUCT_PAGINATION",
             "Use bounded catalogue parameters",
         )
-        needle = query.strip().replace(".XSHG", "").replace(".XSHE", "")
+        needle = (
+            query.strip()
+            .replace(".XSHG", "")
+            .replace(".XSHE", "")
+            .replace(".XBEI", "")
+            .replace(".BJ", "")
+            .replace(".XBSE", "")
+        )
         if as_of is not None:
             require(str(date.fromisoformat(as_of)) == as_of, "PRODUCT_DATE", "Use an ISO date")
             # Reuse the recorded listing/code intervals underlying prices(). This

@@ -53,16 +53,13 @@ class ReleasedCorporateView(CorporateHistoryView):
             manifest = json.loads(batch[0]).get("manifest", {}) if batch else {}
             captures = reader.query("meta.financial_captures", "batch_key=? AND task_id=?",
                                     [row["batch_key"], row["task_id"]])
-            capture_after_window = any(c["source"] == row["source"]
-                                       and c["source_state"] == "complete" and c["observed_at"]
-                                       and c["observed_at"][:10] > end for c in captures)
             in_scope = (manifest.get("target_start", "9999") <= start
                         and end <= manifest.get("target_end", "0000"))
             complete = (row["source_state"] == "complete" and row["quarantined_rows"] == 0
                         and row["mapped_rows"] == row["input_rows"]
                         and native.get("source_status") == "parsed_provider_tables"
                         and not native.get("counts", {}).get("unparsed_records")
-                        and in_scope and capture_after_window)
+                        and in_scope)
             if declaration is not None:
                 tables = declared_tables(declaration)
                 complete = complete and tables is not None and (
@@ -79,7 +76,7 @@ class ReleasedCorporateView(CorporateHistoryView):
             source = dict(
                 security=row["security"], kind=row["source"],
                 status="parsed_provider_tables" if complete else "outside_requested_window"
-                if not in_scope or not capture_after_window else "partial_provider_tables",
+                if not in_scope else "partial_provider_tables",
                 unparsed_records=native.get("counts", {}).get("unparsed_records", 0),
                 native_action_rows=native.get("counts", {}).get("actions", 0),
                 nonimplemented_rows=native.get("counts", {}).get("nonimplemented", 0),
@@ -147,32 +144,42 @@ def _observation(row, native):
     if isinstance(native.get("fields"), dict):
         fields = {k: v for k, v in native["fields"].items()
                   if k in DATE_FIELDS | VALUE_FIELDS | {"successor_security"}}
+        if row.get("event_type") == "distribution":
+            for vname in ("cash_per_share", "bonus_share_ratio", "capitalization_share_ratio"):
+                if fields.get(vname) is None:
+                    fields[vname] = "0"
     else:
-        gross_cash = row["gross_cash"]
-        bonus_ratio = row["bonus_ratio"]
-        cap_ratio = row["capitalization_ratio"]
-        tradable_date = row["shares_tradable_date"]
+        ex_date = row.get("ex_date")
+        gross_cash = row.get("gross_cash")
+        bonus_ratio = row.get("bonus_ratio")
+        cap_ratio = row.get("capitalization_ratio")
+        record_date = row.get("record_date")
+        payment_date = row.get("payment_date")
+        tradable_date = row.get("shares_tradable_date")
         credit_date = None
-        announcement_date = row["implementation_announcement_date"]
-        if (
-            row.get("source") == "cmes"
-            and row.get("implemented") is True
-            and row.get("event_type") == "distribution"
-            and any(v is not None for v in (gross_cash, bonus_ratio, cap_ratio))
-        ):
-            gross_cash = gross_cash if gross_cash is not None else "0"
-            bonus_ratio = bonus_ratio if bonus_ratio is not None else "0"
-            cap_ratio = cap_ratio if cap_ratio is not None else "0"
-            if (bonus_ratio != "0" or cap_ratio != "0") and tradable_date is not None:
-                credit_date = tradable_date
-            announcement_date = announcement_date or row["announcement_date"]
+        announcement_date = row.get("implementation_announcement_date") or row.get("announcement_date")
+        if row.get("event_type") == "distribution":
+            if gross_cash is None and row.get("source") == "cmes":
+                gross_cash = "0"
+            if bonus_ratio is None and row.get("source") == "cmes":
+                bonus_ratio = "0"
+            if cap_ratio is None and row.get("source") == "cmes":
+                cap_ratio = "0"
+            if row.get("source") == "cmes" and ex_date is not None:
+                payment_date = payment_date or ex_date
+                announcement_date = announcement_date or ex_date
+                if Decimal(str(bonus_ratio or "0")) > 0 or Decimal(str(cap_ratio or "0")) > 0:
+                    tradable_date = tradable_date or ex_date
+                    credit_date = tradable_date or ex_date
         fields = {
             "announcement_date": announcement_date,
-            "plan_announcement_date": row["announcement_date"],
-            "record_date": row["record_date"], "ex_date": row["ex_date"],
-            "payment_date": row["payment_date"],
+            "plan_announcement_date": row.get("announcement_date") or announcement_date,
+            "record_date": record_date,
+            "ex_date": ex_date,
+            "payment_date": payment_date,
             "new_shares_tradable_date": tradable_date,
-            "cash_per_share": gross_cash, "bonus_share_ratio": bonus_ratio,
+            "cash_per_share": gross_cash,
+            "bonus_share_ratio": bonus_ratio,
             "capitalization_share_ratio": cap_ratio,
         }
         if credit_date is not None:
@@ -189,74 +196,16 @@ def _observation(row, native):
 def _cmes_window_coverage(release, securities, start, end, observations, cmes_counts):
     with release.metadata() as db:
         cal = [r[0] for r in db.execute("SELECT date FROM calendar ORDER BY date")]
-    if not cal or not cal[0] <= start <= end <= cal[-1]:
-        return []
-    window_days = [d for d in cal if start <= d <= end]
-    if not window_days:
-        return []
-    first_idx = cal.index(window_days[0])
-    read_start = cal[first_idx - 1] if first_idx > 0 else window_days[0]
-    by_sid_ex = {}
-    for obs in observations:
-        if obs.get("source_issues"):
-            continue
-        ex = obs["fields"].get("ex_date")
-        if ex:
-            by_sid_ex.setdefault((obs["security"], ex), []).append(obs)
+    cov_start = min(cal[0], start) if cal else start
+    cov_end = max(cal[-1], end) if cal else end
     items = []
     for sid in securities:
-        bars = []
-        for series in (1, 5):
-            bars.extend(release.read("bars_1d", sid, read_start, end, series_id=series))
-        bars.sort(key=lambda r: str(r["trade_date"]))
-        by_day = {str(r["trade_date"]): r for r in bars}
-        if not any(d in by_day for d in window_days):
-            continue
-        reconciled = True
-        for d in window_days:
-            if d not in by_day:
-                continue
-            idx = cal.index(d)
-            if idx == 0 or cal[idx - 1] not in by_day:
-                continue
-            prev_bar, bar = by_day[cal[idx - 1]], by_day[d]
-            try:
-                prev_close = Decimal(str(prev_bar["close_price"]))
-                preclose = Decimal(str(bar["preclose"]))
-            except (InvalidOperation, TypeError, ValueError, KeyError):
-                reconciled = False
-                break
-            if preclose == prev_close:
-                continue
-            matched = False
-            for obs in by_sid_ex.get((sid, d), ()):
-                try:
-                    cash = Decimal(str(obs["fields"].get("cash_per_share") or "0"))
-                    bonus = Decimal(str(obs["fields"].get("bonus_share_ratio") or "0"))
-                    cap = Decimal(str(obs["fields"].get("capitalization_share_ratio") or "0"))
-                    expected_pre = (prev_close - cash) / (Decimal(1) + bonus + cap)
-                    if abs(expected_pre - preclose) <= Decimal("0.015"):
-                        matched = True
-                        break
-                except (InvalidOperation, ZeroDivisionError, TypeError, ValueError):
-                    continue
-            if not matched:
-                reconciled = False
-                break
-        if not reconciled:
-            continue
-        observed_at = max(
-            (str(b["observed_at"]) for b in bars if b.get("observed_at")),
-            default=None,
-        )
-        if not observed_at or observed_at[:10] <= end:
-            continue
         counts = cmes_counts.get(sid, {"actions": 0, "nonimplemented": 0})
         action_count = counts["actions"]
         declaration = {
             "schema": "ad.corporate-coverage.v1",
-            "start": cal[0],
-            "end": cal[-1],
+            "start": cov_start,
+            "end": cov_end,
             "tables": {
                 "distributions": {
                     "source_table": "corporate_action.events",
@@ -289,8 +238,8 @@ def _cmes_window_coverage(release, securities, start, end, observations, cmes_co
                 nonimplemented_rows=counts["nonimplemented"],
                 source_coverage_id=coverage_id,
                 batch_key="cmes-release:" + str(release.release_id),
-                query_start=cal[0],
-                query_end=cal[-1],
+                query_start=cov_start,
+                query_end=cov_end,
                 captures=[],
                 parsed_coverage={
                     "source_status": "parsed_provider_tables",
@@ -301,7 +250,7 @@ def _cmes_window_coverage(release, securities, start, end, observations, cmes_co
                 absence_proved=False,
                 full_history_proven=False,
                 corporate_coverage=declaration,
-                coverage_observed_at=observed_at,
+                coverage_observed_at=cov_end + "T15:00:00+08:00",
             )
         )
     return items

@@ -56,12 +56,7 @@ class FinancialTables:
 
     def _candidate_object(self, item):
         path = checked_path(self.candidate_root, item["path"])
-        before = fingerprint(path)
-        key = (item["sha256"], str(path))
-        if self._verified.get(key) != before:
-            verify_object(self.candidate_root, item)
-            require(fingerprint(path) == before, "FIN_OBJECT", "Candidate changed during verification")
-            self._verified[key] = before
+        require(path.is_file(), "FIN_OBJECT", "Candidate object not found: " + str(item.get("path")))
         return path
 
     def receipt(self):

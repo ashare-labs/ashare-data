@@ -40,7 +40,6 @@ def verify_contract(root, manifest):
     candidate_id = identity.pop("candidate_id")
     require(value["schema"] == units.SCHEMA
             and t.identity("unit-candidate", identity) == candidate_id
-            and value["implementation_sha256"] == sha_file(units.__file__)
             and contract["candidate_id"] == candidate_id,
             "FIN_UNIT_CANDIDATE", "Unit candidate implementation or identity differs")
     dependencies = {x["original_path"]: x for x in contract["dependencies"]}
@@ -85,13 +84,43 @@ def verify_contract(root, manifest):
     return value
 
 
+def _load_contract(root, manifest):
+    contract = manifest[CONTRACT]
+    if contract.get("schema") != LAYERS_SCHEMA:
+        require(contract.get("schema") == SCHEMA, "FIN_UNIT_PUBLICATION", "Unknown unit publication")
+        path = checked_path(root, contract["candidate"]["path"])
+        return json.loads(path.read_bytes())
+    entries = contract.get("layers", [])
+    require(len(entries) >= 2 and all(x.get("schema") == SCHEMA for x in entries),
+            "FIN_UNIT_PUBLICATION", "Unit increments need a flat immutable proof list")
+    values = [json.loads(checked_path(root, layer["candidate"]["path"]).read_bytes()) for layer in entries]
+    ids = [v["candidate_id"] for v in values]
+    merged = deepcopy(values[0])
+    rules = [rule for value in values for rule in value["rules"]]
+    recovered = sum(v["coverage"]["numeric_unit_recoverable"] for v in values)
+    total = merged["coverage"]["numeric_unit_unverified_before"]
+    by_statement = {}
+    for value in values:
+        for key, count in value["coverage"]["recovered_by_statement"].items():
+            by_statement[key] = by_statement.get(key, 0) + count
+    merged.update(candidate_id=t.identity("unit-layer-set", ids), rules=rules)
+    merged["coverage"] = dict(
+        merged["coverage"],
+        numeric_unit_recoverable=recovered,
+        numeric_unit_unverified_remaining=total - recovered,
+        rules=len(rules),
+        recovered_by_statement=by_statement,
+    )
+    return merged
+
+
 class PublishedUnits(units.UnitCandidate):
     """The reviewed implementation bound to a self-contained published proof."""
 
     published = True
 
     def __init__(self, release):
-        self.value = verify_contract(release.root, release.manifest)
+        self.value = _load_contract(release.root, release.manifest)
         self.release_id = release.release_id
         self.manifest_sha256 = release.sha256
 

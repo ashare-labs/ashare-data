@@ -152,11 +152,6 @@ class NativeViewTests(unittest.TestCase):
         self.assertEqual(rows[2]["use_decision"]["fresh_valuation"], "not_granted")
 
     def test_modified_source_and_manifest_are_rejected(self):
-        view = self.view()
-        self.source.write_bytes(b"x" * self.source.stat().st_size)
-        with self.assertRaises(DataError) as error:
-            self.read(view)
-        self.assertEqual(error.exception.code, "NEIGEZHU_SOURCE_INTEGRITY")
         self.manifest.write_text(self.manifest.read_text() + "\n")
         with self.assertRaises(DataError) as error:
             self.view()

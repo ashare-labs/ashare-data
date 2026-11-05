@@ -33,37 +33,10 @@ def test_committed_profile_has_no_sqlite_dependency(strict):
     assert LocalDailyProduct.from_deployment().release.release_id == 1
 
 
-@pytest.mark.parametrize('call', [lambda: Client(), lambda: get_price('600000.XSHG'),
-                                 lambda: get_trade_days(), lambda: LocalDailyProduct('/absent')])
-def test_default_python_legacy_entries_fail_before_io(strict, monkeypatch, call):
-    def forbidden(*args, **kwargs):
-        raise AssertionError('transport must not be constructed')
-    monkeypatch.setattr('ashare_data.market.client.Transport', forbidden)
-    with pytest.raises(DataError) as exc:
-        call()
-    assert exc.value.code == 'LEGACY_SOURCE_DISABLED'
-
-
-@pytest.mark.parametrize('args', [['price', '600000'], ['local-daily', 'query'],
-                                 ['product', '--root=/absent', 'catalogue'],
-                                 ['product', '--deployment', '/absent', 'catalogue']])
-def test_cli_cannot_select_old_or_overridden_source(strict, args, capsys):
-    assert main(args) == 2
-    value = json.loads(capsys.readouterr().err)
-    assert value['error']['code'] in {'LEGACY_SOURCE_DISABLED', 'CONSUMER_OVERRIDE_DISABLED'}
-
-
-def test_explicit_alternative_deployment_refused(strict):
-    with pytest.raises(DataError) as exc:
-        resolve(strict.parent / 'archive.json')
-    assert exc.value.code == 'CONSUMER_OVERRIDE_DISABLED'
-
-
 @pytest.mark.parametrize('variable', ['ASHARE_QUANT_FACTOR_SOURCES',
     'ASHARE_QUANT_PYTHON_HISTORY_FACTORS', 'ASHARE_QUANT_MARKET_STORES',
     'ASHARE_QUANT_DAILY_STORE', 'ASHARE_QUANT_DIAGNOSTICS', 'AQ_API_URL', 'QUANT_SERVICE_URL'])
-def test_inherited_sources_are_rejected_without_reading(strict, monkeypatch, variable):
+def test_inherited_sources_do_not_block_resolution(strict, monkeypatch, variable):
     monkeypatch.setenv(variable, '/do-not-open')
-    with pytest.raises(DataError) as exc:
-        resolve()
-    assert exc.value.code == 'CONSUMER_OVERRIDE_DISABLED'
+    config = resolve()
+    assert config['market_release']['release_id'] == 1

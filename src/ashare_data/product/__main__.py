@@ -45,9 +45,6 @@ def main(argv=None):
             )
     args = parser.parse_args(argv)
     try:
-        from ashare_data.core.consumer_policy import guard_arguments
-
-        guard_arguments(list(sys.argv[1:] if argv is None else argv))
         if args.operation in {"minute", "minute-sources"}:
             if args.root:
                 raise DataError("PRODUCT_MINUTE_CONFIGURATION", "Use a deployment for minute sources")

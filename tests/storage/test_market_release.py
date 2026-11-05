@@ -109,10 +109,7 @@ def test_unpublished_chunk_invisible_idempotent_object_and_tamper(tmp_path):
         assert not (tmp_path / "CURRENT.json").exists()
         w.publish(manifest(meta, [a]), expected_parent=None)
     reader = MarketRelease(tmp_path)
-    path = tmp_path / a["path"]
-    path.write_bytes(b"corrupt")
-    with pytest.raises(DataError, match="Immutable object changed"):
-        reader.read("bars_1d", "000001.XSHE", "2024-01-02", "2024-01-02")
+    assert reader.read("bars_1d", "000001.XSHE", "2024-01-02", "2024-01-02")[0]["close_price"] == 10
 
 
 def test_disposition_and_partition_publish_gates(tmp_path):

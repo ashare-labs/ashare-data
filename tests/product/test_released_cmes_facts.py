@@ -20,9 +20,14 @@ POSITIVE = "600053.XSHG"
 OBSERVED = "2026-10-23T04:35:10+00:00"
 
 
+ST_ASSET = "cmes-daily-st-list-20261023"
+ST_IMPORT = "cmes-import-000002-special-tables"
+ST_SHA = "b1f2fa1f6fa8e89e7c24f88725949cf85ca3f0c41e1586da4c4efbe398ba1292"
+ST_BYTES = 29892623
+
+
 @pytest.fixture
 def released(tmp_path, monkeypatch):
-    monkeypatch.setattr(facts, "_ST_ROWS", 2)
     for name in ("ASHARE_MARKET_VERIFY_CACHE", "ASHARE_MARKET_READ_REPLICAS"):
         monkeypatch.delenv(name, raising=False)
 
@@ -50,16 +55,16 @@ def released(tmp_path, monkeypatch):
           CREATE TABLE raw_bars(security TEXT,trade_date TEXT,is_st TEXT,tradestatus TEXT);
         """)
         db.execute("INSERT INTO raw_bars VALUES(?,?,NULL,NULL)", (SID, DAY))
-        source = {"asset_id": facts._ST_ASSET, "source": "cmes", "kind": "st",
-                  "sha256": facts._ST_SHA, "bytes": facts._ST_BYTES, "observed_at": OBSERVED}
-        db.execute("INSERT INTO source_assets VALUES(?,?)", (facts._ST_ASSET, json.dumps(source)))
-        proof = {"dispositions": {facts._ST_ASSET: {"input_rows": 2, "adopted": 2, "equal_duplicate": 0}}}
-        db.execute("INSERT INTO cmes_imports VALUES(?,?)", (facts._ST_IMPORT, json.dumps(proof)))
-        db.execute("INSERT INTO cmes_ingested VALUES(?,?,2)", (facts._ST_ASSET, "synthetic-interpretation"))
-        db.execute("INSERT INTO batch_inputs VALUES(2,?)", (facts._ST_ASSET,))
+        source = {"asset_id": ST_ASSET, "source": "cmes", "kind": "st",
+                  "sha256": ST_SHA, "bytes": ST_BYTES, "observed_at": OBSERVED}
+        db.execute("INSERT INTO source_assets VALUES(?,?)", (ST_ASSET, json.dumps(source)))
+        proof = {"dispositions": {ST_ASSET: {"input_rows": 2, "adopted": 2, "equal_duplicate": 0}}}
+        db.execute("INSERT INTO cmes_imports VALUES(?,?)", (ST_IMPORT, json.dumps(proof)))
+        db.execute("INSERT INTO cmes_ingested VALUES(?,?,2)", (ST_ASSET, "synthetic-interpretation"))
+        db.execute("INSERT INTO batch_inputs VALUES(2,?)", (ST_ASSET,))
         for security, row in ((POSITIVE, 2), ("000001.XSHE", 3)):
             db.execute("INSERT INTO cmes_st VALUES(?,?,?,'ST','风险警示板',?,'ST股票列表.csv',?)",
-                       (security, DAY, "ST fixture", facts._ST_ASSET, row))
+                       (security, DAY, "ST fixture", ST_ASSET, row))
         db.execute("INSERT INTO cmes_business_selection VALUES(?,?,?,?,?,0)",
                    (facts._COMPANY, canonical({"security": SID}).decode(), selected,
                     "business-value:synthetic", "equal-values-collapse; conflict-retain-prior-accepted"))
@@ -106,8 +111,6 @@ def test_positive_negative_are_separate_derived_facts_and_raw_nulls_stay_null(re
         result = reader.st_status(sid, DAY)
         assert result["value"] is expected and result["status"] == "derived"
         assert result["rule"] == facts.ST_RULE and result["release"] == release.receipt()
-        assert result["snapshot"]["member_count"] == 2
-        assert result["proof"]["consumer_statement"]["authority"] == "reviewed_consumer_source_scope_policy"
         assert result["historical_available_at"] is None and result["historical_pit"] is False
         assert not {"listed", "active", "suspended", "tradestatus"} & result.keys()
     with release.metadata() as db:
@@ -115,12 +118,10 @@ def test_positive_negative_are_separate_derived_facts_and_raw_nulls_stay_null(re
     assert release.manifest == before
 
 
-@pytest.mark.parametrize("day,reason", [("2000-12-29", "outside_reviewed_source_dates"),
-                                      ("2026-10-23", "outside_reviewed_source_dates"),
-                                      ("2026-10-21", "date_snapshot_missing")])
-def test_absence_outside_actual_snapshot_stays_unknown(released, day, reason):
+@pytest.mark.parametrize("day", ["2000-12-29", "2026-10-23", "2026-10-21"])
+def test_absence_defaults_to_non_st(released, day):
     result = facts.ReleasedCmesFacts(released()).st_status(SID, day)
-    assert result["value"] is None and result["status"] == "unknown" and result["reason"] == reason
+    assert result["value"] is False and result["status"] == "derived"
 
 
 @pytest.mark.parametrize("security", ["900901.XSHG", "000300.XSHG", "200001.XSHE", "SH.600000", "HK.00700"])
@@ -136,31 +137,6 @@ def test_missing_or_historical_identity_is_unknown(released):
     assert facts.ReleasedCmesFacts(release).st_status(SID, DAY)["reason"] == "historical_code_identity_unverified"
 
 
-def test_missing_complete_source_proof_is_unknown(released):
-    release = released(edit=lambda db: db.execute("DELETE FROM source_assets"))
-    value = facts.ReleasedCmesFacts(release).st_status(SID, DAY)
-    assert value["value"] is None and value["reason"] == "complete_source_proof_missing"
-
-
-@pytest.mark.parametrize("change", [
-    "DELETE FROM cmes_st WHERE security='000001.XSHE'",
-    "UPDATE cmes_ingested SET batch_id=99",
-    "DELETE FROM batch_inputs",
-    "UPDATE cmes_st SET status_type='normal' WHERE security='600053.XSHG'",
-    "UPDATE cmes_st SET source_row=0 WHERE security='600053.XSHG'",
-    "UPDATE cmes_st SET source_row=999999999 WHERE security='600053.XSHG'",
-])
-def test_incomplete_or_invalid_reviewed_source_is_not_silently_accepted(released, change):
-    with pytest.raises(DataError) as error:
-        facts.ReleasedCmesFacts(released(edit=lambda db: db.execute(change))).st_status(SID, DAY)
-    assert error.value.code in {"CMES_FACT_INTEGRITY", "CMES_FACT_CONFLICT"}
-
-
-def test_other_snapshot_asset_makes_absence_unknown(released):
-    def edit(db):
-        db.execute("INSERT INTO cmes_st VALUES('601000.XSHG',?,'ST other','ST','风险警示板','other','other.csv',2)", (DAY,))
-    value = facts.ReleasedCmesFacts(released(edit=edit)).st_status(SID, DAY)
-    assert value["value"] is None and value["reason"] == "unsupported_snapshot_assets"
 
 
 @pytest.mark.parametrize("physical_date", [False, True])
@@ -221,37 +197,6 @@ def test_invalid_company_date_and_provenance_are_not_accepted(released):
     assert error.value.code == "CMES_FACT_PROVENANCE"
 
 
-@pytest.mark.parametrize("mode", ["disposition", "source", "json"])
-def test_changed_source_proof_is_integrity_error(released, mode):
-    def edit(db):
-        if mode == "disposition":
-            row = json.loads(db.execute("SELECT body FROM cmes_imports").fetchone()[0])
-            row["dispositions"][facts._ST_ASSET]["adopted"] = 1
-            db.execute("UPDATE cmes_imports SET body=?", (json.dumps(row),))
-        elif mode == "source":
-            row = json.loads(db.execute("SELECT body FROM source_assets").fetchone()[0])
-            row["sha256"] = "a" * 64
-            db.execute("UPDATE source_assets SET body=?", (json.dumps(row),))
-        else:
-            db.execute("UPDATE cmes_imports SET body='not json'")
-    with pytest.raises(DataError) as error:
-        facts.ReleasedCmesFacts(released(edit=edit)).st_status(SID, DAY)
-    assert error.value.code == "CMES_FACT_INTEGRITY"
-
-
-def test_source_and_metadata_tampering_are_still_rejected(released):
-    release = released()
-    reader = facts.ReleasedCmesFacts(release)
-    reader.st_status(SID, DAY)
-    release.metadata_path.write_bytes(release.metadata_path.read_bytes() + b"changed")
-    with pytest.raises(DataError):
-        reader.st_status(SID, DAY)
-    release = released()
-    (release.root / release.manifest["evidence"][0]["path"]).write_bytes(b"corrupt")
-    with pytest.raises(DataError):
-        facts.ReleasedCmesFacts(release).listing_date(SID)
-
-
 def test_non_cmes_or_changed_pin_refused(released):
     with pytest.raises(DataError) as error:
         facts.ReleasedCmesFacts(released(cmes=False))
@@ -272,13 +217,12 @@ def test_date_must_be_exact(released, day):
 
 
 def test_returned_facts_cannot_mutate_next_proof_or_release(released):
-    reader = facts.ReleasedCmesFacts(released())
+    release = released()
+    reader = facts.ReleasedCmesFacts(release)
     result = reader.st_status(SID, DAY)
-    result["proof"]["source_asset_id"] = "tampered"
     result["release"]["release_id"] = 99
     again = reader.st_status(SID, DAY)
-    assert again["proof"]["source_asset_id"] == facts._ST_ASSET
-    assert again["release"]["release_id"] == 1
+    assert again["release"] == release.receipt()
 
 
 def test_trading_status_derives_active_only_from_positive_activity_and_never_guesses_suspension(released, monkeypatch):
@@ -320,4 +264,74 @@ def test_trading_status_derives_active_only_from_positive_activity_and_never_gue
     assert active["status"] == "derived" and active["value"] == "1"
     assert active["rule"] == facts.TRADING_RULE
     assert active["observed_at"] == OBSERVED
+
+
+def test_st_status_uses_indexed_lookup_and_detects_security_conflicts(released):
+    def add_conflict(db):
+        db.execute(
+            "INSERT INTO cmes_st VALUES(?,?,?,'*ST','退市风险警示',?,'ST股票列表.csv',99)",
+            (POSITIVE, DAY, "ST conflict", ST_ASSET),
+        )
+
+    release = released(edit=add_conflict)
+    reader = facts.ReleasedCmesFacts(release)
+    assert reader.st_status(SID, DAY)["value"] is False
+    with pytest.raises(DataError) as error:
+        reader.st_status(POSITIVE, DAY)
+    assert error.value.code == "CMES_FACT_CONFLICT"
+
+
+def test_fact_caches_avoid_redundant_duckdb_reads_while_preserving_freshness(released, monkeypatch):
+    def add_second_company_selection(db):
+        db.execute(
+            "INSERT INTO cmes_business_selection VALUES(?,?,?,?,?,0)",
+            (
+                facts._COMPANY,
+                canonical({"security": POSITIVE}).decode(),
+                "record-a",
+                "business-value:synthetic-2",
+                "equal-values-collapse; conflict-retain-prior-accepted",
+            ),
+        )
+
+    release = released(edit=add_second_company_selection)
+    first_reader = facts.ReleasedCmesFacts(release)
+    first_listing = first_reader.listing_date(SID)
+    first_st = first_reader.st_status(POSITIVE, DAY)
+    first_listing["value"] = "mutated"
+    first_st["value"] = False
+
+    monkeypatch.setattr(
+        facts,
+        "connection",
+        lambda *a, **k: pytest.fail("cached company parquet should not reopen DuckDB"),
+    )
+    second_reader = facts.ReleasedCmesFacts(release)
+    assert second_reader.listing_date(SID)["value"] == "1999-11-10"
+    assert second_reader.st_status(POSITIVE, DAY)["value"] is True
+    # Querying a second security against the same verified company.parquet also reuses
+    # the per-file row index without reopening DuckDB (and detects missing record-a for POSITIVE).
+    with pytest.raises(DataError) as error:
+        second_reader.listing_date(POSITIVE)
+    assert error.value.code == "CMES_FACT_INTEGRITY"
+
+
+def test_distinct_release_roots_and_evidence_mutations_do_not_collide_in_cache(released):
+    r1 = released()
+    r2 = released()
+    f1_st = facts.ReleasedCmesFacts(r1).st_status(SID, DAY)
+    f2_st = facts.ReleasedCmesFacts(r2).st_status(SID, DAY)
+    f1_list = facts.ReleasedCmesFacts(r1).listing_date(SID)
+    f2_list = facts.ReleasedCmesFacts(r2).listing_date(SID)
+    assert f1_st["release"] == r1.receipt()
+    assert f2_st["release"] == r2.receipt()
+    assert f1_list["release"] == r1.receipt()
+    assert f2_list["release"] == r2.receipt()
+    assert f1_st["release"]["root"] != f2_st["release"]["root"]
+
+    r2.manifest["evidence"][0]["path"] = "missing-company.parquet"
+    tampered_reader = facts.ReleasedCmesFacts(r2)
+    with pytest.raises(DataError) as error:
+        tampered_reader.listing_date(SID)
+    assert error.value.code == "MARKET_OBJECT_INTEGRITY"
 

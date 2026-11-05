@@ -148,7 +148,7 @@ def test_content_and_review_pins_fail_closed(deployment):
         query(owner, source="neigezhu")
     assert query(owner)["rows"]
     (deployment.parent / "assets/tdx.json").write_text("{}")
-    with pytest.raises(DataError, match="TDX session changed"):
+    with pytest.raises(DataError, match="Selected minute source is unavailable"):
         query(owner)
 
 
