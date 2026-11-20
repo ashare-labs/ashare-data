@@ -22,8 +22,8 @@ from uuid import uuid4
 import duckdb
 
 from ashare_data.core.model import require
-from ashare_data.storage.read_replicas import consumer_metadata_replica, read_replica
-from ashare_data.storage.verified_objects import fingerprint, verify_cached
+from ashare_data.storage.read_replicas import read_replica
+from ashare_data.storage.verified_objects import fingerprint
 
 SCHEMA = "ad-market-release.v1"
 ENGINE = "1.4.3"

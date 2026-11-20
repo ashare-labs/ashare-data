@@ -5,13 +5,7 @@ not an authentication boundary against a user able to replace both data and cach
 A changed filesystem identity always requires a new full-content check.
 """
 
-import fcntl
-import hashlib
-import json
-import os
 from pathlib import Path
-import stat
-import tempfile
 
 from ashare_data.core.model import require
 

@@ -5,18 +5,9 @@ still pass the ordinary content check against its published SHA and size. Its
 filesystem identity belongs to the replica, never to the original source path.
 """
 
-from contextlib import closing
 from dataclasses import dataclass
-import fcntl
-import json
-import os
 from pathlib import Path
-import re
-import sqlite3
-import stat
-import tempfile
 
-from ashare_data.core.model import DataError, require
 from ashare_data.storage.verified_objects import fingerprint as file_fingerprint
 
 PROJECTION_SCHEMA = "ad-consumer-metadata-projection.v1"

@@ -1,10 +1,6 @@
 """Explicit deployment consumer policy; legacy implementations remain archival tools."""
 
-import json
-import os
-from pathlib import Path
 
-from ashare_data.core.model import DataError, require
 
 
 POLICY = "committed_market_only"

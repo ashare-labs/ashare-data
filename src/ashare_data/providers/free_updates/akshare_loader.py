@@ -5,7 +5,6 @@ unchanged. Missing dependencies fail the affected module, never produce data.
 """
 from __future__ import annotations
 
-import hashlib
 import importlib
 import importlib.metadata
 import json
@@ -13,7 +12,6 @@ from pathlib import Path
 import sys
 import types
 
-from ashare_data.providers.free_updates import catalog
 
 
 class ReviewedAKShare:

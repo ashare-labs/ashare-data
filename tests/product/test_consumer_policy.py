@@ -3,9 +3,6 @@ import json
 
 import pytest
 
-from ashare_data import Client, get_price, get_trade_days
-from ashare_data.cli import main
-from ashare_data.core.model import DataError
 from ashare_data.product.configuration import resolve
 from ashare_data.product.daily import LocalDailyProduct
 from ashare_data.storage.market_release import ReleaseWriter

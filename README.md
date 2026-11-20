@@ -23,9 +23,9 @@ uv sync --locked --extra free-updates --extra local-data --extra factor-evaluati
 ```sh
 uv build
 # 核心依赖隔离验证
-uv run python scripts/verify_wheel.py dist/ashare_data-0.10.0.dev99-py3-none-any.whl --full
+uv run python scripts/verify_wheel.py dist/ashare_data-0.10.0.dev100-py3-none-any.whl --full
 # 含全部可选依赖的完整隔离验证
-uv run python scripts/verify_wheel.py dist/ashare_data-0.10.0.dev99-py3-none-any.whl --full --extra free-updates --extra local-data --extra factor-evaluation
+uv run python scripts/verify_wheel.py dist/ashare_data-0.10.0.dev100-py3-none-any.whl --full --extra free-updates --extra local-data --extra factor-evaluation
 ```
 
 ## 快速开始

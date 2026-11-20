@@ -12,7 +12,6 @@ import sys
 import time
 
 from ashare_data.providers.baostock_receipt.capture import (
-    bh,
     capture_query,
     save_capture,
     sh,

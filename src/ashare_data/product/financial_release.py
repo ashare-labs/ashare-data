@@ -14,9 +14,9 @@ import sqlite3
 from ashare_data.core.model import require
 from ashare_data.financials import tables as t
 from ashare_data.storage.financial_release import (
-    CONTRACT_NAME, table_views, metadata_views, verify_object, checked_path,
+    CONTRACT_NAME, table_views, metadata_views, checked_path,
 )
-from ashare_data.storage.market_release import MarketRelease, fingerprint
+from ashare_data.storage.market_release import MarketRelease
 
 SHANGHAI = timezone(timedelta(hours=8))
 

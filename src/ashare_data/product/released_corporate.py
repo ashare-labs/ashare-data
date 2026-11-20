@@ -5,7 +5,7 @@ proof of all action types or historical announcement visibility. Its imported
 query range, capture, parse counts and quarantine counts must support the window.
 """
 
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 import json
 
 from ashare_data.corporate_actions.history import CorporateHistoryView, DATE_FIELDS, VALUE_FIELDS

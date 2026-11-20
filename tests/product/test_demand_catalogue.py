@@ -2,9 +2,7 @@
 
 import json
 
-import pytest
 
-from ashare_data.core.model import DataError
 from ashare_data.product.market_release import ReleasedDailyProduct
 from ashare_data.storage.local_daily import LocalDailyStore
 from ashare_data.storage.market_release import ReleaseWriter

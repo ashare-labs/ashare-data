@@ -1,6 +1,5 @@
 """Explicit registered minute sources. Reads never collect, repair, or fall back."""
 
-import hashlib
 import json
 import re
 from pathlib import Path

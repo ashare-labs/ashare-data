@@ -5,13 +5,11 @@ and restrictions remain queryable without another whole-source copy.
 """
 
 from contextlib import contextmanager
-import fcntl
 from pathlib import Path
 import threading
 
 from ashare_data.core.model import require
 from ashare_data.storage.local_daily import LocalDailyStore
-from ashare_data.storage.market_release import fingerprint, sha_file
 
 _verified = {}
 _guard = threading.Lock()
